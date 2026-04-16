@@ -8,7 +8,10 @@ const INITIAL_FORM_STATE = {
   location: "",
 };
 
-export default function IncidentForm({ onSubmit }) {
+export default function IncidentForm({
+  onSubmit,
+  submitLabel = "Enviar solicitud",
+}) {
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -85,7 +88,7 @@ export default function IncidentForm({ onSubmit }) {
       </label>
 
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Enviando..." : "Enviar solicitud"}
+        {isSubmitting ? "Enviando..." : submitLabel}
       </button>
       {submitError ? <p className="error-message">{submitError}</p> : null}
     </form>

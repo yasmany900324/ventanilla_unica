@@ -1,6 +1,13 @@
 "use client";
 
-const STATUS_FLOW = ["recibido", "en proceso", "resuelto"];
+const STATUS_FLOW = ["recibido", "en revision", "en proceso", "resuelto"];
+
+const STATUS_LABELS = {
+  recibido: "Recibido",
+  "en revision": "En revision",
+  "en proceso": "En proceso",
+  resuelto: "Resuelto",
+};
 
 export default function IncidentPanel({ incidents, onAdvanceStatus }) {
   if (!incidents.length) {
@@ -19,13 +26,15 @@ export default function IncidentPanel({ incidents, onAdvanceStatus }) {
         {incidents.map((incident) => {
           const currentStatusIndex = STATUS_FLOW.indexOf(incident.status);
           const isResolved = incident.status === "resuelto";
+          const currentProgress =
+            currentStatusIndex >= 0 ? currentStatusIndex + 1 : 1;
 
           return (
             <li key={incident.id} className="incident-card">
               <div className="incident-card__header">
                 <h3>{incident.category}</h3>
                 <span className={`badge badge--${incident.status.replace(" ", "-")}`}>
-                  {incident.status}
+                  {STATUS_LABELS[incident.status] || incident.status}
                 </span>
               </div>
               <p>{incident.description}</p>
@@ -33,7 +42,7 @@ export default function IncidentPanel({ incidents, onAdvanceStatus }) {
                 <strong>Ubicación:</strong> {incident.location}
               </p>
               <p className="progress">
-                Estado {currentStatusIndex + 1} de {STATUS_FLOW.length}
+                Estado {currentProgress} de {STATUS_FLOW.length}
               </p>
               <button
                 type="button"
