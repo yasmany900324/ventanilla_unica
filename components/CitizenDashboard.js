@@ -47,6 +47,28 @@ function shortenText(value, limit = 120) {
   return `${value.slice(0, limit)}...`;
 }
 
+function getDateValue(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const date = new Date(value);
+  const timeValue = date.getTime();
+  return Number.isNaN(timeValue) ? 0 : timeValue;
+}
+
+function getIncidentRecencyValue(incident) {
+  if (!incident) {
+    return 0;
+  }
+
+  return (
+    getDateValue(incident.updatedAt) ||
+    getDateValue(incident.createdAt) ||
+    getDateValue(incident.date)
+  );
+}
+
 function buildHistoryEntries(incident) {
   if (!incident) {
     return [];
@@ -93,7 +115,12 @@ export default function CitizenDashboard() {
         const loadedIncidents = data.incidents ?? [];
         setIncidents(loadedIncidents);
         if (loadedIncidents.length > 0) {
-          setSelectedIncidentId(loadedIncidents[0].id);
+          const mostRecentIncident = [...loadedIncidents].sort(
+            (firstIncident, secondIncident) =>
+              getIncidentRecencyValue(secondIncident) -
+              getIncidentRecencyValue(firstIncident)
+          )[0];
+          setSelectedIncidentId(mostRecentIncident?.id || loadedIncidents[0].id);
         }
       } catch (error) {
         setErrorMessage(error.message);
@@ -105,6 +132,16 @@ export default function CitizenDashboard() {
     loadIncidents();
   }, []);
 
+  const recentIncidents = useMemo(() => {
+    return [...incidents]
+      .sort(
+        (firstIncident, secondIncident) =>
+          getIncidentRecencyValue(secondIncident) -
+          getIncidentRecencyValue(firstIncident)
+      )
+      .slice(0, 8);
+  }, [incidents]);
+
   const selectedIncident = useMemo(() => {
     if (!incidents.length) {
       return null;
@@ -112,9 +149,10 @@ export default function CitizenDashboard() {
 
     return (
       incidents.find((incident) => incident.id === selectedIncidentId) ??
+      recentIncidents[0] ??
       incidents[0]
     );
-  }, [incidents, selectedIncidentId]);
+  }, [incidents, recentIncidents, selectedIncidentId]);
 
   const summary = useMemo(() => {
     const initialSummary = {
@@ -211,45 +249,55 @@ export default function CitizenDashboard() {
         </article>
       </section>
 
-      <div className="layout layout--dashboard">
-        <section id="nueva-incidencia" className="card">
-          <h2>Registrar nueva incidencia</h2>
-          <p className="small">
-            Completa los datos del caso para iniciar su atencion institucional.
-          </p>
-          <IncidentForm
-            onSubmit={handleCreateIncident}
-            submitLabel="Registrar incidencia"
-          />
-        </section>
+      <section id="nueva-incidencia" className="card dashboard-section">
+        <h2>Registrar nueva incidencia</h2>
+        <p className="small">
+          Completa los datos del caso para iniciar su atencion institucional.
+        </p>
+        <IncidentForm
+          onSubmit={handleCreateIncident}
+          submitLabel="Registrar incidencia"
+        />
+      </section>
 
-        <section id="mis-incidencias" className="card">
-          <h2>Mis incidencias</h2>
-          <p className="small">
-            Selecciona un caso para revisar su estado y su seguimiento.
+      <section id="mis-incidencias-recientes" className="card recent-incidents-card">
+        <h2>Mis incidencias recientes</h2>
+        <p className="small">
+          Consulta tus casos mas recientes y selecciona uno para ver su detalle.
+        </p>
+        {isLoading ? <p className="info-message">Cargando incidencias...</p> : null}
+        {!isLoading && incidents.length === 0 ? (
+          <p className="empty-message">
+            Aun no tienes incidencias registradas en tu espacio ciudadano.
           </p>
-          {isLoading ? (
-            <p className="info-message">Cargando incidencias...</p>
-          ) : null}
-          {!isLoading && incidents.length === 0 ? (
-            <p className="empty-message">
-              Aun no tienes incidencias registradas en tu espacio ciudadano.
-            </p>
-          ) : null}
-          {incidents.length > 0 ? (
-            <ul className="incident-list citizen-incident-list">
-              {incidents.map((incident) => (
-                <li key={incident.id} className="incident-card">
+        ) : null}
+        {recentIncidents.length > 0 ? (
+          <ul
+            className="incident-carousel"
+            aria-label="Carrusel de incidencias recientes"
+          >
+            {recentIncidents.map((incident) => {
+              const isSelected = selectedIncident?.id === incident.id;
+
+              return (
+                <li
+                  key={incident.id}
+                  className={`incident-card incident-card--carousel${
+                    isSelected ? " incident-card--selected" : ""
+                  }`}
+                >
                   <div className="incident-card__header">
                     <h3>{incident.category}</h3>
-                    <span
-                      className={`badge badge--${incident.status.replace(
-                        " ",
-                        "-"
-                      )}`}
-                    >
-                      {STATUS_LABELS[incident.status] || incident.status}
-                    </span>
+                    <div className="incident-card__badges">
+                      <span
+                        className={`badge badge--${incident.status.replace(" ", "-")}`}
+                      >
+                        {STATUS_LABELS[incident.status] || incident.status}
+                      </span>
+                      {isSelected ? (
+                        <span className="selected-indicator">Seleccionada</span>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="small">
                     <strong>Codigo:</strong> {formatIncidentCode(incident.id)}
@@ -268,32 +316,38 @@ export default function CitizenDashboard() {
                     <strong>Estado actual:</strong>{" "}
                     {STATUS_LABELS[incident.status] || incident.status}
                   </p>
-                  <p className="small">
-                    <strong>Ultima actualizacion:</strong>{" "}
-                    {formatDate(incident.updatedAt || incident.createdAt)}
-                  </p>
                   <button
                     type="button"
-                    className="button-inline"
+                    className={`button-inline${
+                      isSelected ? " button-inline--selected" : ""
+                    }`}
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedIncidentId(incident.id)}
                   >
                     Ver detalle
                   </button>
                 </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      </div>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
 
       <section id="detalle-caso" className="card case-detail-card">
         <h2>Detalle y seguimiento del caso</h2>
+        <p className="small">
+          Aqui se muestra la informacion del caso seleccionado.
+        </p>
         {!selectedIncident ? (
           <p className="empty-message">
-            Selecciona una incidencia para ver su informacion detallada.
+            Selecciona una incidencia reciente para ver su informacion detallada.
           </p>
         ) : (
           <>
+            <p className="small detail-selected-hint">
+              Caso seleccionado:{" "}
+              <strong>{formatIncidentCode(selectedIncident.id)}</strong>
+            </p>
             <div className="case-detail-grid">
               <p className="small">
                 <strong>Codigo:</strong> {formatIncidentCode(selectedIncident.id)}
