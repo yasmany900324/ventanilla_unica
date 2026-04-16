@@ -39,6 +39,7 @@ export default function IncidentPanel({ incidents, onAdvanceStatus }) {
                 type="button"
                 onClick={() => onAdvanceStatus(incident.id)}
                 disabled={isResolved}
+                aria-label={`Avanzar estado de incidencia ${incident.category}`}
               >
                 {isResolved ? "Incidencia resuelta" : "Avanzar estado"}
               </button>
