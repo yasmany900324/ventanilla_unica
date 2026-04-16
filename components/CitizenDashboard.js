@@ -239,9 +239,6 @@ export default function CitizenDashboard({ initialUser = null }) {
           </p>
         </div>
         <div className="hero-actions">
-          <Link href="/" className="button-link button-link--secondary">
-            Inicio del portal
-          </Link>
           <Link href="#nueva-incidencia" className="button-link">
             Nueva incidencia
           </Link>
