@@ -238,6 +238,10 @@ h3 {
   padding: clamp(1.2rem, 2vw, 2.1rem);
 }
 
+.card--hero h1 {
+  color: #ffffff;
+}
+
 .home-hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
@@ -260,18 +264,19 @@ h3 {
   font-size: clamp(2rem, 3.8vw, 3rem);
   line-height: 1.1;
   letter-spacing: -0.01em;
+  color: #ffffff;
 }
 
 .home-hero-panel__description {
   margin: 0;
   max-width: 62ch;
-  color: #dbeafe;
+  color: #eef5ff;
 }
 
 .home-hero-greeting {
   margin-top: -0.1rem;
   margin-bottom: 0.2rem;
-  color: #bfdbfe;
+  color: #dbeafe;
   font-weight: 600;
 }
 
@@ -340,7 +345,7 @@ h3 {
 .hero-side-card__ticket {
   border: 1px solid #c8d8f4;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: #f8fbff;
   padding: 0.75rem;
   display: grid;
   gap: 0.3rem;
@@ -399,9 +404,9 @@ h3 {
 
 .hero-benefits li {
   border-radius: 999px;
-  border: 1px solid rgba(191, 219, 254, 0.5);
-  background: rgba(15, 23, 42, 0.2);
-  color: #dbeafe;
+  border: 1px solid #93c5fd;
+  background: #1e3a8a;
+  color: #f8fbff;
   font-size: 0.82rem;
   font-weight: 700;
   padding: 0.38rem 0.72rem;
@@ -413,12 +418,12 @@ h3 {
 }
 
 .hero-actions--hero .button-link--secondary {
-  border-color: rgba(191, 219, 254, 0.85);
-  background: rgba(255, 255, 255, 0.96);
+  border-color: #bfdbfe;
+  background: #ffffff;
 }
 
 .eyebrow--hero {
-  color: #bfdbfe;
+  color: #e2ecff;
 }
 
 .home-value-section {
@@ -500,7 +505,7 @@ h3 {
 .citizen-access-section__actions-panel {
   border: 1px solid #c8d8f4;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: #ffffff;
   padding: 0.9rem;
   display: grid;
   gap: 0.6rem;
@@ -530,7 +535,7 @@ h3 {
   border-radius: 12px;
   padding: 0.85rem;
   text-align: left;
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
   display: grid;
   gap: 0.35rem;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
@@ -568,12 +573,12 @@ h3 {
   color: #ffffff;
 }
 
-.support-section .small {
-  color: #dbeafe;
+.support-section > .small {
+  color: #e2edff;
 }
 
 .support-section .eyebrow {
-  color: #bfdbfe;
+  color: #dbeafe;
 }
 
 .support-grid {
@@ -585,11 +590,15 @@ h3 {
 .support-card {
   border: 1px solid #c9d8ef;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.97);
+  background: #ffffff;
   padding: 0.9rem;
   display: grid;
   align-content: flex-start;
   gap: 0.45rem;
+}
+
+.support-card .small {
+  color: #334155;
 }
 
 .support-card h3 {
