@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import IncidentForm from "./IncidentForm";
 
 const STATUS_STEPS = [
@@ -96,19 +97,34 @@ function buildHistoryEntries(incident) {
   }));
 }
 
-export default function CitizenDashboard() {
+export default function CitizenDashboard({ initialUser = null }) {
+  const router = useRouter();
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [authenticatedUser, setAuthenticatedUser] = useState(initialUser);
 
   useEffect(() => {
     const loadIncidents = async () => {
       try {
+        const sessionResponse = await fetch("/api/auth/session");
+        const sessionData = await sessionResponse.json();
+        if (!sessionResponse.ok || !sessionData.user) {
+          router.replace("/login");
+          return;
+        }
+
+        setAuthenticatedUser(sessionData.user);
+
         const response = await fetch("/api/incidents");
         const data = await response.json();
 
         if (!response.ok) {
+          if (response.status === 401) {
+            router.replace("/login");
+            return;
+          }
           throw new Error(data.error || "No se pudieron cargar las incidencias.");
         }
 
@@ -130,7 +146,7 @@ export default function CitizenDashboard() {
     };
 
     loadIncidents();
-  }, []);
+  }, [router]);
 
   const recentIncidents = useMemo(() => {
     return [...incidents]
@@ -191,6 +207,10 @@ export default function CitizenDashboard() {
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        router.replace("/login");
+        return;
+      }
       const message = data.error || "No se pudo registrar la incidencia.";
       setErrorMessage(message);
       throw new Error(message);
@@ -198,6 +218,14 @@ export default function CitizenDashboard() {
 
     setIncidents((previousIncidents) => [data.incident, ...previousIncidents]);
     setSelectedIncidentId(data.incident.id);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.replace("/login");
+    }
   };
 
   const selectedStatusIndex = STATUS_STEPS.findIndex(
@@ -210,7 +238,9 @@ export default function CitizenDashboard() {
       <section className="card dashboard-header">
         <div>
           <p className="eyebrow">Espacio privado ciudadano</p>
-          <h1>Hola, ciudadano</h1>
+          <h1>
+            Hola, {authenticatedUser?.fullName || "ciudadano"}
+          </h1>
           <p className="description">
             Gestiona tus incidencias, revisa sus estados y consulta el detalle
             de seguimiento en un mismo panel.
@@ -220,9 +250,9 @@ export default function CitizenDashboard() {
           <Link href="/" className="button-link button-link--secondary">
             Ver landing publica
           </Link>
-          <Link href="/login" className="button-link">
-            Cambiar cuenta
-          </Link>
+          <button type="button" className="button-link" onClick={handleLogout}>
+            Cerrar sesion
+          </button>
         </div>
       </section>
 

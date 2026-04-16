@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAuthenticatedUser } from "../../../../../lib/auth";
 import { advanceIncidentStatus } from "../../../../../lib/incidents";
 
 function isUuid(value) {
@@ -7,7 +8,7 @@ function isUuid(value) {
   );
 }
 
-export async function PATCH(_request, { params }) {
+export async function PATCH(request, { params }) {
   const incidentId = params.id;
 
   if (!isUuid(incidentId)) {
@@ -18,7 +19,12 @@ export async function PATCH(_request, { params }) {
   }
 
   try {
-    const incident = await advanceIncidentStatus(incidentId);
+    const authenticatedUser = await requireAuthenticatedUser(request);
+    if (!authenticatedUser) {
+      return NextResponse.json({ error: "Sesion no valida." }, { status: 401 });
+    }
+
+    const incident = await advanceIncidentStatus(incidentId, authenticatedUser.id);
 
     if (!incident) {
       return NextResponse.json(
