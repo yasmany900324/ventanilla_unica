@@ -677,28 +677,29 @@ button:disabled {
 }
 
 .my-incidents-inline__viewport {
+  width: 100%;
   overflow: hidden;
 }
 
 .my-incidents-inline__track {
   display: flex;
-  width: 200%;
+  width: 100%;
   transform: translateX(0);
   transition: transform 260ms ease;
 }
 
 .my-incidents-inline__track--detail {
-  transform: translateX(-50%);
+  transform: translateX(-100%);
 }
 
 .my-incidents-inline__panel {
-  width: 50%;
-  padding-right: 0.1rem;
-  flex-shrink: 0;
+  flex: 0 0 100%;
+  min-width: 100%;
+  max-width: 100%;
 }
 
 .my-incidents-inline__panel--detail {
-  padding-left: 0.1rem;
+  overflow-x: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -897,11 +898,12 @@ a {
 
   .my-incidents-inline__panel {
     width: 100%;
+    min-width: 100%;
+    max-width: 100%;
     padding: 0;
   }
 
-  .my-incidents-inline__panel--list[aria-hidden="true"],
-  .my-incidents-inline__panel--detail[aria-hidden="true"] {
+  .my-incidents-inline__panel[aria-hidden="true"] {
     display: none;
   }
 

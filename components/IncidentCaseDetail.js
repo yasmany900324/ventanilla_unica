@@ -18,6 +18,7 @@ export default function IncidentCaseDetail({
   backButtonLabel = "",
   onBackButtonClick = null,
   isBackButtonDisabled = false,
+  emptyStateMessage = "Selecciona una incidencia reciente para ver su informacion detallada.",
 }) {
   const shouldRenderLevelThreeHeading = headingLevel === 3;
   const selectedStatusIndex = STATUS_STEPS.findIndex(
@@ -51,7 +52,7 @@ export default function IncidentCaseDetail({
 
       {!incident ? (
         <p className="empty-message">
-          Selecciona una incidencia reciente para ver su informacion detallada.
+          {emptyStateMessage}
         </p>
       ) : (
         <>
