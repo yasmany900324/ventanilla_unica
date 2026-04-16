@@ -107,9 +107,7 @@ export default async function HomePage() {
     : "/#ayuda-soporte";
   const reportHref = hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro";
   const trackingHref = hasActiveSession ? "/mis-incidencias" : "/login";
-  const accessTitle = hasActiveSession
-    ? "Gestiona tus tramites en un entorno privado"
-    : "Gestiona tus tramites en un entorno privado";
+  const accessTitle = "Gestiona tus tramites en un entorno privado";
   const accessDescription = hasActiveSession
     ? "Tu sesion esta activa y ya puedes operar de forma segura y personalizada:"
     : "Una vez autenticado podras operar de forma segura y personalizada:";
@@ -184,18 +182,20 @@ export default async function HomePage() {
         <div className="home-frequent__grid">
           {FREQUENT_SERVICES.map((item) => (
             <article key={item.title} className="frequent-card">
-              <div className="frequent-card__icon" aria-hidden="true">
-                {item.icon}
-              </div>
-              <div className="frequent-card__content">
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <span className={`frequent-card__badge frequent-card__badge--${item.badgeType}`}>
-                  {item.badge}
+              <Link href={item.href} className="frequent-card__link" aria-label={`Abrir ${item.title}`}>
+                <div className="frequent-card__icon" aria-hidden="true">
+                  {item.icon}
+                </div>
+                <div className="frequent-card__content">
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <span className={`frequent-card__badge frequent-card__badge--${item.badgeType}`}>
+                    {item.badge}
+                  </span>
+                </div>
+                <span className="frequent-card__arrow" aria-hidden="true">
+                  &gt;
                 </span>
-              </div>
-              <Link href={item.href} className="frequent-card__arrow" aria-label={`Abrir ${item.title}`}>
-                &gt;
               </Link>
             </article>
           ))}
