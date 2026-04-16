@@ -242,6 +242,10 @@ h3 {
   color: #ffffff;
 }
 
+.card--hero h1 {
+  color: #ffffff;
+}
+
 .home-hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
