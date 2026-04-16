@@ -88,7 +88,7 @@ const CITIZEN_ACTIONS = [
 ];
 
 const HELP_ITEMS = [
-  { label: "Hablar con el asistente", href: "/#ayuda-soporte", icon: "AS" },
+  { label: "Hablar con el asistente", href: "/asistente", icon: "AS" },
   { label: "Preguntas frecuentes", href: "/#ayuda-soporte", icon: "FAQ" },
   { label: "Canales de contacto", href: "/#ayuda-soporte", icon: "CC" },
 ];
@@ -96,9 +96,7 @@ const HELP_ITEMS = [
 export default function HomePageClient() {
   const { isAuthenticated } = useAuth();
   const hasActiveSession = isAuthenticated;
-  const assistantHref = hasActiveSession
-    ? "/ciudadano/dashboard#detalle-caso"
-    : "/#ayuda-soporte";
+  const assistantHref = "/asistente";
   const reportHref = hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro";
   const trackingHref = hasActiveSession ? "/mis-incidencias" : "/login";
   const accessTitle = "Gestiona tus tramites en un entorno privado";
