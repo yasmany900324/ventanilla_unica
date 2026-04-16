@@ -59,6 +59,10 @@ h3 {
   gap: 0.7rem;
 }
 
+.hero-actions form {
+  margin: 0;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
@@ -84,6 +88,10 @@ h3 {
 
 .button-link--secondary:hover {
   background: #eff6ff;
+}
+
+.button-link--button {
+  width: auto;
 }
 
 .feature-grid {
