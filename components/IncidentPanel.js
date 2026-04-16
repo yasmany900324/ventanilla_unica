@@ -7,7 +7,7 @@ export default function IncidentPanel({ incidents, onAdvanceStatus }) {
     return (
       <section className="panel">
         <p className="empty-message">
-          No hay incidencias todavía. Envía una para verla aquí.
+          No hay casos todavía. Envía una solicitud para verla aquí.
         </p>
       </section>
     );
@@ -39,9 +39,9 @@ export default function IncidentPanel({ incidents, onAdvanceStatus }) {
                 type="button"
                 onClick={() => onAdvanceStatus(incident.id)}
                 disabled={isResolved}
-                aria-label={`Avanzar estado de incidencia ${incident.category}`}
+                aria-label={`Avanzar estado del caso ${incident.category}`}
               >
-                {isResolved ? "Incidencia resuelta" : "Avanzar estado"}
+                {isResolved ? "Caso resuelto" : "Avanzar estado"}
               </button>
             </li>
           );

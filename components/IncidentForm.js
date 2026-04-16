@@ -29,12 +29,12 @@ export default function IncidentForm({ onSubmit }) {
     Promise.resolve(onSubmit(formData))
       .then((result) => {
         if (result && result.ok === false) {
-          throw new Error(result.message || "No se pudo enviar la incidencia.");
+          throw new Error(result.message || "No se pudo enviar la solicitud.");
         }
         setFormData(INITIAL_FORM_STATE);
       })
       .catch((error) => {
-        setSubmitError(error.message || "No se pudo enviar la incidencia.");
+        setSubmitError(error.message || "No se pudo enviar la solicitud.");
       })
       .finally(() => {
         setIsSubmitting(false);
@@ -66,7 +66,7 @@ export default function IncidentForm({ onSubmit }) {
           name="description"
           value={formData.description}
           onChange={handleChange}
-          placeholder="Describe la incidencia"
+          placeholder="Describe la solicitud, reclamo o incidencia"
           required
           rows={4}
         />
@@ -85,7 +85,7 @@ export default function IncidentForm({ onSubmit }) {
       </label>
 
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Enviando..." : "Enviar incidencia"}
+        {isSubmitting ? "Enviando..." : "Enviar solicitud"}
       </button>
       {submitError ? <p className="error-message">{submitError}</p> : null}
     </form>
