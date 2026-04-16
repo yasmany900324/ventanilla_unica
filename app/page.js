@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import {
-  destroySessionByToken,
-  getAuthenticatedUserFromToken,
-  SESSION_COOKIE_NAME,
-} from "../lib/auth";
+import { getAuthenticatedUserFromToken, SESSION_COOKIE_NAME } from "../lib/auth";
 
 const FEATURE_SUMMARY = [
   {
@@ -32,24 +27,6 @@ const CITIZEN_ACTIONS = [
   "Consultar el estado actual de cada caso reportado.",
   "Revisar el historial y seguimiento detallado de sus incidencias.",
 ];
-
-async function logoutAction() {
-  "use server";
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  await destroySessionByToken(token);
-
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
-
-  redirect("/");
-}
 
 export default async function HomePage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
@@ -82,14 +59,9 @@ export default async function HomePage() {
               <Link href="/ciudadano/dashboard" className="button-link">
                 Ir a mi panel
               </Link>
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="button-link button-link--secondary button-link--button"
-                >
-                  Cerrar sesion
-                </button>
-              </form>
+              <Link href="/ciudadano/dashboard#nueva-incidencia" className="button-link button-link--secondary">
+                Nueva incidencia
+              </Link>
             </>
           ) : (
             <>
@@ -145,14 +117,9 @@ export default async function HomePage() {
               <Link href="/ciudadano/dashboard" className="button-link">
                 Ir a mi panel ciudadano
               </Link>
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="button-link button-link--secondary button-link--button"
-                >
-                  Cerrar sesion
-                </button>
-              </form>
+              <Link href="/ciudadano/dashboard#mis-incidencias-recientes" className="button-link button-link--secondary">
+                Ver mis incidencias
+              </Link>
             </>
           ) : (
             <>
@@ -165,6 +132,19 @@ export default async function HomePage() {
             </>
           )}
         </div>
+      </section>
+
+      <section id="ayuda-soporte" className="card flow-section">
+        <h2>Ayuda y soporte</h2>
+        <p className="small">
+          Si necesitas asistencia, consulta las preguntas frecuentes o utiliza los
+          canales institucionales de soporte para seguimiento de tu solicitud.
+        </p>
+        <ul className="citizen-actions-list">
+          <li>Centro de ayuda para uso de la plataforma.</li>
+          <li>Preguntas frecuentes sobre registro, acceso y estados del caso.</li>
+          <li>Contacto institucional para soporte de incidencias digitales.</li>
+        </ul>
       </section>
     </main>
   );
