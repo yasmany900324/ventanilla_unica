@@ -9,7 +9,7 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #eef3fa;
+  background: linear-gradient(180deg, #e8eff9 0%, #f2f6fc 35%, #f6f8fc 100%);
   color: #1f2937;
 }
 
@@ -201,7 +201,7 @@ body {
 .page--home {
   max-width: 1140px;
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .page [id] {
@@ -231,24 +231,47 @@ h3 {
 
 .card--hero {
   margin-bottom: 0;
-  background: linear-gradient(135deg, #ecf3ff, #ffffff);
+  border-color: #1f4aa4;
+  background: linear-gradient(132deg, #0f2f73 0%, #1d4ed8 52%, #2563eb 100%);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.24);
+  color: #eff6ff;
+  padding: clamp(1.2rem, 2vw, 2.1rem);
 }
 
 .home-hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
-  gap: 1rem;
+  gap: 1.15rem;
+  align-items: stretch;
 }
 
 .home-hero-panel {
   display: grid;
+  gap: 0.95rem;
+}
+
+.home-hero-panel__head {
+  display: grid;
   gap: 0.75rem;
 }
 
+.home-hero-panel h1 {
+  margin: 0;
+  font-size: clamp(2rem, 3.8vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.home-hero-panel__description {
+  margin: 0;
+  max-width: 62ch;
+  color: #dbeafe;
+}
+
 .home-hero-greeting {
-  margin-top: -0.25rem;
+  margin-top: -0.1rem;
   margin-bottom: 0.2rem;
-  color: #1e3a8a;
+  color: #bfdbfe;
   font-weight: 600;
 }
 
@@ -300,6 +323,71 @@ h3 {
   background: linear-gradient(180deg, #ffffff, #f4f8ff);
 }
 
+.hero-side-card--featured {
+  border-color: #9eb9e8;
+  background: linear-gradient(162deg, #ffffff 0%, #edf4ff 68%, #e4efff 100%);
+  box-shadow: 0 14px 30px rgba(30, 64, 175, 0.16);
+  padding: 1.2rem;
+}
+
+.hero-side-card--featured h2 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.hero-side-card__ticket {
+  border: 1px solid #c8d8f4;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.hero-side-card__ticket-label {
+  margin: 0;
+  color: #1e40af;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.hero-side-card__ticket-value {
+  margin: 0;
+  color: #172554;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.hero-side-highlights {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hero-side-highlights li {
+  position: relative;
+  padding-left: 1rem;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+}
+
+.hero-side-highlights li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.48rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
 .hero-benefits {
   list-style: none;
   margin: 0.2rem 0 0;
@@ -311,12 +399,46 @@ h3 {
 
 .hero-benefits li {
   border-radius: 999px;
-  border: 1px solid #c9dbfb;
-  background: #f3f7ff;
-  color: #1e3a8a;
+  border: 1px solid rgba(191, 219, 254, 0.5);
+  background: rgba(15, 23, 42, 0.2);
+  color: #dbeafe;
   font-size: 0.82rem;
   font-weight: 700;
-  padding: 0.35rem 0.65rem;
+  padding: 0.38rem 0.72rem;
+}
+
+.hero-actions--hero .button-link {
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+}
+
+.hero-actions--hero .button-link--secondary {
+  border-color: rgba(191, 219, 254, 0.85);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.eyebrow--hero {
+  color: #bfdbfe;
+}
+
+.home-value-section {
+  border: 1px solid #cfddf2;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f3f7ff);
+  padding: 1.2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.home-section-intro {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.home-section-intro h2 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 1.45rem;
 }
 
 .feature-grid {
@@ -327,14 +449,34 @@ h3 {
 }
 
 .feature-card {
-  min-height: 148px;
+  min-height: 190px;
   display: grid;
   align-content: flex-start;
-  gap: 0.45rem;
+  gap: 0.55rem;
+  border-color: #c9d8ef;
+  padding: 1.15rem;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.07);
+}
+
+.feature-card h3 {
+  margin: 0;
+  color: #1e3a8a;
+}
+
+.feature-card__kicker {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .flow-section {
   margin-bottom: 0;
+  border-color: #c5d6f0;
+  background: linear-gradient(180deg, #edf3ff, #f9fbff);
+  padding: 1.3rem;
 }
 
 .citizen-access-section {
@@ -342,6 +484,8 @@ h3 {
   grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr);
   align-items: start;
   gap: 1rem;
+  border-color: #c2d6f3;
+  background: linear-gradient(160deg, #eaf2ff, #f8fbff);
 }
 
 .citizen-access-section__content {
@@ -351,6 +495,15 @@ h3 {
 
 .citizen-access-section__actions {
   align-content: flex-start;
+}
+
+.citizen-access-section__actions-panel {
+  border: 1px solid #c8d8f4;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
 }
 
 .citizen-actions-list {
@@ -368,24 +521,29 @@ h3 {
   margin: 0.8rem 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
 .flow-step {
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 0.75rem;
+  border: 1px solid #c1d4f1;
+  border-radius: 12px;
+  padding: 0.85rem;
   text-align: left;
-  background: #f8fbff;
+  background: rgba(255, 255, 255, 0.94);
   display: grid;
   gap: 0.35rem;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
 }
 
 .flow-step__index {
   margin: 0;
-  color: #1d4ed8;
-  font-size: 0.76rem;
+  color: #1e3a8a;
+  background: #dbeafe;
+  border-radius: 999px;
+  width: fit-content;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
@@ -402,19 +560,33 @@ h3 {
 .support-section {
   display: grid;
   gap: 0.8rem;
+  border-color: #1e3a8a;
+  background: linear-gradient(148deg, #0f2f73 0%, #1e3a8a 78%, #1d4ed8 100%);
+}
+
+.support-section h2 {
+  color: #ffffff;
+}
+
+.support-section .small {
+  color: #dbeafe;
+}
+
+.support-section .eyebrow {
+  color: #bfdbfe;
 }
 
 .support-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .support-card {
-  border: 1px solid #d4deee;
-  border-radius: 10px;
-  background: #fbfdff;
-  padding: 0.8rem;
+  border: 1px solid #c9d8ef;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  padding: 0.9rem;
   display: grid;
   align-content: flex-start;
   gap: 0.45rem;
@@ -440,6 +612,21 @@ h3 {
 
 .support-card__link:hover {
   background: #e2eeff;
+}
+
+.support-card--assistant {
+  border-color: #93c5fd;
+  background: linear-gradient(180deg, #f1f7ff, #e8f1ff);
+}
+
+.support-card__link--assistant {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.support-card__link--assistant:hover {
+  background: #1e40af;
 }
 
 .layout {
@@ -983,6 +1170,10 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .flow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .citizen-access-section {
     grid-template-columns: 1fr;
   }
@@ -1024,6 +1215,14 @@ textarea:focus-visible {
 
   .home-hero-panel {
     gap: 0.65rem;
+  }
+
+  .home-hero-panel h1 {
+    font-size: clamp(1.65rem, 8vw, 2.15rem);
+  }
+
+  .hero-actions--hero .button-link {
+    flex: 1 1 100%;
   }
 
   .hero-benefits {
