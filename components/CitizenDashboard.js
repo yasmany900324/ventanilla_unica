@@ -5,12 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import IncidentForm from "./IncidentForm";
 import IncidentListItem from "./IncidentListItem";
+import IncidentCaseDetail from "./IncidentCaseDetail";
 import {
-  STATUS_LABELS,
-  STATUS_STEPS,
-  buildHistoryEntries,
-  formatDate,
-  formatIncidentCode,
   getIncidentCreationValue,
   getIncidentRecencyValue,
 } from "../lib/incidentDisplay";
@@ -145,11 +141,6 @@ export default function CitizenDashboard({ initialUser = null }) {
     setSelectedIncidentId(data.incident.id);
   };
 
-  const selectedStatusIndex = STATUS_STEPS.findIndex(
-    (status) => status.value === selectedIncident?.status
-  );
-  const historyEntries = buildHistoryEntries(selectedIncident);
-
   return (
     <main className="page page--dashboard">
       <section className="card dashboard-header">
@@ -246,86 +237,7 @@ export default function CitizenDashboard({ initialUser = null }) {
       </section>
 
       <section id="detalle-caso" className="card case-detail-card">
-        <h2>Detalle y seguimiento del caso</h2>
-        <p className="small">
-          Aqui se muestra la informacion del caso seleccionado.
-        </p>
-        {!selectedIncident ? (
-          <p className="empty-message">
-            Selecciona una incidencia reciente para ver su informacion detallada.
-          </p>
-        ) : (
-          <>
-            <p className="small detail-selected-hint">
-              Caso seleccionado:{" "}
-              <strong>{formatIncidentCode(selectedIncident.id)}</strong>
-            </p>
-            <div className="case-detail-grid">
-              <p className="small">
-                <strong>Codigo:</strong> {formatIncidentCode(selectedIncident.id)}
-              </p>
-              <p className="small">
-                <strong>Categoria:</strong> {selectedIncident.category}
-              </p>
-              <p className="small">
-                <strong>Ubicacion:</strong> {selectedIncident.location}
-              </p>
-              <p className="small">
-                <strong>Fecha de registro:</strong>{" "}
-                {formatDate(selectedIncident.createdAt)}
-              </p>
-              <p className="small">
-                <strong>Estado actual:</strong>{" "}
-                {STATUS_LABELS[selectedIncident.status] || selectedIncident.status}
-              </p>
-              <p className="small">
-                <strong>Ultima actualizacion:</strong>{" "}
-                {formatDate(selectedIncident.updatedAt || selectedIncident.createdAt)}
-              </p>
-            </div>
-            <p className="small">
-              <strong>Descripcion completa:</strong> {selectedIncident.description}
-            </p>
-
-            <div className="timeline-section">
-              <h3>Progreso del caso</h3>
-              <ol className="timeline-steps" aria-label="Timeline del caso">
-                {STATUS_STEPS.map((step, index) => {
-                  const stepState =
-                    index < selectedStatusIndex
-                      ? "done"
-                      : index === selectedStatusIndex
-                      ? "current"
-                      : "pending";
-
-                  return (
-                    <li
-                      key={step.value}
-                      className={`timeline-step timeline-step--${stepState}`}
-                    >
-                      {step.label}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
-
-            <div className="updates-section">
-              <h3>Historial de actualizaciones</h3>
-              <ul className="updates-list">
-                {historyEntries.map((entry) => (
-                  <li key={entry.id} className="updates-item">
-                    <p>
-                      <strong>{entry.title}</strong>
-                    </p>
-                    <p className="small">{entry.date}</p>
-                    <p className="small">{entry.description}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
+        <IncidentCaseDetail incident={selectedIncident} />
       </section>
 
       {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
