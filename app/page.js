@@ -4,6 +4,26 @@ import { useEffect, useState } from "react";
 import IncidentForm from "../components/IncidentForm";
 import IncidentPanel from "../components/IncidentPanel";
 
+const FEATURE_SUMMARY = [
+  {
+    title: "Registro simple",
+    description:
+      "Ingresa una solicitud con la información necesaria para iniciar su atención.",
+  },
+  {
+    title: "Seguimiento claro",
+    description:
+      "Visualiza el estado de cada caso y su avance dentro del proceso de atención.",
+  },
+  {
+    title: "Atención organizada",
+    description:
+      "Facilita la gestión y resolución de solicitudes ciudadanas en un solo flujo.",
+  },
+];
+
+const ATTENTION_FLOW = ["Recibido", "En revisión", "En proceso", "Resuelto"];
+
 export default function HomePage() {
   const [incidents, setIncidents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +35,7 @@ export default function HomePage() {
         const response = await fetch("/api/incidents");
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || "No se pudieron cargar las incidencias.");
+          throw new Error(data.error || "No se pudieron cargar los casos.");
         }
 
         setIncidents(data.incidents ?? []);
@@ -41,7 +61,7 @@ export default function HomePage() {
     const data = await response.json();
 
     if (!response.ok) {
-      const message = data.error || "No se pudo registrar la incidencia.";
+      const message = data.error || "No se pudo registrar la solicitud.";
       setErrorMessage(message);
       throw new Error(message);
     }
@@ -73,19 +93,52 @@ export default function HomePage() {
 
   return (
     <main className="page">
-      <h1>MVP de Reporte de Incidencias</h1>
-      <p className="description">
-        Registra incidencias y simula su avance de estado con un flujo simple.
-      </p>
+      <section className="card card--hero">
+        <p className="eyebrow">Atención ciudadana digital</p>
+        <h1>Sistema de Atención Ciudadana</h1>
+        <p className="description">
+          Registra solicitudes, reclamos o incidencias y consulta su estado
+          dentro de un flujo simple de atención.
+        </p>
+        <div className="hero-actions">
+          <a href="#registro" className="button-link">
+            Registrar solicitud
+          </a>
+          <a href="#seguimiento" className="button-link button-link--secondary">
+            Ver seguimiento
+          </a>
+        </div>
+      </section>
+
+      <section className="feature-grid" aria-label="Funcionalidades principales">
+        {FEATURE_SUMMARY.map((feature) => (
+          <article key={feature.title} className="card feature-card">
+            <h2>{feature.title}</h2>
+            <p className="small">{feature.description}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="card flow-section">
+        <h2>Flujo de atención</h2>
+        <p className="small">Cada caso avanza por etapas claras y visibles.</p>
+        <ul className="flow-steps" aria-label="Etapas del flujo de atención">
+          {ATTENTION_FLOW.map((step) => (
+            <li key={step} className="flow-step">
+              {step}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <div className="layout">
-        <section className="card">
-          <h2>Nueva incidencia</h2>
+        <section id="registro" className="card">
+          <h2>Registrar solicitud</h2>
           <IncidentForm onSubmit={handleCreateIncident} />
         </section>
 
-        <section className="card">
-          <h2>Panel de estado</h2>
+        <section id="seguimiento" className="card">
+          <h2>Seguimiento de casos</h2>
           <IncidentPanel
             incidents={incidents}
             onAdvanceStatus={handleAdvanceStatus}
@@ -93,10 +146,10 @@ export default function HomePage() {
         </section>
       </div>
 
-      {isLoading && <p className="info-message">Cargando incidencias...</p>}
+      {isLoading && <p className="info-message">Cargando casos...</p>}
       {!isLoading && incidents.length === 0 && (
         <p className="info-message">
-          Todavía no hay incidencias guardadas. Crea una para comenzar.
+          Aún no hay casos registrados. Crea una solicitud para comenzar.
         </p>
       )}
       {errorMessage && <p className="error-message">{errorMessage}</p>}

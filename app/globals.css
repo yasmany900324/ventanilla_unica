@@ -30,6 +30,87 @@ h3 {
   color: #4b5563;
 }
 
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: #1d4ed8;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.card--hero {
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  padding: 0.6rem 0.95rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.button-link:hover {
+  background: #1e40af;
+}
+
+.button-link--secondary {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.button-link--secondary:hover {
+  background: #eff6ff;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.feature-card {
+  min-height: 140px;
+}
+
+.flow-section {
+  margin-bottom: 1rem;
+}
+
+.flow-steps {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+}
+
+.flow-step {
+  border: 1px dashed #93c5fd;
+  border-radius: 8px;
+  padding: 0.65rem;
+  text-align: center;
+  font-weight: 600;
+  color: #1e3a8a;
+  background: #f8fbff;
+}
+
 .layout {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -165,4 +246,24 @@ button:disabled {
   margin: 0 0 1rem;
   color: #b91c1c;
   font-size: 0.9rem;
+}
+
+.info-message {
+  margin-top: 1rem;
+  color: #1d4ed8;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding-top: 1.25rem;
+  }
+
+  .card {
+    padding: 0.9rem;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
