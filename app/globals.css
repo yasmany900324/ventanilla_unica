@@ -198,6 +198,12 @@ body {
   max-width: 1140px;
 }
 
+.page--home {
+  max-width: 1140px;
+  display: grid;
+  gap: 1rem;
+}
+
 .page [id] {
   scroll-margin-top: 100px;
 }
@@ -224,8 +230,26 @@ h3 {
 }
 
 .card--hero {
-  margin-bottom: 1rem;
+  margin-bottom: 0;
   background: linear-gradient(135deg, #ecf3ff, #ffffff);
+}
+
+.home-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
+  gap: 1rem;
+}
+
+.home-hero-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-hero-greeting {
+  margin-top: -0.25rem;
+  margin-bottom: 0.2rem;
+  color: #1e3a8a;
+  font-weight: 600;
 }
 
 .hero-actions {
@@ -269,24 +293,64 @@ h3 {
   width: auto;
 }
 
+.hero-side-card {
+  display: grid;
+  align-content: flex-start;
+  gap: 0.75rem;
+  background: linear-gradient(180deg, #ffffff, #f4f8ff);
+}
+
+.hero-benefits {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hero-benefits li {
+  border-radius: 999px;
+  border: 1px solid #c9dbfb;
+  background: #f3f7ff;
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .feature-card {
-  min-height: 140px;
+  min-height: 148px;
+  display: grid;
+  align-content: flex-start;
+  gap: 0.45rem;
 }
 
 .flow-section {
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .citizen-access-section {
   display: grid;
-  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.citizen-access-section__content {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.citizen-access-section__actions {
+  align-content: flex-start;
 }
 
 .citizen-actions-list {
@@ -304,18 +368,78 @@ h3 {
   margin: 0.8rem 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
 }
 
 .flow-step {
-  border: 1px dashed #93c5fd;
-  border-radius: 8px;
-  padding: 0.65rem;
-  text-align: center;
-  font-weight: 600;
-  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 0.75rem;
+  text-align: left;
   background: #f8fbff;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.flow-step__index {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.flow-step__title {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 1rem;
+}
+
+.flow-step__description {
+  margin: 0;
+}
+
+.support-section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.support-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.support-card {
+  border: 1px solid #d4deee;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 0.8rem;
+  display: grid;
+  align-content: flex-start;
+  gap: 0.45rem;
+}
+
+.support-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.support-card__link {
+  display: inline-flex;
+  width: fit-content;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #c9dbfb;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.support-card__link:hover {
+  background: #e2eeff;
 }
 
 .layout {
@@ -845,6 +969,25 @@ a {
   color: #1d4ed8;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+@media (max-width: 960px) {
+  .home-hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .citizen-access-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .portal-header {
     position: static;
@@ -877,6 +1020,23 @@ a {
 
   .card {
     padding: 0.9rem;
+  }
+
+  .home-hero-panel {
+    gap: 0.65rem;
+  }
+
+  .hero-benefits {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .flow-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .support-grid {
+    grid-template-columns: 1fr;
   }
 
   .layout {
