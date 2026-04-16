@@ -154,3 +154,15 @@ button:disabled {
 .empty-message {
   color: #6b7280;
 }
+
+.status-message {
+  margin: 0 0 1rem;
+  color: #1d4ed8;
+  font-size: 0.9rem;
+}
+
+.error-message {
+  margin: 0 0 1rem;
+  color: #b91c1c;
+  font-size: 0.9rem;
+}

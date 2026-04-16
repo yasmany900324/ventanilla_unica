@@ -1,45 +1,74 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import IncidentForm from "../components/IncidentForm";
 import IncidentPanel from "../components/IncidentPanel";
 
-const STATUS_FLOW = ["recibido", "en proceso", "resuelto"];
-
-function buildNewIncident(formData) {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    category: formData.category,
-    description: formData.description,
-    location: formData.location,
-    status: "recibido",
-  };
-}
-
 export default function HomePage() {
   const [incidents, setIncidents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleCreateIncident = (newIncidentData) => {
-    const newIncident = buildNewIncident(newIncidentData);
-    setIncidents((prev) => [newIncident, ...prev]);
-  };
-
-  const handleAdvanceStatus = (incidentId) => {
-    setIncidents((prev) =>
-      prev.map((incident) => {
-        if (incident.id !== incidentId) {
-          return incident;
+  useEffect(() => {
+    const loadIncidents = async () => {
+      try {
+        const response = await fetch("/api/incidents");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "No se pudieron cargar las incidencias.");
         }
 
-        const currentIndex = STATUS_FLOW.indexOf(incident.status);
-        const nextIndex = Math.min(currentIndex + 1, STATUS_FLOW.length - 1);
+        setIncidents(data.incidents ?? []);
+      } catch (error) {
+        setErrorMessage(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-        return {
-          ...incident,
-          status: STATUS_FLOW[nextIndex],
-        };
-      })
-    );
+    loadIncidents();
+  }, []);
+
+  const handleCreateIncident = async (newIncidentData) => {
+    setErrorMessage("");
+    const response = await fetch("/api/incidents", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newIncidentData),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = data.error || "No se pudo registrar la incidencia.";
+      setErrorMessage(message);
+      throw new Error(message);
+    }
+
+    setIncidents((prev) => [data.incident, ...prev]);
+  };
+
+  const handleAdvanceStatus = async (incidentId) => {
+    setErrorMessage("");
+    try {
+      const response = await fetch(`/api/incidents/${incidentId}/advance`, {
+        method: "PATCH",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo actualizar el estado.");
+      }
+
+      setIncidents((prev) =>
+        prev.map((incident) =>
+          incident.id === incidentId ? data.incident : incident
+        )
+      );
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   };
 
   return (
@@ -63,6 +92,14 @@ export default function HomePage() {
           />
         </section>
       </div>
+
+      {isLoading && <p className="info-message">Cargando incidencias...</p>}
+      {!isLoading && incidents.length === 0 && (
+        <p className="info-message">
+          Todavía no hay incidencias guardadas. Crea una para comenzar.
+        </p>
+      )}
+      {errorMessage && <p className="error-message">{errorMessage}</p>}
     </main>
   );
 }

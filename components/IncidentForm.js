@@ -10,6 +10,8 @@ const INITIAL_FORM_STATE = {
 
 export default function IncidentForm({ onSubmit }) {
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -21,8 +23,22 @@ export default function IncidentForm({ onSubmit }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit(formData);
-    setFormData(INITIAL_FORM_STATE);
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    Promise.resolve(onSubmit(formData))
+      .then((result) => {
+        if (result && result.ok === false) {
+          throw new Error(result.message || "No se pudo enviar la incidencia.");
+        }
+        setFormData(INITIAL_FORM_STATE);
+      })
+      .catch((error) => {
+        setSubmitError(error.message || "No se pudo enviar la incidencia.");
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   return (
@@ -68,7 +84,10 @@ export default function IncidentForm({ onSubmit }) {
         />
       </label>
 
-      <button type="submit">Enviar incidencia</button>
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Enviando..." : "Enviar incidencia"}
+      </button>
+      {submitError ? <p className="error-message">{submitError}</p> : null}
     </form>
   );
 }
