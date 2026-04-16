@@ -9,7 +9,7 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f2f4f7;
+  background: #f3f5f9;
   color: #1f2937;
 }
 
@@ -17,6 +17,14 @@ body {
   max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1rem 3rem;
+}
+
+.page--auth {
+  max-width: 640px;
+}
+
+.page--dashboard {
+  max-width: 1140px;
 }
 
 h1,
@@ -28,6 +36,7 @@ h3 {
 .description {
   margin-bottom: 1.5rem;
   color: #4b5563;
+  line-height: 1.5;
 }
 
 .eyebrow {
@@ -92,6 +101,21 @@ h3 {
   margin-bottom: 1rem;
 }
 
+.citizen-access-section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.citizen-actions-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #374151;
+}
+
+.citizen-actions-list li {
+  margin-bottom: 0.35rem;
+}
+
 .flow-steps {
   list-style: none;
   margin: 0.8rem 0 0;
@@ -117,6 +141,10 @@ h3 {
   gap: 1rem;
 }
 
+.layout--dashboard {
+  align-items: start;
+}
+
 .card {
   background: #ffffff;
   border: 1px solid #d1d5db;
@@ -130,10 +158,12 @@ h3 {
   gap: 0.75rem;
 }
 
-label {
+.incident-form label,
+.auth-form label {
   display: block;
   margin-bottom: 0.25rem;
   font-weight: 600;
+  color: #111827;
 }
 
 input,
@@ -193,6 +223,39 @@ button:disabled {
   gap: 0.4rem;
 }
 
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.summary-card__label {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+.summary-card__value {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
 .incident-card__header {
   display: flex;
   justify-content: space-between;
@@ -227,9 +290,115 @@ button:disabled {
   color: #92400e;
 }
 
+.badge--en-revision {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
 .badge--resuelto {
   background: #dcfce7;
   color: #166534;
+}
+
+.button-inline {
+  width: auto;
+  display: inline-flex;
+  padding: 0.45rem 0.8rem;
+}
+
+.citizen-incident-list {
+  max-height: 460px;
+}
+
+.case-detail-card {
+  margin-top: 1rem;
+}
+
+.case-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.timeline-section {
+  margin-top: 1rem;
+}
+
+.timeline-steps {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem;
+}
+
+.timeline-step {
+  border-radius: 8px;
+  padding: 0.55rem;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+  background: #f9fafb;
+  text-align: center;
+  font-weight: 600;
+}
+
+.timeline-step--done {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.timeline-step--current {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.updates-section {
+  margin-top: 1rem;
+}
+
+.updates-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.updates-item {
+  border: 1px solid #dbe1ea;
+  border-radius: 8px;
+  padding: 0.6rem;
+  background: #fbfcff;
+}
+
+.updates-item p {
+  margin: 0 0 0.2rem;
+}
+
+.auth-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.auth-footnote {
+  margin-top: 1rem;
+}
+
+.auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
 }
 
 .empty-message {
@@ -254,6 +423,10 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+a {
+  color: #1d4ed8;
+}
+
 @media (max-width: 640px) {
   .page {
     padding-top: 1.25rem;
@@ -265,5 +438,9 @@ button:disabled {
 
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
   }
 }
