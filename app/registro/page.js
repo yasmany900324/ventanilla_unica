@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USER_STORAGE_KEY = "citizen-users";
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -17,8 +16,9 @@ export default function RegistroPage() {
     confirmPassword: "",
   });
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
 
@@ -60,35 +60,27 @@ export default function RegistroPage() {
       return;
     }
 
-    const storedUsers = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || "[]");
-    const isCedulaDuplicated = storedUsers.some(
-      (user) => user.cedula === normalizedData.cedula,
-    );
-    const isEmailDuplicated =
-      normalizedData.email &&
-      storedUsers.some((user) => user.email === normalizedData.email);
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(normalizedData),
+      });
+      const data = await response.json();
 
-    if (isCedulaDuplicated) {
-      setErrorMessage("La cedula ya se encuentra registrada.");
-      return;
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo completar el registro.");
+      }
+
+      router.push("/ciudadano/dashboard");
+    } catch (error) {
+      setErrorMessage(error.message || "No se pudo completar el registro.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (isEmailDuplicated) {
-      setErrorMessage("El correo electronico ya se encuentra registrado.");
-      return;
-    }
-
-    const nextUsers = [
-      ...storedUsers,
-      {
-        fullName: normalizedData.fullName,
-        cedula: normalizedData.cedula,
-        email: normalizedData.email,
-        password: normalizedData.password,
-      },
-    ];
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUsers));
-    router.push("/ciudadano/dashboard");
   };
 
   const handleChange = (event) => {
@@ -174,12 +166,13 @@ export default function RegistroPage() {
             />
           </label>
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
-          <button type="submit">Crear cuenta</button>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creando cuenta..." : "Crear cuenta"}
+          </button>
         </form>
 
         <p className="small auth-footnote">
-          Esta vista aplica validaciones de registro y deja preparado el flujo
-          para integracion con backend.
+          El registro crea tu usuario en base de datos y abre una sesion real.
         </p>
         <p className="small">
           Ya tienes cuenta? <Link href="/login">Inicia sesion</Link>

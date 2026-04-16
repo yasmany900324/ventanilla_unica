@@ -4,9 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USER_STORAGE_KEY = "citizen-users";
-
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -14,8 +11,9 @@ export default function LoginPage() {
     password: "",
   });
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
 
@@ -27,39 +25,27 @@ export default function LoginPage() {
       return;
     }
 
-    const normalizedIdentifier = EMAIL_PATTERN.test(identifier)
-      ? identifier.toLowerCase()
-      : identifier;
-    const identifierType = EMAIL_PATTERN.test(identifier) ? "email" : "cedula";
-    const storedUsers = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || "[]");
-    const matchedUser = storedUsers.find((user) =>
-      identifierType === "email"
-        ? user.email === normalizedIdentifier
-        : user.cedula === normalizedIdentifier,
-    );
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ identifier, password }),
+      });
+      const data = await response.json();
 
-    if (!matchedUser) {
-      setErrorMessage(
-        `No existe una cuenta asociada a ${
-          identifierType === "email" ? "ese correo electronico." : "esa cedula."
-        }`,
-      );
-      return;
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo iniciar sesion.");
+      }
+
+      router.push("/ciudadano/dashboard");
+    } catch (error) {
+      setErrorMessage(error.message || "No se pudo iniciar sesion.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (matchedUser.password !== password) {
-      setErrorMessage("La contrasena ingresada no es correcta.");
-      return;
-    }
-
-    const authPayload = {
-      identifier: normalizedIdentifier,
-      password,
-      identifierType,
-    };
-
-    console.log("Auth payload listo para backend:", authPayload);
-    router.push("/ciudadano/dashboard");
   };
 
   const handleChange = (event) => {
@@ -105,20 +91,19 @@ export default function LoginPage() {
           />
 
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
-          <button type="submit">Entrar a mi panel</button>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Ingresando..." : "Entrar a mi panel"}
+          </button>
         </form>
 
         <p className="small auth-footnote">
-          La autenticacion usa un identificador unico y detecta automaticamente
-          si corresponde a cedula o correo electronico.
+          La autenticacion valida tus credenciales contra usuarios persistidos en
+          base de datos.
         </p>
 
         <div className="auth-footer">
           <Link href="/registro" className="button-link button-link--secondary">
             Crear cuenta
-          </Link>
-          <Link href="/ciudadano/dashboard" className="button-link">
-            Ver dashboard ciudadano
           </Link>
         </div>
       </section>
