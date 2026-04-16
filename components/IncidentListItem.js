@@ -16,6 +16,10 @@ export default function IncidentListItem({
   actionLabel = "Ver detalle",
   actionHref = "",
   descriptionLimit = 120,
+  actionButtonRef = null,
+  isActionDisabled = false,
+  actionAriaControls = undefined,
+  actionAriaExpanded = undefined,
 }) {
   const rootClassName = `incident-card ${className}`.trim();
   const badgeClassName = `badge badge--${incident.status.replace(" ", "-")}`;
@@ -51,7 +55,11 @@ export default function IncidentListItem({
           type="button"
           className={`button-inline${isSelected ? " button-inline--selected" : ""}`}
           aria-pressed={isSelected}
+          aria-controls={actionAriaControls}
+          aria-expanded={actionAriaExpanded}
+          ref={actionButtonRef}
           onClick={() => onSelect(incident.id)}
+          disabled={isActionDisabled}
         >
           {actionLabel}
         </button>

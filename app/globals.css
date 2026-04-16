@@ -572,6 +572,11 @@ button:disabled {
   margin-top: 1rem;
 }
 
+.case-detail-back-button {
+  margin-top: 0.25rem;
+  margin-bottom: 0.85rem;
+}
+
 .detail-selected-hint {
   margin-top: 0.1rem;
   margin-bottom: 0.8rem;
@@ -665,6 +670,41 @@ button:disabled {
 .pagination__actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.my-incidents-inline {
+  overflow: hidden;
+}
+
+.my-incidents-inline__viewport {
+  overflow: hidden;
+}
+
+.my-incidents-inline__track {
+  display: flex;
+  width: 200%;
+  transform: translateX(0);
+  transition: transform 260ms ease;
+}
+
+.my-incidents-inline__track--detail {
+  transform: translateX(-50%);
+}
+
+.my-incidents-inline__panel {
+  width: 50%;
+  padding-right: 0.1rem;
+  flex-shrink: 0;
+}
+
+.my-incidents-inline__panel--detail {
+  padding-left: 0.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-incidents-inline__track {
+    transition: none;
+  }
 }
 
 .auth-card {
@@ -843,6 +883,26 @@ a {
 
   .incident-carousel {
     grid-auto-columns: minmax(88%, 1fr);
+  }
+
+  .my-incidents-inline__track,
+  .my-incidents-inline__track--detail {
+    width: 100%;
+    transform: none;
+  }
+
+  .my-incidents-inline__track {
+    display: block;
+  }
+
+  .my-incidents-inline__panel {
+    width: 100%;
+    padding: 0;
+  }
+
+  .my-incidents-inline__panel--list[aria-hidden="true"],
+  .my-incidents-inline__panel--detail[aria-hidden="true"] {
+    display: none;
   }
 
   .portal-footer__inner {
