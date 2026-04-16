@@ -186,7 +186,6 @@ export default function MyIncidentsPageContent() {
             <section
               className="my-incidents-inline__panel my-incidents-inline__panel--list"
               aria-hidden={isShowingDetail}
-              inert={isShowingDetail ? "" : undefined}
             >
               <ul
                 className="incident-list incident-list--full"
@@ -242,7 +241,6 @@ export default function MyIncidentsPageContent() {
               id={DETAIL_PANEL_ID}
               className="my-incidents-inline__panel my-incidents-inline__panel--detail"
               aria-hidden={!isShowingDetail}
-              inert={!isShowingDetail ? "" : undefined}
             >
               <IncidentCaseDetail
                 incident={selectedIncident}
@@ -253,6 +251,7 @@ export default function MyIncidentsPageContent() {
                 backButtonLabel="Volver a mis incidencias"
                 onBackButtonClick={handleBackToList}
                 isBackButtonDisabled={!isShowingDetail}
+                emptyStateMessage="No se pudo cargar el detalle de esta incidencia. Vuelve al listado e intenta de nuevo."
               />
             </section>
           </div>
