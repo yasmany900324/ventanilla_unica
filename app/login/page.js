@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, isLoadingAuth } = useAuth();
   const [formData, setFormData] = useState({
     identifier: "",
     password: "",
@@ -27,19 +29,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ identifier, password }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "No se pudo iniciar sesion.");
-      }
-
+      await login({ identifier, password });
       router.push("/ciudadano/dashboard");
     } catch (error) {
       setErrorMessage(error.message || "No se pudo iniciar sesion.");
@@ -91,7 +81,7 @@ export default function LoginPage() {
           />
 
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" disabled={isSubmitting || isLoadingAuth}>
             {isSubmitting ? "Ingresando..." : "Entrar a mi panel"}
           </button>
         </form>

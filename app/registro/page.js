@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegistroPage() {
   const router = useRouter();
+  const { register, isLoadingAuth } = useAuth();
   const [formData, setFormData] = useState({
     fullName: "",
     cedula: "",
@@ -62,19 +64,7 @@ export default function RegistroPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(normalizedData),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "No se pudo completar el registro.");
-      }
-
+      await register(normalizedData);
       router.push("/ciudadano/dashboard");
     } catch (error) {
       setErrorMessage(error.message || "No se pudo completar el registro.");
@@ -166,7 +156,7 @@ export default function RegistroPage() {
             />
           </label>
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" disabled={isSubmitting || isLoadingAuth}>
             {isSubmitting ? "Creando cuenta..." : "Crear cuenta"}
           </button>
         </form>

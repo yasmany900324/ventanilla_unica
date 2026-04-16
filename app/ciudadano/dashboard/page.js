@@ -11,5 +11,5 @@ export default async function CitizenDashboardPage() {
     redirect("/login");
   }
 
-  return <CitizenDashboard initialUser={authenticatedUser} />;
+  return <CitizenDashboard />;
 }
