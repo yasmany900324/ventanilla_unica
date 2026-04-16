@@ -2,277 +2,267 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { getAuthenticatedUserFromToken, SESSION_COOKIE_NAME } from "../lib/auth";
 
-const FEATURE_SUMMARY = [
+const HERO_ATTRIBUTES = [
+  "Disponible 24 horas",
+  "Seguimiento por numero de ticket",
+  "ES | PT | EN",
+];
+
+const FREQUENT_SERVICES = [
   {
-    title: "Canal unico y trazable",
+    icon: "AR",
+    title: "Arbol caido / ramas peligrosas",
     description:
-      "Centraliza solicitudes, reclamos e incidencias ciudadanas en un sistema institucional.",
+      "Reporta incidentes con arboles en la via publica.",
+    badge: "Reporte anonimo",
+    badgeType: "anonymous",
+    href: "/registro",
   },
   {
-    title: "Comunicacion clara",
+    icon: "CD",
+    title: "Contenedor desbordado",
     description:
-      "Cada caso mantiene estados visibles y mensajes de seguimiento durante todo el proceso.",
+      "Informa sobre contenedores que necesitan vaciado urgente.",
+    badge: "Reporte anonimo",
+    badgeType: "anonymous",
+    href: "/registro",
   },
   {
-    title: "Gestion con enfoque ciudadano",
+    icon: "AP",
+    title: "Alumbrado publico",
+    description: "Farolas apagadas o en mal estado.",
+    badge: "Reporte anonimo",
+    badgeType: "anonymous",
+    href: "/registro",
+  },
+  {
+    icon: "RE",
+    title: "Registro de empresa",
     description:
-      "Mejora la atencion, los tiempos de respuesta y la transparencia del servicio publico.",
+      "Habilitacion comercial para nuevos emprendimientos.",
+    badge: "Requiere identidad",
+    badgeType: "identity",
+    href: "/login",
+  },
+  {
+    icon: "PC",
+    title: "Permiso de construccion",
+    description: "Habilitaciones para obras en propiedad privada.",
+    badge: "Requiere identidad",
+    badgeType: "identity",
+    href: "/login",
+  },
+  {
+    icon: "CT",
+    title: "Consultar mi tramite",
+    description: "Segui el estado de una gestion ya iniciada.",
+    badge: "Con numero de ticket",
+    badgeType: "ticket",
+    href: "/mis-incidencias",
   },
 ];
 
 const ATTENTION_FLOW = [
   {
+    icon: "1",
     title: "Recibido",
-    description: "Se registra el caso y se genera un numero de ticket para seguimiento.",
+    description: "Registramos tu solicitud",
   },
   {
+    icon: "2",
     title: "En revision",
-    description: "El equipo valida la informacion y define el tipo de atencion requerida.",
+    description: "Evaluamos y asignamos",
   },
   {
+    icon: "3",
     title: "En proceso",
-    description:
-      "Se ejecutan las acciones operativas y se actualiza el avance del caso.",
+    description: "Trabajamos para resolver",
   },
   {
+    icon: "4",
     title: "Resuelto",
-    description:
-      "Se comunica el cierre con resultado y queda disponible el historial completo.",
+    description: "Te notificamos la solucion",
   },
-];
-
-const HERO_BENEFITS = [
-  "Disponible 24 horas",
-  "Seguimiento por ticket",
-  "Atencion clara y trazable",
 ];
 
 const CITIZEN_ACTIONS = [
-  "Registrar nuevas incidencias con informacion completa.",
-  "Consultar el estado actual de cada caso reportado.",
-  "Revisar el historial y seguimiento detallado de sus incidencias.",
+  "Iniciar nuevos tramites y reportes",
+  "Consultar el estado actual de cada caso",
+  "Revisar el historial y seguimiento detallado",
+  "Adjuntar documentacion cuando sea necesario",
 ];
 
-const SUPPORT_ACCESS = [
-  {
-    title: "Centro de ayuda",
-    description:
-      "Guia de uso del portal para iniciar incidencias y gestionar el seguimiento.",
-    href: "/#ayuda-soporte",
-    actionLabel: "Ver recursos",
-  },
-  {
-    title: "Preguntas frecuentes",
-    description:
-      "Respuestas sobre registro, acceso, estados del caso y trazabilidad.",
-    href: "/#ayuda-soporte",
-    actionLabel: "Consultar FAQ",
-  },
-  {
-    title: "Canales de contacto",
-    description:
-      "Canales institucionales para soporte tecnico y consultas de atencion.",
-    href: "/#ayuda-soporte",
-    actionLabel: "Ver canales",
-  },
+const HELP_ITEMS = [
+  { label: "Hablar con el asistente", href: "/#ayuda-soporte", icon: "AS" },
+  { label: "Preguntas frecuentes", href: "/#ayuda-soporte", icon: "FAQ" },
+  { label: "Canales de contacto", href: "/#ayuda-soporte", icon: "CC" },
 ];
 
 export default async function HomePage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const authenticatedUser = await getAuthenticatedUserFromToken(token);
   const hasActiveSession = Boolean(authenticatedUser);
-  const citizenName = authenticatedUser?.fullName || "ciudadano";
-
-  const heroDescription =
-    "Portal institucional para registrar incidencias, consultar estados y mantener trazabilidad completa de cada caso.";
-  const accessTitle = hasActiveSession
-    ? "Tu espacio ciudadano ya esta listo para operar"
-    : "Accede a tu espacio ciudadano";
-  const accessDescription = hasActiveSession
-    ? "Tu sesion esta activa: puedes registrar incidencias, consultar estados y revisar el seguimiento de tus casos."
-    : "Una vez autenticado podras operar sobre tus propios casos de forma segura y personalizada.";
   const assistantHref = hasActiveSession
     ? "/ciudadano/dashboard#detalle-caso"
     : "/#ayuda-soporte";
+  const reportHref = hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro";
+  const trackingHref = hasActiveSession ? "/mis-incidencias" : "/login";
+  const accessTitle = hasActiveSession
+    ? "Gestiona tus tramites en un entorno privado"
+    : "Gestiona tus tramites en un entorno privado";
+  const accessDescription = hasActiveSession
+    ? "Tu sesion esta activa y ya puedes operar de forma segura y personalizada:"
+    : "Una vez autenticado podras operar de forma segura y personalizada:";
+  const identityHref = hasActiveSession ? "/ciudadano/dashboard" : "/login";
 
   return (
     <main className="page page--home">
-      <section className="home-hero-grid" aria-labelledby="titulo-home">
-        <div className="card card--hero home-hero-panel">
-          <div className="home-hero-panel__head">
-            <p className="eyebrow eyebrow--hero">Portal institucional de atencion ciudadana</p>
-            <h1 id="titulo-home">Ventanilla Digital de Atencion Ciudadana</h1>
-            <p className="description home-hero-panel__description">{heroDescription}</p>
-          </div>
+      <nav className="home-breadcrumb" aria-label="Ruta de navegacion">
+        <ol>
+          <li>
+            <Link href="/">Inicio</Link>
+          </li>
+          <li aria-current="page">Portal de Tramites y Reportes</li>
+        </ol>
+      </nav>
 
-          {hasActiveSession ? (
-            <p className="small home-hero-greeting">Sesion activa: hola, {citizenName}.</p>
-          ) : null}
-
-          <div className="hero-actions hero-actions--hero">
-            <Link
-              href={hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro"}
-              className="button-link"
-            >
-              Iniciar incidencia
+      <section className="home-hero" aria-labelledby="titulo-home">
+        <div className="home-hero__content">
+          <span className="home-hero__kicker">ATENCION CIUDADANA DIGITAL</span>
+          <h1 id="titulo-home">Portal de Tramites y Reportes</h1>
+          <p>
+            Gestiona tus tramites, reportes e incidencias en linea de forma simple, con
+            seguimiento y asistencia en cada paso.
+          </p>
+          <div className="home-hero__actions">
+            <Link href={reportHref} className="home-cta home-cta--primary">
+              Iniciar un tramite
             </Link>
-            <Link
-              href={hasActiveSession ? "/mis-incidencias" : "/login"}
-              className="button-link button-link--secondary"
-            >
+            <Link href={reportHref} className="home-cta home-cta--secondary">
+              Reportar un problema
+            </Link>
+            <Link href={trackingHref} className="home-cta home-cta--secondary">
               Consultar estado
             </Link>
-            <Link href={assistantHref} className="button-link button-link--secondary">
-              Hablar con el asistente
-            </Link>
           </div>
-
-          <ul className="hero-benefits" aria-label="Atributos del sistema">
-            {HERO_BENEFITS.map((item) => (
+          <ul className="home-hero__chips" aria-label="Atributos del portal">
+            {HERO_ATTRIBUTES.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </div>
 
-        <aside className="card hero-side-card hero-side-card--featured" aria-label="Asistente y acceso rapido">
-          <p className="eyebrow">Asistente ciudadano</p>
-          <h2>Orientacion inmediata para cada tramite o incidencia</h2>
-          <p className="small">
-            Consulta pasos, estados y resolucion de dudas con una atencion guiada y trazable.
+        <aside className="home-assistant-card" aria-label="Asistente virtual">
+          <span className="home-assistant-card__icon" aria-hidden="true">
+            BOT
+          </span>
+          <h2>Asistente virtual</h2>
+          <p>
+            Te guia paso a paso, responde preguntas y te ayuda a encontrar el tramite
+            que necesitas.
           </p>
-          <div className="hero-side-card__ticket">
-            <p className="hero-side-card__ticket-label">Seguimiento institucional</p>
-            <p className="hero-side-card__ticket-value">Ticket ACT-2026-0148</p>
-            <p className="small">Estado, mensajes oficiales y cierre visibles en un solo hilo.</p>
-          </div>
-          <ul className="hero-side-highlights" aria-label="Atributos del asistente">
-            <li>Respuesta guiada para ciudadanos</li>
-            <li>Contexto por numero de ticket</li>
-            <li>Escalamiento a soporte institucional</li>
-          </ul>
-          <div className="hero-actions">
-            <Link href={assistantHref} className="button-link">
-              Hablar con el asistente
-            </Link>
-            <Link
-              href={hasActiveSession ? "/ciudadano/dashboard" : "/login"}
-              className="button-link button-link--secondary"
-            >
-              {hasActiveSession ? "Abrir mi espacio" : "Iniciar sesion"}
-            </Link>
-            {!hasActiveSession ? (
-              <Link href="/registro" className="button-link button-link--secondary">
-                Crear cuenta
-              </Link>
-            ) : null}
-          </div>
+          <Link href={assistantHref} className="home-cta home-cta--assistant">
+            Hablar con el asistente
+          </Link>
         </aside>
       </section>
 
-      <section className="home-value-section" aria-label="Beneficios del sistema">
-        <div className="home-section-intro">
-          <p className="eyebrow">Beneficios institucionales</p>
-          <h2>Atencion publica moderna con foco en transparencia</h2>
-        </div>
-        <div className="feature-grid">
-          {FEATURE_SUMMARY.map((feature, index) => (
-            <article key={feature.title} className="card feature-card">
-              <p className="feature-card__kicker">Beneficio {String(index + 1).padStart(2, "0")}</p>
-              <h3>{feature.title}</h3>
-              <p className="small">{feature.description}</p>
+      <section id="tramites" className="home-frequent card" aria-labelledby="frequent-title">
+        <header className="home-frequent__head">
+          <div>
+            <h2 id="frequent-title">Tramites y reportes frecuentes</h2>
+            <p>
+              Elegi un tramite para comenzar o escribinos directamente a nuestro
+              asistente
+            </p>
+          </div>
+          <Link href="/login" className="home-frequent__all-link">
+            Ver todos los tramites
+          </Link>
+        </header>
+
+        <div className="home-frequent__grid">
+          {FREQUENT_SERVICES.map((item) => (
+            <article key={item.title} className="frequent-card">
+              <div className="frequent-card__icon" aria-hidden="true">
+                {item.icon}
+              </div>
+              <div className="frequent-card__content">
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <span className={`frequent-card__badge frequent-card__badge--${item.badgeType}`}>
+                  {item.badge}
+                </span>
+              </div>
+              <Link href={item.href} className="frequent-card__arrow" aria-label={`Abrir ${item.title}`}>
+                &gt;
+              </Link>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="card flow-section">
-        <p className="eyebrow">Trazabilidad del proceso</p>
-        <h2>Flujo general de atencion</h2>
-        <p className="small">
-          Todas las incidencias siguen etapas estandar para dar trazabilidad y
-          claridad del avance.
-        </p>
-        <ul className="flow-steps" aria-label="Etapas del flujo de atencion">
-          {ATTENTION_FLOW.map((step, index) => (
-            <li key={step.title} className="flow-step">
-              <p className="flow-step__index">{String(index + 1).padStart(2, "0")}</p>
-              <h3 className="flow-step__title">{step.title}</h3>
-              <p className="small flow-step__description">{step.description}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <section className="home-bottom-grid">
+        <article className="card home-flow-card">
+          <h2>Flujo general de atencion</h2>
+          <p>
+            Tus solicitudes siguen etapas claras para asegurar trazabilidad y
+            seguimiento.
+          </p>
+          <ol className="home-flow-card__steps" aria-label="Etapas de atencion">
+            {ATTENTION_FLOW.map((step, index) => (
+              <li key={step.title} className="home-flow-step">
+                <span className="home-flow-step__icon" aria-hidden="true">
+                  {step.icon}
+                </span>
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+                {index < ATTENTION_FLOW.length - 1 ? (
+                  <span className="home-flow-step__connector" aria-hidden="true" />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </article>
 
-      <section className="card citizen-access-section">
-        <div className="citizen-access-section__content">
-          <p className="eyebrow">Espacio ciudadano privado</p>
+        <article className="card home-access-card">
+          <span className="home-access-card__label">ACCEDE A TU ESPACIO CIUDADANO</span>
           <h2>{accessTitle}</h2>
-          <p className="small">{accessDescription}</p>
-          <ul className="citizen-actions-list">
+          <p>{accessDescription}</p>
+          <ul>
             {CITIZEN_ACTIONS.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
-        </div>
-        <div className="citizen-access-section__actions-panel">
-          <p className="eyebrow">Acceso seguro</p>
-          <p className="small">
-            {hasActiveSession
-              ? "Continua la gestion de tus casos activos y revisa el historial de seguimiento."
-              : "Autenticate para operar sobre tus casos y mantener tu historial ciudadano protegido."}
-          </p>
-          <div className="hero-actions citizen-access-section__actions">
-            {hasActiveSession ? (
-              <>
-                <Link href="/ciudadano/dashboard" className="button-link">
-                  Ir a mi panel ciudadano
-                </Link>
-                <Link href="/mis-incidencias" className="button-link button-link--secondary">
-                  Ver mis incidencias
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="button-link">
-                  Ir a iniciar sesion
-                </Link>
-                <Link href="/registro" className="button-link button-link--secondary">
-                  Registrarme ahora
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section id="ayuda-soporte" className="card support-section">
-        <p className="eyebrow">Ayuda institucional</p>
-        <h2>Ayuda y soporte</h2>
-        <p className="small">
-          Accede a recursos de orientacion y a los canales institucionales para
-          resolver dudas sobre registro, seguimiento y gestion de casos.
-        </p>
-        <div className="support-grid">
-          {SUPPORT_ACCESS.map((item) => (
-            <article key={item.title} className="support-card">
-              <h3>{item.title}</h3>
-              <p className="small">{item.description}</p>
-              <Link href={item.href} className="support-card__link">
-                {item.actionLabel}
-              </Link>
-            </article>
-          ))}
-          <article className="support-card support-card--assistant">
-            <h3>Hablar con el asistente</h3>
-            <p className="small">
-              Inicia una consulta guiada para orientarte sobre el estado de tu caso o
-              sobre los pasos del proceso de atencion.
-            </p>
-            <Link href={assistantHref} className="support-card__link support-card__link--assistant">
-              Iniciar conversacion
+          <div className="home-access-card__actions">
+            <Link href={identityHref} className="home-cta home-cta--inline-primary">
+              Iniciar sesion
             </Link>
-          </article>
-        </div>
+            <Link href="/registro" className="home-cta home-cta--inline-secondary">
+              Registrarme ahora
+            </Link>
+          </div>
+        </article>
+
+        <article id="ayuda-soporte" className="card home-help-card">
+          <h2>Necesitas ayuda?</h2>
+          <p>
+            Nuestro equipo y canales de atencion estan disponibles para acompanarte.
+          </p>
+          <ul>
+            {HELP_ITEMS.map((item) => (
+              <li key={item.label}>
+                <Link href={item.href}>
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link href={assistantHref} className="home-help-card__assistant-link">
+            Hablar con el asistente
+          </Link>
+        </article>
       </section>
     </main>
   );

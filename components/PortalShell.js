@@ -7,10 +7,17 @@ import {
   SESSION_COOKIE_NAME,
 } from "../lib/auth";
 
+const TOPBAR_LINKS = [
+  { href: "/#accesibilidad", label: "Accesibilidad" },
+  { href: "/#mapa-del-sitio", label: "Mapa del sitio" },
+];
+
+const LANGUAGE_LINKS = ["ES", "PT", "EN"];
+
 const PUBLIC_MOBILE_NAV = [
   { href: "/", label: "Inicio", icon: "home" },
   { href: "/login", label: "Acceder", icon: "login" },
-  { href: "/registro", label: "Registro", icon: "register" },
+  { href: "/registro", label: "Cuenta", icon: "register" },
   { href: "/#ayuda-soporte", label: "Ayuda", icon: "help" },
 ];
 
@@ -27,11 +34,11 @@ const AUTH_MOBILE_NAV = [
 
 const FOOTER_LINK_GROUPS = [
   {
-    title: "Plataforma",
+    title: "Tramites en linea",
     links: [
-      { href: "/", label: "Inicio" },
-      { href: "/mis-incidencias", label: "Mis incidencias" },
-      { href: "/ciudadano/dashboard#nueva-incidencia", label: "Nueva incidencia" },
+      { href: "/#tramites", label: "Portal Tributario" },
+      { href: "/#tramites", label: "Guia de Tramites" },
+      { href: "/mis-incidencias", label: "Estado de expediente" },
     ],
   },
   {
@@ -46,10 +53,17 @@ const FOOTER_LINK_GROUPS = [
     title: "Informacion institucional",
     links: [
       { href: "/#informacion-institucional", label: "Politica de privacidad" },
-      { href: "/#informacion-institucional", label: "Accesibilidad" },
+      { href: "/#accesibilidad", label: "Accesibilidad" },
       { href: "/#informacion-institucional", label: "Terminos de uso" },
     ],
   },
+];
+
+const SOCIAL_LINKS = [
+  { href: "https://www.facebook.com", label: "Facebook", shortLabel: "Fb" },
+  { href: "https://x.com", label: "X", shortLabel: "X" },
+  { href: "https://www.instagram.com", label: "Instagram", shortLabel: "Ig" },
+  { href: "https://www.youtube.com", label: "YouTube", shortLabel: "Yt" },
 ];
 
 function Icon({ name }) {
@@ -139,15 +153,18 @@ export default async function PortalShell({ children }) {
   const authenticatedUser = await getAuthenticatedUserFromToken(token);
   const hasActiveSession = Boolean(authenticatedUser);
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || "ciudadano";
+  const assistantHref = hasActiveSession
+    ? "/ciudadano/dashboard#detalle-caso"
+    : "/#ayuda-soporte";
   const mainNav = [
     { href: "/", label: "Inicio" },
     {
       href: hasActiveSession ? "/mis-incidencias" : "/login",
-      label: "Mis incidencias",
+      label: "Mis tramites e incidencias",
     },
     {
       href: hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/login",
-      label: "Nueva incidencia",
+      label: "Nuevo tramite o reporte",
     },
     { href: "/#ayuda-soporte", label: "Ayuda y soporte" },
   ];
@@ -160,54 +177,76 @@ export default async function PortalShell({ children }) {
       </a>
 
       <header className="portal-header">
-        <div className="portal-header__inner">
-          <Link href="/" className="portal-brand" aria-label="Atencion Ciudadana Digital">
-            <span className="portal-brand__mark" aria-hidden="true">
-              ACD
-            </span>
-            <span className="portal-brand__text">
-              <strong>Atencion Ciudadana Digital</strong>
-              <small>Portal institucional de incidencias</small>
-            </span>
-          </Link>
-
-          <nav className="portal-nav" aria-label="Navegacion principal">
-            <ul className="portal-nav__list">
-              {mainNav.map((item) => (
+        <div className="portal-topbar">
+          <div className="portal-topbar__inner">
+            <ul className="portal-topbar__links">
+              {TOPBAR_LINKS.map((item) => (
                 <li key={item.label}>
-                  <Link href={item.href} className="portal-nav__link">
-                    {item.label}
-                  </Link>
+                  <Link href={item.href}>{item.label}</Link>
                 </li>
               ))}
             </ul>
-          </nav>
-
-          <div className="portal-header__actions">
-            {hasActiveSession ? (
-              <>
-                <span className="portal-user-chip">Hola, {shortName}</span>
-                <Link href="/ciudadano/dashboard" className="portal-action-link">
-                  Mi panel
-                </Link>
-                <form action={logoutAction} className="portal-action-form">
-                  <button type="submit" className="portal-action-button">
-                    Cerrar sesion
-                  </button>
-                </form>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="portal-action-link">
-                  Iniciar sesion
-                </Link>
-                <Link href="/registro" className="portal-action-link portal-action-link--primary">
-                  Crear cuenta
-                </Link>
-              </>
-            )}
+            <ul className="portal-topbar__languages" aria-label="Idiomas disponibles">
+              {LANGUAGE_LINKS.map((language) => (
+                <li key={language}>
+                  <span lang={language.toLowerCase()}>{language}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
+
+        <div className="portal-header__main">
+          <div className="portal-header__inner">
+            <Link href="/" className="portal-brand" aria-label="Intendencia de Maldonado">
+              <span className="portal-brand__crest" aria-hidden="true">
+                IM
+              </span>
+              <span className="portal-brand__text">
+                <strong>Intendencia de Maldonado</strong>
+                <small>Portal de Tramites y Reportes</small>
+              </span>
+            </Link>
+
+            <nav className="portal-nav" aria-label="Navegacion principal">
+              <ul className="portal-nav__list">
+                {mainNav.map((item) => (
+                  <li key={item.label}>
+                    <Link href={item.href} className="portal-nav__link">
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <div className="portal-header__actions">
+              {hasActiveSession ? (
+                <>
+                  <span className="portal-user-chip">Hola, {shortName}</span>
+                  <Link href="/ciudadano/dashboard" className="portal-action-link">
+                    Mi espacio
+                  </Link>
+                  <form action={logoutAction} className="portal-action-form">
+                    <button type="submit" className="portal-action-button">
+                      Cerrar sesion
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="portal-action-link">
+                    Iniciar sesion
+                  </Link>
+                  <Link href="/registro" className="portal-action-link portal-action-link--primary">
+                    Crear cuenta
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="portal-header__gold-line" aria-hidden="true" />
       </header>
 
       <div id="contenido-principal" className="app-shell__content">
@@ -217,11 +256,28 @@ export default async function PortalShell({ children }) {
       <footer className="portal-footer" id="informacion-institucional">
         <div className="portal-footer__inner">
           <div className="portal-footer__brand">
-            <h2>Atencion Ciudadana Digital</h2>
+            <div className="portal-footer__brand-head">
+              <span className="portal-footer__crest" aria-hidden="true">
+                IM
+              </span>
+              <h2>Intendencia de Maldonado</h2>
+            </div>
             <p>
-              Plataforma institucional para registrar, monitorear y gestionar
-              incidencias de forma trazable y transparente.
+              Calle Florida 580, Maldonado
+              <br />
+              Tel. +598 4222 4220
+              <br />
+              tramites@maldonado.gub.uy
             </p>
+            <ul className="portal-footer__social">
+              {SOCIAL_LINKS.map((social) => (
+                <li key={social.label}>
+                  <a href={social.href} aria-label={social.label}>
+                    {social.shortLabel}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
 
           {FOOTER_LINK_GROUPS.map((group) => (
@@ -238,12 +294,20 @@ export default async function PortalShell({ children }) {
           ))}
         </div>
         <div className="portal-footer__legal">
-          <p>
-            © {new Date().getFullYear()} Atencion Ciudadana Digital. Uso interno
-            e institucional.
-          </p>
+          <p>© 2026 Intendencia de Maldonado - Todos los derechos reservados.</p>
         </div>
       </footer>
+
+      <Link href={assistantHref} className="floating-chat-button" aria-label="Hablar con el asistente">
+        <span className="floating-chat-button__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4.5 5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.2l-3.9 2.9a.5.5 0 0 1-.8-.4v-2.5H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.5 1v9.5h1a1 1 0 0 1 1 1V18l2.9-2.2a1 1 0 0 1 .6-.2H19V6H5Zm3.2 3h7.6v1.5H8.2V9Zm0 3h5.6v1.5H8.2V12Z" />
+          </svg>
+        </span>
+        <span className="floating-chat-button__badge" aria-hidden="true">
+          1
+        </span>
+      </Link>
 
       <nav className="mobile-bottom-nav" aria-label="Navegacion inferior movil">
         <ul className="mobile-bottom-nav__list">
