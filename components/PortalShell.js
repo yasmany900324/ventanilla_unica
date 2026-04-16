@@ -1,11 +1,8 @@
+"use client";
+
+import { useCallback } from "react";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import {
-  destroySessionByToken,
-  getAuthenticatedUserFromToken,
-  SESSION_COOKIE_NAME,
-} from "../lib/auth";
+import { useAuth } from "./AuthProvider";
 
 const TOPBAR_LINKS = [
   { href: "/#accesibilidad", label: "Accesibilidad" },
@@ -130,29 +127,18 @@ function Icon({ name }) {
   );
 }
 
-async function logoutAction() {
-  "use server";
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  await destroySessionByToken(token);
-
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
-
-  redirect("/");
-}
-
-export default async function PortalShell({ children }) {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  const authenticatedUser = await getAuthenticatedUserFromToken(token);
-  const hasActiveSession = Boolean(authenticatedUser);
+export default function PortalShell({ children }) {
+  const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
+  const hasActiveSession = isAuthenticated;
+  const authenticatedUser = user;
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || "ciudadano";
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout({ redirectTo: "/" });
+    } catch (error) {
+      console.error("[auth] Header logout failed.", error);
+    }
+  }, [logout]);
   const assistantHref = hasActiveSession
     ? "/ciudadano/dashboard#detalle-caso"
     : "/#ayuda-soporte";
@@ -227,11 +213,16 @@ export default async function PortalShell({ children }) {
                   <Link href="/ciudadano/dashboard" className="portal-action-link">
                     Mi espacio
                   </Link>
-                  <form action={logoutAction} className="portal-action-form">
-                    <button type="submit" className="portal-action-button">
-                      Cerrar sesion
+                  <div className="portal-action-form">
+                    <button
+                      type="button"
+                      className="portal-action-button"
+                      onClick={handleLogout}
+                      disabled={isLoadingAuth}
+                    >
+                      {isLoadingAuth ? "Cerrando..." : "Cerrar sesion"}
                     </button>
-                  </form>
+                  </div>
                 </>
               ) : (
                 <>
@@ -323,14 +314,21 @@ export default async function PortalShell({ children }) {
           ))}
           {hasActiveSession ? (
             <li>
-              <form action={logoutAction} className="mobile-bottom-nav__form">
-                <button type="submit" className="mobile-bottom-nav__link mobile-bottom-nav__button">
+              <div className="mobile-bottom-nav__form">
+                <button
+                  type="button"
+                  className="mobile-bottom-nav__link mobile-bottom-nav__button"
+                  onClick={handleLogout}
+                  disabled={isLoadingAuth}
+                >
                   <span className="mobile-bottom-nav__icon">
                     <Icon name="login" />
                   </span>
-                  <span className="mobile-bottom-nav__label">Salir</span>
+                  <span className="mobile-bottom-nav__label">
+                    {isLoadingAuth ? "Saliendo..." : "Salir"}
+                  </span>
                 </button>
-              </form>
+              </div>
             </li>
           ) : null}
         </ul>

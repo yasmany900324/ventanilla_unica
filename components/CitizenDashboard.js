@@ -6,32 +6,33 @@ import { useRouter, useSearchParams } from "next/navigation";
 import IncidentForm from "./IncidentForm";
 import IncidentListItem from "./IncidentListItem";
 import IncidentCaseDetail from "./IncidentCaseDetail";
+import { useAuth } from "./AuthProvider";
 import {
   getIncidentCreationValue,
   getIncidentRecencyValue,
 } from "../lib/incidentDisplay";
 
-export default function CitizenDashboard({ initialUser = null }) {
+export default function CitizenDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, refreshSession } = useAuth();
   const requestedIncidentId = searchParams.get("incidentId");
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [authenticatedUser, setAuthenticatedUser] = useState(initialUser);
 
   useEffect(() => {
     const loadIncidents = async () => {
       try {
-        const sessionResponse = await fetch("/api/auth/session");
-        const sessionData = await sessionResponse.json();
-        if (!sessionResponse.ok || !sessionData.user) {
+        const sessionUser = await refreshSession({ silent: true });
+        if (!sessionUser) {
           router.replace("/login");
           return;
         }
 
-        setAuthenticatedUser(sessionData.user);
+        // Temporary trace log while validating auth synchronization flow.
+        console.info("[auth] Dashboard synchronized with refreshed session.");
 
         const response = await fetch("/api/incidents");
         const data = await response.json();
@@ -67,7 +68,7 @@ export default function CitizenDashboard({ initialUser = null }) {
     };
 
     loadIncidents();
-  }, [requestedIncidentId, router]);
+  }, [requestedIncidentId, refreshSession, router]);
 
   const recentIncidents = useMemo(() => {
     return [...incidents]
@@ -147,7 +148,7 @@ export default function CitizenDashboard({ initialUser = null }) {
         <div>
           <p className="eyebrow">Espacio privado ciudadano</p>
           <h1>
-            Hola, {authenticatedUser?.fullName || "ciudadano"}
+            Hola, {user?.fullName || "ciudadano"}
           </h1>
           <p className="description">
             Gestiona tus incidencias, revisa sus estados y consulta el detalle
