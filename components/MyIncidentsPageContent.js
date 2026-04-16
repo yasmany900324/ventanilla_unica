@@ -26,7 +26,9 @@ export default function MyIncidentsPageContent() {
   const [page, setPage] = useState(1);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [activeView, setActiveView] = useState(VIEW_LIST);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const detailHeadingRef = useRef(null);
+  const trackRef = useRef(null);
   const actionButtonRefs = useRef(new Map());
   const lastFocusedIncidentIdRef = useRef("");
   const shouldRestoreFocusRef = useRef(false);
@@ -103,12 +105,29 @@ export default function MyIncidentsPageContent() {
   }, [activeView, incidents, selectedIncidentId]);
 
   useEffect(() => {
-    if (activeView === VIEW_DETAIL) {
-      detailHeadingRef.current?.focus();
-    }
-  }, [activeView, selectedIncidentId]);
+    const mediaQueryList = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleMotionPreferenceChange = (event) => {
+      setPrefersReducedMotion(event.matches);
+    };
+
+    setPrefersReducedMotion(mediaQueryList.matches);
+    mediaQueryList.addEventListener("change", handleMotionPreferenceChange);
+
+    return () => {
+      mediaQueryList.removeEventListener("change", handleMotionPreferenceChange);
+    };
+  }, []);
 
   useEffect(() => {
+    if (!prefersReducedMotion) {
+      return;
+    }
+
+    if (activeView === VIEW_DETAIL) {
+      detailHeadingRef.current?.focus();
+      return;
+    }
+
     if (activeView !== VIEW_LIST || !shouldRestoreFocusRef.current) {
       return;
     }
@@ -120,7 +139,7 @@ export default function MyIncidentsPageContent() {
       lastFocusedButton.focus();
     }
     shouldRestoreFocusRef.current = false;
-  }, [activeView]);
+  }, [activeView, prefersReducedMotion]);
 
   const hasPreviousPage = useMemo(() => pagination.page > 1, [pagination.page]);
   const hasNextPage = useMemo(
@@ -147,6 +166,7 @@ export default function MyIncidentsPageContent() {
 
   const handleOpenDetail = (incidentId) => {
     lastFocusedIncidentIdRef.current = incidentId;
+    shouldRestoreFocusRef.current = false;
     setSelectedIncidentId(incidentId);
     setActiveView(VIEW_DETAIL);
   };
@@ -154,6 +174,29 @@ export default function MyIncidentsPageContent() {
   const handleBackToList = () => {
     shouldRestoreFocusRef.current = true;
     setActiveView(VIEW_LIST);
+  };
+
+  const handleTrackTransitionEnd = (event) => {
+    if (event.target !== trackRef.current || event.propertyName !== "transform") {
+      return;
+    }
+
+    if (activeView === VIEW_DETAIL) {
+      detailHeadingRef.current?.focus();
+      return;
+    }
+
+    if (!shouldRestoreFocusRef.current) {
+      return;
+    }
+
+    const lastFocusedButton = actionButtonRefs.current.get(
+      lastFocusedIncidentIdRef.current
+    );
+    if (lastFocusedButton) {
+      lastFocusedButton.focus();
+    }
+    shouldRestoreFocusRef.current = false;
   };
 
   return (
@@ -179,9 +222,11 @@ export default function MyIncidentsPageContent() {
       {!isLoading && !errorMessage && incidents.length > 0 ? (
         <div className="my-incidents-inline__viewport">
           <div
+            ref={trackRef}
             className={`my-incidents-inline__track${
               isShowingDetail ? " my-incidents-inline__track--detail" : ""
             }`}
+            onTransitionEnd={handleTrackTransitionEnd}
           >
             <section
               className="my-incidents-inline__panel my-incidents-inline__panel--list"

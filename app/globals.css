@@ -679,17 +679,22 @@ button:disabled {
 .my-incidents-inline__viewport {
   width: 100%;
   overflow: hidden;
+  min-height: clamp(28rem, 60vh, 40rem);
+  position: relative;
 }
 
 .my-incidents-inline__track {
   display: flex;
+  align-items: flex-start;
   width: 100%;
-  transform: translateX(0);
-  transition: transform 260ms ease;
+  transform: translate3d(0, 0, 0);
+  transition: transform 240ms ease;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .my-incidents-inline__track--detail {
-  transform: translateX(-100%);
+  transform: translate3d(-100%, 0, 0);
 }
 
 .my-incidents-inline__panel {
@@ -886,25 +891,8 @@ a {
     grid-auto-columns: minmax(88%, 1fr);
   }
 
-  .my-incidents-inline__track,
-  .my-incidents-inline__track--detail {
-    width: 100%;
-    transform: none;
-  }
-
-  .my-incidents-inline__track {
-    display: block;
-  }
-
-  .my-incidents-inline__panel {
-    width: 100%;
-    min-width: 100%;
-    max-width: 100%;
-    padding: 0;
-  }
-
-  .my-incidents-inline__panel[aria-hidden="true"] {
-    display: none;
+  .my-incidents-inline__viewport {
+    min-height: 24rem;
   }
 
   .portal-footer__inner {
