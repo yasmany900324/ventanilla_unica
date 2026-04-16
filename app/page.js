@@ -53,18 +53,6 @@ export default async function HomePage() {
         <p className="eyebrow">Atencion ciudadana digital</p>
         <h1>{heroTitle}</h1>
         <p className="description">{heroDescription}</p>
-        {!hasActiveSession ? (
-          <div className="hero-actions">
-            <>
-              <Link href="/login" className="button-link">
-                Iniciar sesion
-              </Link>
-              <Link href="/registro" className="button-link button-link--secondary">
-                Crear cuenta
-              </Link>
-            </>
-          </div>
-        ) : null}
       </section>
 
       <section className="feature-grid" aria-label="Beneficios del sistema">
