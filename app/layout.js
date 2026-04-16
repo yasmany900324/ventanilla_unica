@@ -1,4 +1,5 @@
 import "./globals.css";
+import PortalShell from "../components/PortalShell";
 
 export const metadata = {
   title: "Ventanilla de incidencias",
@@ -8,7 +9,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <PortalShell>{children}</PortalShell>
+      </body>
     </html>
   );
 }

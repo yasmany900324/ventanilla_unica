@@ -220,14 +220,6 @@ export default function CitizenDashboard({ initialUser = null }) {
     setSelectedIncidentId(data.incident.id);
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } finally {
-      router.replace("/login");
-    }
-  };
-
   const selectedStatusIndex = STATUS_STEPS.findIndex(
     (status) => status.value === selectedIncident?.status
   );
@@ -248,11 +240,11 @@ export default function CitizenDashboard({ initialUser = null }) {
         </div>
         <div className="hero-actions">
           <Link href="/" className="button-link button-link--secondary">
-            Ver landing publica
+            Inicio del portal
           </Link>
-          <button type="button" className="button-link" onClick={handleLogout}>
-            Cerrar sesion
-          </button>
+          <Link href="#nueva-incidencia" className="button-link">
+            Nueva incidencia
+          </Link>
         </div>
       </section>
 
