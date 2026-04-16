@@ -108,7 +108,7 @@ export default async function HomePage() {
               <Link href="/ciudadano/dashboard" className="button-link">
                 Ir a mi panel ciudadano
               </Link>
-              <Link href="/ciudadano/dashboard#mis-incidencias-recientes" className="button-link button-link--secondary">
+              <Link href="/mis-incidencias" className="button-link button-link--secondary">
                 Ver mis incidencias
               </Link>
             </>

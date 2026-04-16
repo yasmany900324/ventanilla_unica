@@ -2,103 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import IncidentForm from "./IncidentForm";
-
-const STATUS_STEPS = [
-  { value: "recibido", label: "Recibido" },
-  { value: "en revision", label: "En revision" },
-  { value: "en proceso", label: "En proceso" },
-  { value: "resuelto", label: "Resuelto" },
-];
-
-const STATUS_LABELS = STATUS_STEPS.reduce((accumulator, status) => {
-  return { ...accumulator, [status.value]: status.label };
-}, {});
-
-function formatDate(value) {
-  if (!value) {
-    return "Sin fecha";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Sin fecha";
-  }
-
-  return new Intl.DateTimeFormat("es-ES", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function formatIncidentCode(id) {
-  return `INC-${String(id).slice(0, 8).toUpperCase()}`;
-}
-
-function shortenText(value, limit = 120) {
-  if (!value) {
-    return "";
-  }
-
-  if (value.length <= limit) {
-    return value;
-  }
-
-  return `${value.slice(0, limit)}...`;
-}
-
-function getDateValue(value) {
-  if (!value) {
-    return 0;
-  }
-
-  const date = new Date(value);
-  const timeValue = date.getTime();
-  return Number.isNaN(timeValue) ? 0 : timeValue;
-}
-
-function getIncidentRecencyValue(incident) {
-  if (!incident) {
-    return 0;
-  }
-
-  return (
-    getDateValue(incident.updatedAt) ||
-    getDateValue(incident.createdAt) ||
-    getDateValue(incident.date)
-  );
-}
-
-function buildHistoryEntries(incident) {
-  if (!incident) {
-    return [];
-  }
-
-  const currentStatusIndex = STATUS_STEPS.findIndex(
-    (step) => step.value === incident.status
-  );
-  const reachedSteps = STATUS_STEPS.slice(
-    0,
-    currentStatusIndex >= 0 ? currentStatusIndex + 1 : 1
-  );
-
-  return reachedSteps.map((step, index) => ({
-    id: `${incident.id}-${step.value}`,
-    title: index === 0 ? "Caso recibido" : `Cambio a ${step.label}`,
-    date:
-      index === 0
-        ? formatDate(incident.createdAt)
-        : formatDate(incident.updatedAt || incident.createdAt),
-    description:
-      index === 0
-        ? "La incidencia fue registrada y enviada al sistema institucional."
-        : "El caso avanzo dentro del flujo oficial de atencion.",
-  }));
-}
+import IncidentListItem from "./IncidentListItem";
+import {
+  STATUS_LABELS,
+  STATUS_STEPS,
+  buildHistoryEntries,
+  formatDate,
+  formatIncidentCode,
+  getIncidentCreationValue,
+  getIncidentRecencyValue,
+} from "../lib/incidentDisplay";
 
 export default function CitizenDashboard({ initialUser = null }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedIncidentId = searchParams.get("incidentId");
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -131,12 +51,17 @@ export default function CitizenDashboard({ initialUser = null }) {
         const loadedIncidents = data.incidents ?? [];
         setIncidents(loadedIncidents);
         if (loadedIncidents.length > 0) {
+          const requestedIncident = loadedIncidents.find(
+            (incident) => incident.id === requestedIncidentId
+          );
           const mostRecentIncident = [...loadedIncidents].sort(
             (firstIncident, secondIncident) =>
               getIncidentRecencyValue(secondIncident) -
               getIncidentRecencyValue(firstIncident)
           )[0];
-          setSelectedIncidentId(mostRecentIncident?.id || loadedIncidents[0].id);
+          setSelectedIncidentId(
+            requestedIncident?.id || mostRecentIncident?.id || loadedIncidents[0].id
+          );
         }
       } catch (error) {
         setErrorMessage(error.message);
@@ -146,16 +71,16 @@ export default function CitizenDashboard({ initialUser = null }) {
     };
 
     loadIncidents();
-  }, [router]);
+  }, [requestedIncidentId, router]);
 
   const recentIncidents = useMemo(() => {
     return [...incidents]
       .sort(
         (firstIncident, secondIncident) =>
-          getIncidentRecencyValue(secondIncident) -
-          getIncidentRecencyValue(firstIncident)
+          getIncidentCreationValue(secondIncident) -
+          getIncidentCreationValue(firstIncident)
       )
-      .slice(0, 8);
+      .slice(0, 6);
   }, [incidents]);
 
   const selectedIncident = useMemo(() => {
@@ -299,57 +224,25 @@ export default function CitizenDashboard({ initialUser = null }) {
               const isSelected = selectedIncident?.id === incident.id;
 
               return (
-                <li
+                <IncidentListItem
                   key={incident.id}
-                  className={`incident-card incident-card--carousel${
+                  incident={incident}
+                  className={`incident-card--carousel${
                     isSelected ? " incident-card--selected" : ""
                   }`}
-                >
-                  <div className="incident-card__header">
-                    <h3>{incident.category}</h3>
-                    <div className="incident-card__badges">
-                      <span
-                        className={`badge badge--${incident.status.replace(" ", "-")}`}
-                      >
-                        {STATUS_LABELS[incident.status] || incident.status}
-                      </span>
-                      {isSelected ? (
-                        <span className="selected-indicator">Seleccionada</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="small">
-                    <strong>Codigo:</strong> {formatIncidentCode(incident.id)}
-                  </p>
-                  <p className="small">
-                    <strong>Descripcion breve:</strong>{" "}
-                    {shortenText(incident.description)}
-                  </p>
-                  <p className="small">
-                    <strong>Ubicacion:</strong> {incident.location}
-                  </p>
-                  <p className="small">
-                    <strong>Fecha:</strong> {formatDate(incident.createdAt)}
-                  </p>
-                  <p className="small">
-                    <strong>Estado actual:</strong>{" "}
-                    {STATUS_LABELS[incident.status] || incident.status}
-                  </p>
-                  <button
-                    type="button"
-                    className={`button-inline${
-                      isSelected ? " button-inline--selected" : ""
-                    }`}
-                    aria-pressed={isSelected}
-                    onClick={() => setSelectedIncidentId(incident.id)}
-                  >
-                    Ver detalle
-                  </button>
-                </li>
+                  isSelected={isSelected}
+                  onSelect={setSelectedIncidentId}
+                  actionLabel="Ver detalle"
+                />
               );
             })}
           </ul>
         ) : null}
+        <div className="recent-incidents-footer">
+          <Link href="/mis-incidencias" className="button-link button-link--secondary">
+            Ver todas mis incidencias
+          </Link>
+        </div>
       </section>
 
       <section id="detalle-caso" className="card case-detail-card">
