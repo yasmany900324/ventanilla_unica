@@ -38,7 +38,7 @@ export default async function HomePage() {
     ? `Bienvenido, ${citizenName}`
     : "Sistema de Atencion Ciudadana";
   const heroDescription = hasActiveSession
-    ? "Ya tienes una sesion activa. Accede a tu panel para registrar nuevas incidencias y consultar el estado de tus casos."
+    ? "Tu espacio ciudadano esta activo para gestionar tus incidencias desde la navegacion principal."
     : "Plataforma institucional para gestionar incidencias con un flujo ordenado, visible y centrado en la experiencia de la ciudadania.";
   const accessTitle = hasActiveSession
     ? "Tu espacio ciudadano ya esta listo para operar"
@@ -53,17 +53,8 @@ export default async function HomePage() {
         <p className="eyebrow">Atencion ciudadana digital</p>
         <h1>{heroTitle}</h1>
         <p className="description">{heroDescription}</p>
-        <div className="hero-actions">
-          {hasActiveSession ? (
-            <>
-              <Link href="/ciudadano/dashboard" className="button-link">
-                Ir a mi panel
-              </Link>
-              <Link href="/ciudadano/dashboard#nueva-incidencia" className="button-link button-link--secondary">
-                Nueva incidencia
-              </Link>
-            </>
-          ) : (
+        {!hasActiveSession ? (
+          <div className="hero-actions">
             <>
               <Link href="/login" className="button-link">
                 Iniciar sesion
@@ -72,8 +63,8 @@ export default async function HomePage() {
                 Crear cuenta
               </Link>
             </>
-          )}
-        </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="feature-grid" aria-label="Beneficios del sistema">
