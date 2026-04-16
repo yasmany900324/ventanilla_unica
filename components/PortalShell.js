@@ -17,7 +17,7 @@ const PUBLIC_MOBILE_NAV = [
 const AUTH_MOBILE_NAV = [
   { href: "/", label: "Inicio", icon: "home" },
   {
-    href: "/ciudadano/dashboard#mis-incidencias-recientes",
+    href: "/mis-incidencias",
     label: "Mis casos",
     icon: "cases",
   },
@@ -30,7 +30,7 @@ const FOOTER_LINK_GROUPS = [
     title: "Plataforma",
     links: [
       { href: "/", label: "Inicio" },
-      { href: "/ciudadano/dashboard#mis-incidencias-recientes", label: "Mis incidencias" },
+      { href: "/mis-incidencias", label: "Mis incidencias" },
       { href: "/ciudadano/dashboard#nueva-incidencia", label: "Nueva incidencia" },
     ],
   },
@@ -142,7 +142,7 @@ export default async function PortalShell({ children }) {
   const mainNav = [
     { href: "/", label: "Inicio" },
     {
-      href: hasActiveSession ? "/ciudadano/dashboard#mis-incidencias-recientes" : "/login",
+      href: hasActiveSession ? "/mis-incidencias" : "/login",
       label: "Mis incidencias",
     },
     {
