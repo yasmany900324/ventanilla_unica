@@ -8,14 +8,6 @@ import {
   formatIncidentCode,
 } from "../lib/incidentDisplay";
 
-function getHeadingTag(level) {
-  if (level === 3) {
-    return "h3";
-  }
-
-  return "h2";
-}
-
 export default function IncidentCaseDetail({
   incident = null,
   headingRef = null,
@@ -27,7 +19,7 @@ export default function IncidentCaseDetail({
   onBackButtonClick = null,
   isBackButtonDisabled = false,
 }) {
-  const HeadingTag = getHeadingTag(headingLevel);
+  const shouldRenderLevelThreeHeading = headingLevel === 3;
   const selectedStatusIndex = STATUS_STEPS.findIndex(
     (status) => status.value === incident?.status
   );
@@ -35,9 +27,15 @@ export default function IncidentCaseDetail({
 
   return (
     <>
-      <HeadingTag id={headingId} ref={headingRef} tabIndex={-1}>
-        {title}
-      </HeadingTag>
+      {shouldRenderLevelThreeHeading ? (
+        <h3 id={headingId} ref={headingRef} tabIndex={-1}>
+          {title}
+        </h3>
+      ) : (
+        <h2 id={headingId} ref={headingRef} tabIndex={-1}>
+          {title}
+        </h2>
+      )}
       <p className="small">{description}</p>
 
       {onBackButtonClick ? (
