@@ -43,8 +43,8 @@ const ATTENTION_FLOW = [
 
 const HERO_BENEFITS = [
   "Disponible 24 horas",
-  "Seguimiento por numero de ticket",
-  "Gestion clara y trazable",
+  "Seguimiento por ticket",
+  "Atencion clara y trazable",
 ];
 
 const CITIZEN_ACTIONS = [
@@ -84,7 +84,7 @@ export default async function HomePage() {
   const citizenName = authenticatedUser?.fullName || "ciudadano";
 
   const heroDescription =
-    "Portal institucional para iniciar incidencias y tramites, consultar estados y mantener un seguimiento transparente de cada caso.";
+    "Portal institucional para registrar incidencias, consultar estados y mantener trazabilidad completa de cada caso.";
   const accessTitle = hasActiveSession
     ? "Tu espacio ciudadano ya esta listo para operar"
     : "Accede a tu espacio ciudadano";
@@ -99,15 +99,17 @@ export default async function HomePage() {
     <main className="page page--home">
       <section className="home-hero-grid" aria-labelledby="titulo-home">
         <div className="card card--hero home-hero-panel">
-          <p className="eyebrow">Atencion ciudadana digital</p>
-          <h1 id="titulo-home">Sistema de Atencion Ciudadana</h1>
-          <p className="description">{heroDescription}</p>
+          <div className="home-hero-panel__head">
+            <p className="eyebrow eyebrow--hero">Portal institucional de atencion ciudadana</p>
+            <h1 id="titulo-home">Ventanilla Digital de Atencion Ciudadana</h1>
+            <p className="description home-hero-panel__description">{heroDescription}</p>
+          </div>
 
           {hasActiveSession ? (
             <p className="small home-hero-greeting">Sesion activa: hola, {citizenName}.</p>
           ) : null}
 
-          <div className="hero-actions">
+          <div className="hero-actions hero-actions--hero">
             <Link
               href={hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro"}
               className="button-link"
@@ -132,24 +134,31 @@ export default async function HomePage() {
           </ul>
         </div>
 
-        <aside className="card hero-side-card" aria-label="Acceso rapido">
-          <p className="eyebrow">Acceso rapido</p>
-          <h2>
-            {hasActiveSession
-              ? "Ir a tu espacio ciudadano"
-              : "Crea o activa tu perfil ciudadano"}
-          </h2>
+        <aside className="card hero-side-card hero-side-card--featured" aria-label="Asistente y acceso rapido">
+          <p className="eyebrow">Asistente ciudadano</p>
+          <h2>Orientacion inmediata para cada tramite o incidencia</h2>
           <p className="small">
-            {hasActiveSession
-              ? "Ingresa al panel para registrar nuevas incidencias y revisar el estado de tus casos."
-              : "Registra tu cuenta para iniciar tramites, consultar estados y recibir actualizaciones de seguimiento."}
+            Consulta pasos, estados y resolucion de dudas con una atencion guiada y trazable.
           </p>
+          <div className="hero-side-card__ticket">
+            <p className="hero-side-card__ticket-label">Seguimiento institucional</p>
+            <p className="hero-side-card__ticket-value">Ticket ACT-2026-0148</p>
+            <p className="small">Estado, mensajes oficiales y cierre visibles en un solo hilo.</p>
+          </div>
+          <ul className="hero-side-highlights" aria-label="Atributos del asistente">
+            <li>Respuesta guiada para ciudadanos</li>
+            <li>Contexto por numero de ticket</li>
+            <li>Escalamiento a soporte institucional</li>
+          </ul>
           <div className="hero-actions">
+            <Link href={assistantHref} className="button-link">
+              Hablar con el asistente
+            </Link>
             <Link
               href={hasActiveSession ? "/ciudadano/dashboard" : "/login"}
-              className="button-link"
+              className="button-link button-link--secondary"
             >
-              {hasActiveSession ? "Abrir mi panel" : "Iniciar sesion"}
+              {hasActiveSession ? "Abrir mi espacio" : "Iniciar sesion"}
             </Link>
             {!hasActiveSession ? (
               <Link href="/registro" className="button-link button-link--secondary">
@@ -160,16 +169,24 @@ export default async function HomePage() {
         </aside>
       </section>
 
-      <section className="feature-grid" aria-label="Beneficios del sistema">
-        {FEATURE_SUMMARY.map((feature) => (
-          <article key={feature.title} className="card feature-card">
-            <h2>{feature.title}</h2>
-            <p className="small">{feature.description}</p>
-          </article>
-        ))}
+      <section className="home-value-section" aria-label="Beneficios del sistema">
+        <div className="home-section-intro">
+          <p className="eyebrow">Beneficios institucionales</p>
+          <h2>Atencion publica moderna con foco en transparencia</h2>
+        </div>
+        <div className="feature-grid">
+          {FEATURE_SUMMARY.map((feature, index) => (
+            <article key={feature.title} className="card feature-card">
+              <p className="feature-card__kicker">Beneficio {String(index + 1).padStart(2, "0")}</p>
+              <h3>{feature.title}</h3>
+              <p className="small">{feature.description}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="card flow-section">
+        <p className="eyebrow">Trazabilidad del proceso</p>
         <h2>Flujo general de atencion</h2>
         <p className="small">
           Todas las incidencias siguen etapas estandar para dar trazabilidad y
@@ -197,30 +214,39 @@ export default async function HomePage() {
             ))}
           </ul>
         </div>
-        <div className="hero-actions citizen-access-section__actions">
-          {hasActiveSession ? (
-            <>
-              <Link href="/ciudadano/dashboard" className="button-link">
-                Ir a mi panel ciudadano
-              </Link>
-              <Link href="/mis-incidencias" className="button-link button-link--secondary">
-                Ver mis incidencias
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="button-link">
-                Ir a iniciar sesion
-              </Link>
-              <Link href="/registro" className="button-link button-link--secondary">
-                Registrarme ahora
-              </Link>
-            </>
-          )}
+        <div className="citizen-access-section__actions-panel">
+          <p className="eyebrow">Acceso seguro</p>
+          <p className="small">
+            {hasActiveSession
+              ? "Continua la gestion de tus casos activos y revisa el historial de seguimiento."
+              : "Autenticate para operar sobre tus casos y mantener tu historial ciudadano protegido."}
+          </p>
+          <div className="hero-actions citizen-access-section__actions">
+            {hasActiveSession ? (
+              <>
+                <Link href="/ciudadano/dashboard" className="button-link">
+                  Ir a mi panel ciudadano
+                </Link>
+                <Link href="/mis-incidencias" className="button-link button-link--secondary">
+                  Ver mis incidencias
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="button-link">
+                  Ir a iniciar sesion
+                </Link>
+                <Link href="/registro" className="button-link button-link--secondary">
+                  Registrarme ahora
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
       <section id="ayuda-soporte" className="card support-section">
+        <p className="eyebrow">Ayuda institucional</p>
         <h2>Ayuda y soporte</h2>
         <p className="small">
           Accede a recursos de orientacion y a los canales institucionales para
@@ -236,13 +262,13 @@ export default async function HomePage() {
               </Link>
             </article>
           ))}
-          <article className="support-card">
+          <article className="support-card support-card--assistant">
             <h3>Hablar con el asistente</h3>
             <p className="small">
               Inicia una consulta guiada para orientarte sobre el estado de tu caso o
               sobre los pasos del proceso de atencion.
             </p>
-            <Link href={assistantHref} className="support-card__link">
+            <Link href={assistantHref} className="support-card__link support-card__link--assistant">
               Iniciar conversacion
             </Link>
           </article>
