@@ -139,9 +139,7 @@ export default function PortalShell({ children }) {
       console.error("[auth] Header logout failed.", error);
     }
   }, [logout]);
-  const assistantHref = hasActiveSession
-    ? "/ciudadano/dashboard#detalle-caso"
-    : "/#ayuda-soporte";
+  const assistantHref = "/asistente";
   const mainNav = [
     { href: "/", label: "Inicio" },
     {
