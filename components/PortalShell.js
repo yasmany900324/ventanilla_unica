@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
@@ -225,13 +226,14 @@ export default function PortalShell({ children }) {
         <div className="portal-header__main">
           <div className="portal-header__inner">
             <Link href="/" className="portal-brand" aria-label={copy.portal.brandAriaLabel}>
-              <span className="portal-brand__crest" aria-hidden="true">
-                IM
-              </span>
-              <span className="portal-brand__text">
-                <strong>{copy.portal.brandName}</strong>
-                <small>{copy.portal.brandSubtitle}</small>
-              </span>
+              <Image
+                src="/images/logo-intendencia-maldonado.png"
+                alt={copy.portal.brandName}
+                width={1401}
+                height={606}
+                className="portal-brand__image"
+                priority
+              />
             </Link>
 
             <nav className="portal-nav" aria-label={copy.portal.mainNavAriaLabel}>
@@ -290,10 +292,13 @@ export default function PortalShell({ children }) {
         <div className="portal-footer__inner">
           <div className="portal-footer__brand">
             <div className="portal-footer__brand-head">
-              <span className="portal-footer__crest" aria-hidden="true">
-                IM
-              </span>
-              <h2>{copy.portal.brandName}</h2>
+              <Image
+                src="/images/logo-intendencia-maldonado.png"
+                alt={copy.portal.brandName}
+                width={1401}
+                height={606}
+                className="portal-footer__brand-logo"
+              />
             </div>
             <p>
               {copy.portal.footerAddress}
