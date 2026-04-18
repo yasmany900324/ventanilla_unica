@@ -1,5 +1,8 @@
 :root {
   color-scheme: light;
+  --institutional-logo-ratio: 1401 / 606;
+  --institutional-logo-header-width: clamp(176px, 24vw, 310px);
+  --institutional-logo-footer-width: clamp(200px, 28vw, 300px);
 }
 
 * {
@@ -150,13 +153,30 @@ body {
 .portal-brand {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   color: inherit;
   text-decoration: none;
 }
 
-.portal-brand__image {
-  width: clamp(190px, 25vw, 320px);
+.institutional-logo {
+  max-width: var(--institutional-logo-max-width);
+  width: 100%;
+  aspect-ratio: var(--institutional-logo-ratio);
+  display: block;
+}
+
+.institutional-logo__image {
+  width: 100%;
   height: auto;
+  object-fit: contain;
+}
+
+.institutional-logo--header {
+  --institutional-logo-max-width: var(--institutional-logo-header-width);
+}
+
+.institutional-logo--footer {
+  --institutional-logo-max-width: var(--institutional-logo-footer-width);
 }
 
 .portal-nav {
@@ -1922,13 +1942,9 @@ button:disabled {
 .portal-footer__brand-head {
   display: inline-flex;
   align-items: center;
+  width: 100%;
+  max-width: var(--institutional-logo-footer-width);
   gap: 0;
-}
-
-.portal-footer__brand-logo {
-  width: min(100%, 300px);
-  height: auto;
-  border-radius: 8px;
 }
 
 .portal-footer__brand h2 {
@@ -2600,11 +2616,11 @@ textarea:focus-visible {
   }
 
   .portal-header__inner {
-    padding: 0.7rem 0.8rem;
+    padding: 0.52rem 0.8rem;
   }
 
-  .portal-brand__image {
-    width: clamp(160px, 55vw, 250px);
+  .institutional-logo--header {
+    --institutional-logo-max-width: clamp(156px, 58vw, 236px);
   }
 
   .portal-nav {
