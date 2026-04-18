@@ -537,7 +537,7 @@ export default function AssistantChatPage() {
   return (
     <main className="page page--assistant" lang={locale}>
       <section className="card assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
-        <ChatHeader copy={uiCopy.header} />
+        <ChatHeader copy={uiCopy} />
 
         <div
           ref={scrollContainerRef}
