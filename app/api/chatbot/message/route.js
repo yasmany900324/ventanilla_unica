@@ -34,6 +34,11 @@ import {
   computeMissingIncidentFields,
   normalizeIncidentDraft,
 } from "../../../../lib/chatbotIncidentMapper";
+import {
+  CHATBOT_FUNNEL_STEPS,
+  CHATBOT_TELEMETRY_EVENTS,
+  trackChatbotEvent,
+} from "../../../../lib/chatbotTelemetry";
 
 const FALLBACK_REPLY =
   "No logre identificar con claridad tu solicitud. Contame si quieres reportar un problema, iniciar un tramite o consultar el estado de una gestion.";
@@ -93,6 +98,20 @@ export async function POST(request) {
     headerLocale ||
     getDefaultLocale();
   const effectiveLocale = normalizeLocale(selectedLocale) || getDefaultLocale();
+  const trackEvent = async (partialPayload) => {
+    await trackChatbotEvent({
+      sessionId,
+      locale: effectiveLocale,
+      command,
+      ...partialPayload,
+    });
+  };
+
+  await trackEvent({
+    eventName: CHATBOT_TELEMETRY_EVENTS.TURN_RECEIVED,
+    mode: "unknown",
+    details: text ? "user_turn_with_text" : "user_turn_command_only",
+  });
 
   if (command === "cancel_incident") {
     await clearIncidentDraft(sessionId);
@@ -102,6 +121,13 @@ export async function POST(request) {
       draft: EMPTY_INCIDENT_DRAFT,
       pendingField: null,
       lastAction: command,
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.CANCELLED,
+      funnelStep: CHATBOT_FUNNEL_STEPS.CANCELLED,
+      mode: "incident",
+      action: command,
+      outcome: "draft_cleared",
     });
 
     return NextResponse.json({
@@ -140,6 +166,14 @@ export async function POST(request) {
         draft: normalizedDraft,
         pendingField: nextField,
         lastAction: command,
+      });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+        funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+        mode: "incident",
+        action: command,
+        fieldName: nextField,
+        outcome: "resume_missing_fields",
       });
 
       const partialFlow = buildIncidentFlowFromDialogTurn({
@@ -188,6 +222,13 @@ export async function POST(request) {
       pendingField: null,
       lastAction: command,
     });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_RESUMED,
+      funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
+      mode: "incident",
+      action: command,
+      outcome: "resume_ready",
+    });
 
     return NextResponse.json({
       sessionId,
@@ -225,6 +266,14 @@ export async function POST(request) {
         draft: normalizedDraft,
         pendingField: nextField,
         lastAction: command,
+      });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+        funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+        mode: "incident",
+        action: command,
+        fieldName: nextField,
+        outcome: "confirm_with_missing_fields",
       });
 
       const partialFlow = buildIncidentFlowFromDialogTurn({
@@ -275,6 +324,14 @@ export async function POST(request) {
         pendingField: null,
         lastAction: command,
       });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.AUTH_REQUIRED,
+        funnelStep: CHATBOT_FUNNEL_STEPS.AUTH_REQUIRED,
+        mode: "incident",
+        action: command,
+        hasAuth: true,
+        outcome: "auth_needed_before_creation",
+      });
 
       return NextResponse.json({
         sessionId,
@@ -302,6 +359,13 @@ export async function POST(request) {
     }
 
     try {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+        funnelStep: CHATBOT_FUNNEL_STEPS.CONFIRMED,
+        mode: "incident",
+        action: command,
+        outcome: "user_confirmed_creation",
+      });
       const incident = await createIncident({
         userId: authenticatedUser.id,
         category: normalizedDraft.category,
@@ -315,6 +379,15 @@ export async function POST(request) {
         draft: EMPTY_INCIDENT_DRAFT,
         pendingField: null,
         lastAction: "incident_created",
+      });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.INCIDENT_CREATED,
+        funnelStep: CHATBOT_FUNNEL_STEPS.INCIDENT_CREATED,
+        mode: "incident",
+        action: "incident_created",
+        outcome: "success",
+        incidentId: incident.id,
+        userId: authenticatedUser.id,
       });
 
       return NextResponse.json({
@@ -360,6 +433,14 @@ export async function POST(request) {
         userId: authenticatedUser.id,
         message: error?.message,
       });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
+        mode: "incident",
+        action: command,
+        outcome: "incident_creation_failed",
+        details: error?.message,
+        userId: authenticatedUser.id,
+      });
       return NextResponse.json(
         {
           error:
@@ -378,6 +459,21 @@ export async function POST(request) {
       draft: normalizedDraft,
       pendingField: "category",
       lastAction: command,
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
+      mode: "incident",
+      action: command,
+      fieldName: "category",
+      outcome: "edit_requested",
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+      mode: "incident",
+      action: command,
+      fieldName: "category",
+      outcome: "edit_prompted",
     });
     const partialFlow = buildIncidentFlowFromDialogTurn({
       text: "",
@@ -425,6 +521,21 @@ export async function POST(request) {
       draft: normalizedDraft,
       pendingField: "description",
       lastAction: command,
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
+      mode: "incident",
+      action: command,
+      fieldName: "description",
+      outcome: "edit_requested",
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+      mode: "incident",
+      action: command,
+      fieldName: "description",
+      outcome: "edit_prompted",
     });
 
     const partialFlow = buildIncidentFlowFromDialogTurn({
@@ -474,6 +585,21 @@ export async function POST(request) {
       pendingField: "location",
       lastAction: command,
     });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
+      mode: "incident",
+      action: command,
+      fieldName: "location",
+      outcome: "edit_requested",
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+      mode: "incident",
+      action: command,
+      fieldName: "location",
+      outcome: "edit_prompted",
+    });
 
     const partialFlow = buildIncidentFlowFromDialogTurn({
       text: "",
@@ -515,6 +641,11 @@ export async function POST(request) {
 
   if (!isDialogflowConfigured()) {
     console.error("[chatbot] Dialogflow no configurado en entorno servidor.");
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
+      mode: "unknown",
+      outcome: "dialogflow_not_configured",
+    });
     return NextResponse.json(
       {
         error: "El asistente no esta disponible temporalmente.",
@@ -565,6 +696,74 @@ export async function POST(request) {
       lastAction: dialogflowResponse.action,
       lastConfidence: dialogflowResponse.confidence,
     });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.INTENT_DETECTED,
+      mode: conversationFlow.mode,
+      intent: dialogflowResponse.intent,
+      action: dialogflowResponse.action,
+      confidence: dialogflowResponse.confidence,
+      outcome: shouldAskClarification ? "low_confidence_or_fallback" : "intent_ok",
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
+      mode: conversationFlow.mode,
+      intent: dialogflowResponse.intent,
+      action: dialogflowResponse.action,
+      confidence: dialogflowResponse.confidence,
+      hasRedirect: Boolean(resolvedRedirect),
+      outcome: conversationFlow.nextStep?.type || "none",
+    });
+    if (conversationFlow.mode === "incident") {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
+        funnelStep: CHATBOT_FUNNEL_STEPS.ENTERED_INCIDENT_FLOW,
+        mode: conversationFlow.mode,
+        intent: dialogflowResponse.intent,
+        action: dialogflowResponse.action,
+        outcome: "incident_mode_active",
+      });
+      if (conversationFlow.nextStep?.type === "ask_field") {
+        await trackEvent({
+          eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
+          funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+          mode: conversationFlow.mode,
+          intent: dialogflowResponse.intent,
+          action: dialogflowResponse.action,
+          fieldName: conversationFlow.nextStep?.field || null,
+          outcome: "field_requested",
+        });
+      }
+      if (conversationFlow.nextStep?.type === "confirm_incident") {
+        await trackEvent({
+          eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+          funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
+          mode: conversationFlow.mode,
+          intent: dialogflowResponse.intent,
+          action: dialogflowResponse.action,
+          outcome: "waiting_user_confirmation",
+        });
+      }
+    }
+    if (conversationFlow.mode === "fallback") {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.FALLBACK_CLARIFICATION,
+        mode: conversationFlow.mode,
+        intent: dialogflowResponse.intent,
+        action: dialogflowResponse.action,
+        confidence: dialogflowResponse.confidence,
+        outcome: "clarification_prompted",
+      });
+    }
+    if (resolvedRedirect) {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.REDIRECT_OFFERED,
+        mode: conversationFlow.mode,
+        intent: dialogflowResponse.intent,
+        action: dialogflowResponse.action,
+        hasRedirect: true,
+        outcome: resolvedRedirect,
+      });
+    }
 
     return NextResponse.json({
       sessionId: dialogflowResponse.sessionId,
@@ -592,6 +791,12 @@ export async function POST(request) {
       sessionId,
       textLength: text.length,
       message: error?.message,
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
+      mode: "unknown",
+      outcome: "detect_intent_failed",
+      details: error?.message,
     });
 
     return NextResponse.json(
