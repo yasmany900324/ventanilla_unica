@@ -11,7 +11,7 @@ export default function HomePageClient() {
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
   const assistantHref = "/asistente";
-  const reportHref = hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/registro";
+  const reportHref = assistantHref;
   const trackingHref = hasActiveSession ? "/mis-incidencias" : "/login";
   const accessTitle = copy.home.accessTitle;
   const accessDescription = hasActiveSession
@@ -78,14 +78,7 @@ export default function HomePageClient() {
 
         <div className="home-frequent__grid">
           {copy.home.frequentServices.map((item) => {
-            const href =
-              item.badgeType === "identity"
-                ? hasActiveSession
-                  ? "/ciudadano/dashboard"
-                  : "/login"
-                : hasActiveSession
-                  ? "/ciudadano/dashboard#nueva-incidencia"
-                  : "/registro";
+            const href = item.badgeType === "identity" && !hasActiveSession ? "/login" : assistantHref;
 
             return (
               <article key={item.title} className="frequent-card">

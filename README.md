@@ -71,7 +71,7 @@ El mapeo centralizado vive en:
 
 Ejemplos actuales:
 
-- `crear_incidencia` -> `/ciudadano/dashboard#nueva-incidencia`
+- `crear_incidencia` -> `/asistente`
 - `consultar_tramite` -> `/mis-incidencias`
 
 Puedes extender los mapas `ACTION_ROUTE_MAP` e `INTENT_ROUTE_MAP` segun tus intents reales de Dialogflow.
