@@ -5,6 +5,13 @@ import {
   validateDialogflowMessagePayload,
 } from "../../../../lib/dialogflowService";
 import {
+  getDefaultLocale,
+  normalizeLocale,
+  resolveLocaleFromAcceptLanguage,
+} from "../../../../lib/i18n";
+import { detectLocaleFromText } from "../../../../lib/languageDetection";
+import { getSessionLocale, setSessionLocale } from "../../../../lib/chatSessionStore";
+import {
   getChatbotRouteMetadata,
   resolveChatbotRedirect,
 } from "../../../../lib/chatbotIntentRoutes";
@@ -39,7 +46,7 @@ export async function POST(request) {
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
   }
 
-  const { text, sessionId } = validationResult.value;
+  const { text, sessionId, preferredLocale } = validationResult.value;
 
   if (!isDialogflowConfigured()) {
     console.error("[chatbot] Dialogflow no configurado en entorno servidor.");
@@ -51,8 +58,27 @@ export async function POST(request) {
     );
   }
 
+  const headerLocale = normalizeLocale(request.headers.get("accept-language"));
+  const persistedSessionLocale = getSessionLocale(sessionId);
+  const detectedTextLocale = detectLocaleFromText(text);
+  const selectedLocale =
+    preferredLocale ||
+    persistedSessionLocale ||
+    detectedTextLocale ||
+    resolveLocaleFromAcceptLanguage(request.headers.get("accept-language")) ||
+    headerLocale ||
+    getDefaultLocale();
+  const effectiveLocale = normalizeLocale(selectedLocale) || getDefaultLocale();
+  if (!persistedSessionLocale || persistedSessionLocale !== effectiveLocale) {
+    setSessionLocale(sessionId, effectiveLocale);
+  }
+
   try {
-    const dialogflowResponse = await detectDialogflowIntent({ text, sessionId });
+    const dialogflowResponse = await detectDialogflowIntent({
+      text,
+      sessionId,
+      languageCode: effectiveLocale,
+    });
     const hasLowConfidence =
       typeof dialogflowResponse.confidence === "number" &&
       dialogflowResponse.confidence < MIN_CONFIDENCE_TO_REDIRECT;
@@ -72,6 +98,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       sessionId: dialogflowResponse.sessionId,
+      locale: dialogflowResponse.languageCode || effectiveLocale,
       replyText,
       intent: dialogflowResponse.intent,
       confidence: dialogflowResponse.confidence,
