@@ -59,7 +59,7 @@ export async function POST(request) {
   }
 
   const headerLocale = normalizeLocale(request.headers.get("accept-language"));
-  const persistedSessionLocale = getSessionLocale(sessionId);
+  const persistedSessionLocale = await getSessionLocale(sessionId);
   const detectedTextLocale = detectLocaleFromText(text);
   const selectedLocale =
     preferredLocale ||
@@ -70,7 +70,7 @@ export async function POST(request) {
     getDefaultLocale();
   const effectiveLocale = normalizeLocale(selectedLocale) || getDefaultLocale();
   if (!persistedSessionLocale || persistedSessionLocale !== effectiveLocale) {
-    setSessionLocale(sessionId, effectiveLocale);
+    await setSessionLocale(sessionId, effectiveLocale);
   }
 
   try {
