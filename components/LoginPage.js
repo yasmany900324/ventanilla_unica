@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
@@ -9,9 +9,11 @@ import { getLocaleCopy } from "../lib/uiTranslations";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoadingAuth } = useAuth();
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
+  const nextPath = searchParams.get("next");
   const [formData, setFormData] = useState({
     identifier: "",
     password: "",
@@ -42,6 +44,10 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login({ identifier, password });
+      if (typeof nextPath === "string" && nextPath.startsWith("/")) {
+        router.push(nextPath);
+        return;
+      }
       router.push("/ciudadano/dashboard");
     } catch (error) {
       setErrorMessage(error.message || localizedErrorText.loginFailed);
