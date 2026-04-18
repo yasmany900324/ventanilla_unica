@@ -2,24 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 
 const MAX_MESSAGE_LENGTH = 500;
 
-const QUICK_PROMPTS = [
-  "Quiero reportar un problema",
-  "Necesito hacer un tramite",
-  "Quiero crear una incidencia",
-  "Donde consulto el estado de mi solicitud?",
-];
-
-const WELCOME_TEXT =
-  "Hola, soy tu asistente virtual. Puedo ayudarte a identificar el tramite correcto, sugerir una categoria y llevarte al flujo indicado.";
-
-const ERROR_TEXT =
-  "Hubo un problema de conexion. Intenta nuevamente para continuar con la conversacion.";
-
 const MAX_TEXTAREA_HEIGHT = 168;
-const TYPING_STATUS_TEXT = "El asistente esta escribiendo una respuesta.";
 const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
 const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
 
@@ -114,7 +102,7 @@ function extractPayloadChips(fulfillmentMessages) {
   return Array.from(chipSet);
 }
 
-function ChatHeader() {
+function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
       <div className="assistant-chat-header__identity">
@@ -122,29 +110,28 @@ function ChatHeader() {
           AV
         </div>
         <div>
-          <p className="assistant-chat-header__eyebrow">Asistente virtual</p>
-          <h1>Chat de orientacion ciudadana</h1>
+          <p className="assistant-chat-header__eyebrow">{copy.header.eyebrow}</p>
+          <h1>{copy.header.title}</h1>
           <p className="assistant-chat-header__subtitle">
-            Te ayudo a identificar tramites, reportar problemas o consultar el estado de tu
-            solicitud.
+            {copy.header.subtitle}
           </p>
         </div>
       </div>
       <div className="assistant-chat-header__meta">
         <p className="assistant-chat-header__status" aria-live="polite">
           <span className="assistant-chat-header__status-dot" aria-hidden="true" />
-          En linea
+          {copy.header.online}
         </p>
-        <nav aria-label="Acciones de navegacion secundaria">
+        <nav aria-label={copy.header.secondaryNavAria}>
           <ul className="assistant-chat-header__actions">
             <li>
               <Link href="/" className="assistant-chat-header__action-link">
-                Volver al inicio
+                {copy.header.backHome}
               </Link>
             </li>
             <li>
               <Link href="/mis-incidencias" className="assistant-chat-header__action-link">
-                Ver mis incidencias
+                {copy.header.viewIncidents}
               </Link>
             </li>
           </ul>
@@ -154,21 +141,21 @@ function ChatHeader() {
   );
 }
 
-function ChatMeta({ message }) {
+function ChatMeta({ message, copy }) {
   if (message.sender !== "bot" || (!message.intent && !message.action && !message.confidence)) {
     return null;
   }
 
   return (
     <div className="assistant-message__meta">
-      {message.intent ? <span>Intent: {message.intent}</span> : null}
-      {message.confidence ? <span>Confianza: {message.confidence}</span> : null}
-      {message.action ? <span>Action: {message.action}</span> : null}
+      {message.intent ? <span>{copy.meta.intent}: {message.intent}</span> : null}
+      {message.confidence ? <span>{copy.meta.confidence}: {message.confidence}</span> : null}
+      {message.action ? <span>{copy.meta.action}: {message.action}</span> : null}
     </div>
   );
 }
 
-function ChatMessageBubble({ message, onChipClick, disabled }) {
+function ChatMessageBubble({ message, onChipClick, disabled, copy }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
 
@@ -176,31 +163,30 @@ function ChatMessageBubble({ message, onChipClick, disabled }) {
     <li className={`assistant-thread__item assistant-thread__item--${message.sender}`}>
       <article className={`assistant-message assistant-message--${message.sender}`}>
         {message.kind === "error" ? (
-          <p className="assistant-message__system-label">Problema de conexion</p>
+          <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
         <p>{message.text}</p>
-        <ChatMeta message={message} />
+        <ChatMeta message={message} copy={copy} />
 
         {isBot && message.needsClarification ? (
           <p className="assistant-message__clarification">
-            Si quieres, cuentame si se trata de un problema, un tramite o una consulta de
-            estado para orientarte mejor.
+            {copy.clarification}
           </p>
         ) : null}
 
         {isBot && message.redirectTo ? (
           <div className="assistant-message__redirect-wrap">
             <p className="assistant-message__redirect-text">
-              Identifique un flujo recomendado para tu consulta.
+              {copy.redirectIntro}
             </p>
             <Link href={message.redirectTo} className="assistant-message__redirect">
-              {message.redirectLabel || "Ir al flujo sugerido"}
+              {message.redirectLabel || copy.redirectCta}
             </Link>
           </div>
         ) : null}
 
         {isBot && Array.isArray(message.suggestedReplies) && message.suggestedReplies.length > 0 ? (
-          <div className="assistant-chat-quick-replies" aria-label="Sugerencias del asistente">
+          <div className="assistant-chat-quick-replies" aria-label={copy.dynamicSuggestions}>
             <div className="assistant-chat-quick-replies__list">
               {message.suggestedReplies.map((suggestedReply) => (
                 <button
@@ -227,14 +213,14 @@ function ChatMessageBubble({ message, onChipClick, disabled }) {
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({ copy }) {
   return (
     <li className="assistant-thread__item assistant-thread__item--bot">
       <article
         className="assistant-message assistant-message--bot assistant-message--typing"
         aria-live="polite"
       >
-        <p className="assistant-message__typing-copy">El asistente esta escribiendo...</p>
+        <p className="assistant-message__typing-copy">{copy.typing}</p>
         <div className="assistant-typing-dots" aria-hidden="true">
           <span />
           <span />
@@ -245,29 +231,29 @@ function TypingIndicator() {
   );
 }
 
-function ChatErrorMessage({ onRetry, disabled }) {
+function ChatErrorMessage({ onRetry, disabled, copy }) {
   return (
     <li className="assistant-thread__item assistant-thread__item--bot">
       <article className="assistant-message assistant-message--error">
-        <p className="assistant-message__system-label">No pude responder en este momento.</p>
-        <p>Hubo un problema de conexion. Intenta nuevamente.</p>
+        <p className="assistant-message__system-label">{copy.retryTitle}</p>
+        <p>{copy.retryBody}</p>
         <button
           type="button"
           className="assistant-message__retry-button"
           onClick={onRetry}
           disabled={disabled}
         >
-          Reintentar
+          {copy.retryButton}
         </button>
       </article>
     </li>
   );
 }
 
-function ChatQuickReplies({ prompts, onPromptClick, disabled }) {
+function ChatQuickReplies({ prompts, onPromptClick, disabled, copy }) {
   return (
-    <div className="assistant-chat-quick-replies" aria-label="Respuestas rapidas sugeridas">
-      <p className="assistant-chat-quick-replies__title">Sugerencias rapidas</p>
+    <div className="assistant-chat-quick-replies" aria-label={copy.quickRepliesTitle}>
+      <p className="assistant-chat-quick-replies__title">{copy.quickRepliesTitle}</p>
       <div className="assistant-chat-quick-replies__list">
         {prompts.map((prompt) => (
           <button
@@ -294,20 +280,21 @@ function ChatComposer({
   onKeyDown,
   characterCount,
   inputRef,
+  copy,
 }) {
   const shouldShowCounter = characterCount >= MAX_MESSAGE_LENGTH - 80;
 
   return (
     <form className="assistant-chat-composer" onSubmit={onSubmit}>
       <label htmlFor="assistant-chat-input" className="assistant-chat-composer__sr-only">
-        Escribe tu consulta
+        {copy.composer.label}
       </label>
       <textarea
         ref={inputRef}
         id="assistant-chat-input"
         name="message"
         maxLength={MAX_MESSAGE_LENGTH}
-        placeholder="Escribe tu consulta..."
+        placeholder={copy.composer.placeholder}
         value={inputValue}
         onChange={onInputChange}
         onKeyDown={onKeyDown}
@@ -320,13 +307,13 @@ function ChatComposer({
             {characterCount}/{MAX_MESSAGE_LENGTH}
           </p>
         ) : (
-          <span className="assistant-chat-composer__hint">Enter para enviar</span>
+          <span className="assistant-chat-composer__hint">{copy.composer.counterHint}</span>
         )}
         <button
           type="submit"
           className="assistant-chat-composer__send"
           disabled={!canSend}
-          aria-label={isSending ? "Enviando mensaje" : "Enviar mensaje"}
+          aria-label={isSending ? copy.composer.sendingAria : copy.composer.sendAria}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3.7 20.3 21.1 12 3.7 3.7v6.4l10.2 1.9-10.2 1.9v6.4Z" />
@@ -338,6 +325,9 @@ function ChatComposer({
 }
 
 export default function AssistantChatPage() {
+  const { locale } = useLocale();
+  const uiCopy = getLocaleCopy(locale).chat;
+  const quickPrompts = uiCopy.quickPrompts;
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
   const initializedSessionRef = useRef(false);
@@ -345,9 +335,28 @@ export default function AssistantChatPage() {
   const [messages, setMessages] = useState([
     createLocalMessage({
       sender: "bot",
-      text: WELCOME_TEXT,
+      text: uiCopy.welcome,
     }),
   ]);
+  useEffect(() => {
+    setMessages((previousMessages) => {
+      if (!previousMessages.length) {
+        return previousMessages;
+      }
+      const [firstMessage, ...rest] = previousMessages;
+      if (firstMessage.sender !== "bot") {
+        return previousMessages;
+      }
+      return [
+        {
+          ...firstMessage,
+          text: uiCopy.welcome,
+        },
+        ...rest,
+      ];
+    });
+  }, [uiCopy.welcome]);
+
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [serviceError, setServiceError] = useState(false);
@@ -452,7 +461,7 @@ export default function AssistantChatPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "No pudimos contactar al asistente.");
+        throw new Error(data?.error || uiCopy.networkError);
       }
 
       const fulfillmentMessages = Array.isArray(data?.fulfillmentMessages)
@@ -471,7 +480,7 @@ export default function AssistantChatPage() {
           sender: "bot",
           text:
             data?.replyText ||
-            "No pude entender del todo tu solicitud. Puedes contarme un poco mas?",
+            uiCopy.fallbackReply,
           intent: data?.intent || null,
           confidence: formatConfidence(data?.confidence),
           action: data?.action || null,
@@ -526,30 +535,30 @@ export default function AssistantChatPage() {
   const showQuickReplies = messages.some((message) => message.sender === "bot") && !isSending;
 
   return (
-    <main className="page page--assistant">
-      <section className="card assistant-chat-card" aria-label="Conversacion con asistente">
-        <ChatHeader />
+    <main className="page page--assistant" lang={locale}>
+      <section className="card assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
+        <ChatHeader copy={uiCopy.header} />
 
         <div
           ref={scrollContainerRef}
           id="assistant-chat-scroll-container"
           className="assistant-chat-messages"
-          aria-label="Conversacion con el asistente virtual"
+          aria-label={uiCopy.conversationAria.region}
           aria-describedby="assistant-chat-description"
           role="region"
         >
           <p id="assistant-chat-description" className="assistant-chat-composer__sr-only">
-            Conversacion entre el asistente virtual y la persona usuaria.
+            {uiCopy.conversationAria.description}
           </p>
           <p className="assistant-chat-composer__sr-only" role="status" aria-live="polite">
-            {isSending ? TYPING_STATUS_TEXT : serviceError ? ERROR_TEXT : ""}
+            {isSending ? uiCopy.typingStatus : serviceError ? uiCopy.networkError : ""}
           </p>
           <ol
             className="assistant-thread"
             role="log"
             aria-live="polite"
             aria-relevant="additions text"
-            aria-label="Mensajes del chatbot"
+            aria-label={uiCopy.conversationAria.log}
           >
             {messages.map((message) => (
               <ChatMessageBubble
@@ -557,20 +566,24 @@ export default function AssistantChatPage() {
                 message={message}
                 onChipClick={handleSendMessage}
                 disabled={isSending}
+                copy={uiCopy}
               />
             ))}
 
-            {isSending ? <TypingIndicator /> : null}
+            {isSending ? <TypingIndicator copy={uiCopy} /> : null}
 
-            {serviceError ? <ChatErrorMessage onRetry={handleRetry} disabled={isSending} /> : null}
+            {serviceError ? (
+              <ChatErrorMessage onRetry={handleRetry} disabled={isSending} copy={uiCopy} />
+            ) : null}
           </ol>
         </div>
 
         {showQuickReplies ? (
           <ChatQuickReplies
-            prompts={QUICK_PROMPTS}
+            prompts={quickPrompts}
             onPromptClick={handleSendMessage}
             disabled={isSending}
+            copy={uiCopy}
           />
         ) : null}
 
@@ -583,6 +596,7 @@ export default function AssistantChatPage() {
           onKeyDown={handleInputKeyDown}
           characterCount={characterCount}
           inputRef={inputRef}
+          copy={uiCopy}
         />
       </section>
     </main>

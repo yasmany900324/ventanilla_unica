@@ -7,6 +7,8 @@ import IncidentForm from "./IncidentForm";
 import IncidentListItem from "./IncidentListItem";
 import IncidentCaseDetail from "./IncidentCaseDetail";
 import { useAuth } from "./AuthProvider";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 import {
   getIncidentCreationValue,
   getIncidentRecencyValue,
@@ -16,6 +18,9 @@ export default function CitizenDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, refreshSession } = useAuth();
+  const { locale } = useLocale();
+  const copy = getLocaleCopy(locale);
+  const dashboardCopy = copy.dashboard;
   const requestedIncidentId = searchParams.get("incidentId");
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
@@ -32,7 +37,7 @@ export default function CitizenDashboard() {
         }
 
         // Temporary trace log while validating auth synchronization flow.
-        console.info("[auth] Dashboard synchronized with refreshed session.");
+        console.info(dashboardCopy.authTraceLog);
 
         const response = await fetch("/api/incidents");
         const data = await response.json();
@@ -42,7 +47,7 @@ export default function CitizenDashboard() {
             router.replace("/login");
             return;
           }
-          throw new Error(data.error || "No se pudieron cargar las incidencias.");
+          throw new Error(data.error || dashboardCopy.loadIncidentsError);
         }
 
         const loadedIncidents = data.incidents ?? [];
@@ -68,7 +73,7 @@ export default function CitizenDashboard() {
     };
 
     loadIncidents();
-  }, [requestedIncidentId, refreshSession, router]);
+  }, [dashboardCopy.authTraceLog, dashboardCopy.loadIncidentsError, requestedIncidentId, refreshSession, router]);
 
   const recentIncidents = useMemo(() => {
     return [...incidents]
@@ -133,7 +138,7 @@ export default function CitizenDashboard() {
         router.replace("/login");
         return;
       }
-      const message = data.error || "No se pudo registrar la incidencia.";
+      const message = data.error || dashboardCopy.createIncidentError;
       setErrorMessage(message);
       throw new Error(message);
     }
@@ -146,71 +151,62 @@ export default function CitizenDashboard() {
     <main className="page page--dashboard">
       <section className="card dashboard-header">
         <div>
-          <p className="eyebrow">Espacio privado ciudadano</p>
+          <p className="eyebrow">{dashboardCopy.privateSpaceEyebrow}</p>
           <h1>
-            Hola, {user?.fullName || "ciudadano"}
+            {dashboardCopy.hello}, {user?.fullName || dashboardCopy.greetingFallback}
           </h1>
-          <p className="description">
-            Gestiona tus incidencias, revisa sus estados y consulta el detalle
-            de seguimiento en un mismo panel.
-          </p>
+          <p className="description">{dashboardCopy.description}</p>
         </div>
         <div className="hero-actions">
           <Link href="#nueva-incidencia" className="button-link">
-            Nueva incidencia
+            {dashboardCopy.newIncident}
           </Link>
         </div>
       </section>
 
-      <section className="summary-grid" aria-label="Resumen de incidencias">
+      <section className="summary-grid" aria-label={dashboardCopy.summaryLabel}>
         <article className="card summary-card">
-          <p className="summary-card__label">Total de incidencias</p>
+          <p className="summary-card__label">{dashboardCopy.totalIncidents}</p>
           <p className="summary-card__value">{summary.total}</p>
         </article>
         <article className="card summary-card">
-          <p className="summary-card__label">Recibidas</p>
+          <p className="summary-card__label">{dashboardCopy.received}</p>
           <p className="summary-card__value">{summary.recibido}</p>
         </article>
         <article className="card summary-card">
-          <p className="summary-card__label">En revision</p>
+          <p className="summary-card__label">{dashboardCopy.inReview}</p>
           <p className="summary-card__value">{summary.enRevision}</p>
         </article>
         <article className="card summary-card">
-          <p className="summary-card__label">En proceso</p>
+          <p className="summary-card__label">{dashboardCopy.inProgress}</p>
           <p className="summary-card__value">{summary.enProceso}</p>
         </article>
         <article className="card summary-card">
-          <p className="summary-card__label">Resueltas</p>
+          <p className="summary-card__label">{dashboardCopy.resolved}</p>
           <p className="summary-card__value">{summary.resuelto}</p>
         </article>
       </section>
 
       <section id="nueva-incidencia" className="card dashboard-section">
-        <h2>Registrar nueva incidencia</h2>
-        <p className="small">
-          Completa los datos del caso para iniciar su atencion institucional.
-        </p>
+        <h2>{dashboardCopy.registerIncidentTitle}</h2>
+        <p className="small">{dashboardCopy.registerIncidentDescription}</p>
         <IncidentForm
           onSubmit={handleCreateIncident}
-          submitLabel="Registrar incidencia"
+          submitLabel={dashboardCopy.submitIncident}
         />
       </section>
 
       <section id="mis-incidencias-recientes" className="card recent-incidents-card">
-        <h2>Mis incidencias recientes</h2>
-        <p className="small">
-          Consulta tus casos mas recientes y selecciona uno para ver su detalle.
-        </p>
-        {isLoading ? <p className="info-message">Cargando incidencias...</p> : null}
+        <h2>{dashboardCopy.recentIncidentsTitle}</h2>
+        <p className="small">{dashboardCopy.recentIncidentsDescription}</p>
+        {isLoading ? <p className="info-message">{dashboardCopy.loadingIncidents}</p> : null}
         {!isLoading && incidents.length === 0 ? (
-          <p className="empty-message">
-            Aun no tienes incidencias registradas en tu espacio ciudadano.
-          </p>
+          <p className="empty-message">{dashboardCopy.emptyRecentIncidents}</p>
         ) : null}
         {recentIncidents.length > 0 ? (
           <ul
             className="incident-carousel"
-            aria-label="Carrusel de incidencias recientes"
+            aria-label={dashboardCopy.recentCarouselLabel}
           >
             {recentIncidents.map((incident) => {
               const isSelected = selectedIncident?.id === incident.id;
@@ -224,7 +220,7 @@ export default function CitizenDashboard() {
                   }`}
                   isSelected={isSelected}
                   onSelect={setSelectedIncidentId}
-                  actionLabel="Ver detalle"
+                  actionLabel={copy.myIncidents.actionViewDetail}
                 />
               );
             })}
@@ -232,13 +228,18 @@ export default function CitizenDashboard() {
         ) : null}
         <div className="recent-incidents-footer">
           <Link href="/mis-incidencias" className="button-link button-link--secondary">
-            Ver todas mis incidencias
+            {dashboardCopy.goToAllIncidents}
           </Link>
         </div>
       </section>
 
       <section id="detalle-caso" className="card case-detail-card">
-        <IncidentCaseDetail incident={selectedIncident} />
+        <IncidentCaseDetail
+          incident={selectedIncident}
+          title={dashboardCopy.detailTitle}
+          description={dashboardCopy.detailDescription}
+          emptyStateMessage={dashboardCopy.emptyDetail}
+        />
       </section>
 
       {errorMessage ? <p className="error-message">{errorMessage}</p> : null}

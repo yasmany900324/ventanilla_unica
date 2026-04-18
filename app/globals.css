@@ -88,6 +88,25 @@ body {
   font-size: 0.78rem;
 }
 
+.portal-language-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.portal-language-button--active {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 700;
+}
+
 .portal-topbar__languages li + li::before {
   content: "|";
   margin-right: 0.45rem;

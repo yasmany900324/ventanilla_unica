@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import IncidentListItem from "./IncidentListItem";
 import IncidentCaseDetail from "./IncidentCaseDetail";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 
 const DEFAULT_PAGE_SIZE = 6;
 const VIEW_LIST = "list";
@@ -19,6 +21,8 @@ const FALLBACK_PAGINATION = {
 
 export default function MyIncidentsPageContent() {
   const router = useRouter();
+  const { locale } = useLocale();
+  const copy = getLocaleCopy(locale);
   const [incidents, setIncidents] = useState([]);
   const [pagination, setPagination] = useState(FALLBACK_PAGINATION);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +57,7 @@ export default function MyIncidentsPageContent() {
             return;
           }
 
-          throw new Error(data.error || "No se pudieron cargar tus incidencias.");
+          throw new Error(data.error || copy.myIncidents.loadError);
         }
 
         const loadedIncidents = data.incidents ?? [];
@@ -83,7 +87,7 @@ export default function MyIncidentsPageContent() {
     return () => {
       abortController.abort();
     };
-  }, [page, router]);
+  }, [copy.myIncidents.loadError, page, router]);
 
   useEffect(() => {
     if (!selectedIncidentId) {
@@ -203,7 +207,7 @@ export default function MyIncidentsPageContent() {
     <section className="card my-incidents-inline" aria-live="polite">
       {isLoading ? (
         <p className="info-message" role="status" aria-live="polite">
-          Cargando incidencias...
+          {copy.myIncidents.loading}
         </p>
       ) : null}
 
@@ -215,7 +219,7 @@ export default function MyIncidentsPageContent() {
 
       {!isLoading && !errorMessage && incidents.length === 0 ? (
         <p className="empty-message" role="status" aria-live="polite">
-          Aun no tienes incidencias registradas.
+          {copy.myIncidents.empty}
         </p>
       ) : null}
 
@@ -234,7 +238,7 @@ export default function MyIncidentsPageContent() {
             >
               <ul
                 className="incident-list incident-list--full"
-                aria-label="Listado de mis incidencias"
+                aria-label={copy.myIncidents.listAriaLabel}
               >
                 {incidents.map((incident) => (
                   <IncidentListItem
@@ -242,7 +246,7 @@ export default function MyIncidentsPageContent() {
                     incident={incident}
                     isSelected={selectedIncident?.id === incident.id}
                     onSelect={handleOpenDetail}
-                    actionLabel="Ver detalle"
+                    actionLabel={copy.myIncidents.actionViewDetail}
                     descriptionLimit={180}
                     actionButtonRef={registerActionButtonRef(incident.id)}
                     isActionDisabled={isShowingDetail}
@@ -254,10 +258,13 @@ export default function MyIncidentsPageContent() {
                 ))}
               </ul>
 
-              <nav className="pagination" aria-label="Paginacion de incidencias">
+              <nav className="pagination" aria-label={copy.myIncidents.paginationAriaLabel}>
                 <p className="small pagination__summary" aria-live="polite">
-                  Pagina {pagination.page} de {pagination.totalPages || 1}. Total:{" "}
-                  {pagination.total} incidencias.
+                  {copy.myIncidents.paginationSummary({
+                    page: pagination.page,
+                    totalPages: pagination.totalPages,
+                    total: pagination.total,
+                  })}
                 </p>
                 <div className="pagination__actions">
                   <button
@@ -265,18 +272,18 @@ export default function MyIncidentsPageContent() {
                     className="button-link button-link--secondary button-link--compact"
                     onClick={() => setPage(Math.max(1, pagination.page - 1))}
                     disabled={!hasPreviousPage || isShowingDetail}
-                    aria-label="Ir a la pagina anterior"
+                    aria-label={copy.myIncidents.prevPageAria}
                   >
-                    Anterior
+                    {copy.myIncidents.prevPage}
                   </button>
                   <button
                     type="button"
                     className="button-link button-link--secondary button-link--compact"
                     onClick={() => setPage(pagination.page + 1)}
                     disabled={!hasNextPage || isShowingDetail}
-                    aria-label="Ir a la pagina siguiente"
+                    aria-label={copy.myIncidents.nextPageAria}
                   >
-                    Siguiente
+                    {copy.myIncidents.nextPage}
                   </button>
                 </div>
               </nav>
@@ -291,12 +298,12 @@ export default function MyIncidentsPageContent() {
                 incident={selectedIncident}
                 headingRef={detailHeadingRef}
                 headingId="mis-incidencias-detalle-heading"
-                title="Detalle y seguimiento del caso"
-                description="Revisa aqui toda la informacion del caso seleccionado, sin salir de Mis incidencias."
-                backButtonLabel="Volver a mis incidencias"
+                title={copy.myIncidents.detailTitle}
+                description={copy.myIncidents.detailDescription}
+                backButtonLabel={copy.myIncidents.backToList}
                 onBackButtonClick={handleBackToList}
                 isBackButtonDisabled={!isShowingDetail}
-                emptyStateMessage="No se pudo cargar el detalle de esta incidencia. Vuelve al listado e intenta de nuevo."
+                emptyStateMessage={copy.myIncidents.emptyDetail}
               />
             </section>
           </div>

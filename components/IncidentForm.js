@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 
 const INITIAL_FORM_STATE = {
   category: "",
@@ -12,6 +14,9 @@ export default function IncidentForm({
   onSubmit,
   submitLabel = "Enviar solicitud",
 }) {
+  const { locale } = useLocale();
+  const copy = getLocaleCopy(locale);
+  const formCopy = copy.incidentForm;
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -32,12 +37,12 @@ export default function IncidentForm({
     Promise.resolve(onSubmit(formData))
       .then((result) => {
         if (result && result.ok === false) {
-          throw new Error(result.message || "No se pudo enviar la solicitud.");
+          throw new Error(result.message || formCopy.submitError);
         }
         setFormData(INITIAL_FORM_STATE);
       })
       .catch((error) => {
-        setSubmitError(error.message || "No se pudo enviar la solicitud.");
+        setSubmitError(error.message || formCopy.submitError);
       })
       .finally(() => {
         setIsSubmitting(false);
@@ -47,48 +52,48 @@ export default function IncidentForm({
   return (
     <form className="incident-form" onSubmit={handleSubmit}>
       <label>
-        Categoría
+        {formCopy.categoryLabel}
         <select
           name="category"
           value={formData.category}
           onChange={handleChange}
           required
         >
-          <option value="">Selecciona una categoría</option>
-          <option value="alumbrado">Alumbrado</option>
-          <option value="limpieza">Limpieza</option>
-          <option value="seguridad">Seguridad</option>
-          <option value="infraestructura">Infraestructura</option>
-          <option value="otro">Otro</option>
+          <option value="">{formCopy.selectCategory}</option>
+          <option value="alumbrado">{formCopy.categories.alumbrado}</option>
+          <option value="limpieza">{formCopy.categories.limpieza}</option>
+          <option value="seguridad">{formCopy.categories.seguridad}</option>
+          <option value="infraestructura">{formCopy.categories.infraestructura}</option>
+          <option value="otro">{formCopy.categories.otro}</option>
         </select>
       </label>
 
       <label>
-        Descripción
+        {formCopy.descriptionLabel}
         <textarea
           name="description"
           value={formData.description}
           onChange={handleChange}
-          placeholder="Describe la solicitud, reclamo o incidencia"
+          placeholder={formCopy.descriptionPlaceholder}
           required
           rows={4}
         />
       </label>
 
       <label>
-        Ubicación
+        {formCopy.locationLabel}
         <input
           type="text"
           name="location"
           value={formData.location}
           onChange={handleChange}
-          placeholder="Ej. Calle 10 con Av. Principal"
+          placeholder={formCopy.locationPlaceholder}
           required
         />
       </label>
 
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Enviando..." : submitLabel}
+        {isSubmitting ? formCopy.submitting : submitLabel || formCopy.defaultSubmitLabel}
       </button>
       {submitError ? <p className="error-message">{submitError}</p> : null}
     </form>
