@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import InstitutionalLogo from "./InstitutionalLogo";
 import { useAuth } from "./AuthProvider";
@@ -57,6 +57,12 @@ const FOOTER_LINK_GROUPS = [
       { href: "/#informacion-institucional", labelKey: "terms" },
     ],
   },
+];
+
+const FOOTER_MOBILE_PRIORITY_LINKS = [
+  { href: "/#tramites", labelKey: "proceduresGuide" },
+  { href: "/#ayuda-soporte", labelKey: "helpCenter" },
+  { href: "/#accesibilidad", labelKey: "accessibility" },
 ];
 
 const SOCIAL_LINKS = [
@@ -179,6 +185,7 @@ export default function PortalShell({ children }) {
   const footerLinkGroups = useMemo(
     () =>
       FOOTER_LINK_GROUPS.map((group) => ({
+        key: group.titleKey,
         title: copy.portal.footerGroups[group.titleKey],
         links: group.links.map((link) => ({
           href: link.href,
@@ -187,6 +194,47 @@ export default function PortalShell({ children }) {
       })),
     [copy.portal.footerGroups, copy.portal.footerLinks]
   );
+  const footerPriorityLinks = useMemo(
+    () =>
+      FOOTER_MOBILE_PRIORITY_LINKS.map((link) => ({
+        href: link.href,
+        label: copy.portal.footerLinks[link.labelKey],
+      })),
+    [copy.portal.footerLinks]
+  );
+  const [mobileFooterAccordionState, setMobileFooterAccordionState] = useState({
+    onlineServices: false,
+    helpSupport: false,
+    institutionalInfo: false,
+  });
+  const footerRef = useRef(null);
+  const [isFooterVisible, setIsFooterVisible] = useState(false);
+  const toggleMobileFooterGroup = useCallback((groupKey) => {
+    setMobileFooterAccordionState((previousState) => ({
+      ...previousState,
+      [groupKey]: !previousState[groupKey],
+    }));
+  }, []);
+  useEffect(() => {
+    const footerNode = footerRef.current;
+
+    if (!footerNode || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsFooterVisible(entry.isIntersecting);
+      },
+      {
+        threshold: 0.08,
+        rootMargin: "0px 0px -72px 0px",
+      }
+    );
+
+    observer.observe(footerNode);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div className="app-shell">
@@ -287,19 +335,31 @@ export default function PortalShell({ children }) {
         {children}
       </div>
 
-      <footer className="portal-footer" id="informacion-institucional">
+      <footer className="portal-footer" id="informacion-institucional" ref={footerRef}>
         <div className="portal-footer__inner">
           <div className="portal-footer__brand">
             <div className="portal-footer__brand-head">
               <InstitutionalLogo alt={copy.portal.brandName} variant="footer" />
             </div>
-            <p>
+            <p className="portal-footer__contact portal-footer__contact--desktop">
               {copy.portal.footerAddress}
               <br />
               Tel. +598 4222 4220
               <br />
               {copy.portal.footerMail}
             </p>
+            <p className="portal-footer__contact portal-footer__contact--mobile">
+              {copy.portal.footerAddress}
+              <br />
+              {copy.portal.footerMail}
+            </p>
+            <ul className="portal-footer__quick-links">
+              {footerPriorityLinks.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href}>{link.label}</Link>
+                </li>
+              ))}
+            </ul>
             <ul className="portal-footer__social">
               {SOCIAL_LINKS.map((social) => (
                 <li key={social.label}>
@@ -312,7 +372,7 @@ export default function PortalShell({ children }) {
           </div>
 
           {footerLinkGroups.map((group) => (
-            <section key={group.title} className="portal-footer__column">
+            <section key={group.title} className="portal-footer__column portal-footer__column--desktop">
               <h3>{group.title}</h3>
               <ul>
                 {group.links.map((link) => (
@@ -323,13 +383,60 @@ export default function PortalShell({ children }) {
               </ul>
             </section>
           ))}
+
+          <div className="portal-footer__mobile-accordion">
+            {footerLinkGroups.map((group) => {
+              const isExpanded = Boolean(mobileFooterAccordionState[group.key]);
+              const panelId = `portal-footer-mobile-group-${group.key}`;
+              const triggerId = `${panelId}-trigger`;
+
+              return (
+                <section key={group.key} className="portal-footer__accordion-item">
+                  <h3 className="portal-footer__accordion-heading">
+                    <button
+                      id={triggerId}
+                      type="button"
+                      className="portal-footer__accordion-trigger"
+                      aria-expanded={isExpanded}
+                      aria-controls={panelId}
+                      onClick={() => toggleMobileFooterGroup(group.key)}
+                    >
+                      <span>{group.title}</span>
+                      <span className="portal-footer__accordion-icon" aria-hidden="true">
+                        {isExpanded ? "−" : "+"}
+                      </span>
+                    </button>
+                  </h3>
+                  <div
+                    id={panelId}
+                    className="portal-footer__accordion-panel"
+                    role="region"
+                    aria-labelledby={triggerId}
+                    hidden={!isExpanded}
+                  >
+                    <ul>
+                      {group.links.map((link) => (
+                        <li key={link.label}>
+                          <Link href={link.href}>{link.label}</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
         <div className="portal-footer__legal">
           <p>{copy.portal.footerRights}</p>
         </div>
       </footer>
 
-      <Link href={assistantHref} className="floating-chat-button" aria-label={copy.portal.floatingChatLabel}>
+      <Link
+        href={assistantHref}
+        className={`floating-chat-button${isFooterVisible ? " floating-chat-button--footer-aware" : ""}`}
+        aria-label={copy.portal.floatingChatLabel}
+      >
         <span className="floating-chat-button__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4.5 5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.2l-3.9 2.9a.5.5 0 0 1-.8-.4v-2.5H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.5 1v9.5h1a1 1 0 0 1 1 1V18l2.9-2.2a1 1 0 0 1 .6-.2H19V6H5Zm3.2 3h7.6v1.5H8.2V9Zm0 3h5.6v1.5H8.2V12Z" />
