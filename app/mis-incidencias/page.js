@@ -5,6 +5,7 @@ import {
   getAuthenticatedUserFromToken,
   SESSION_COOKIE_NAME,
 } from "../../lib/auth";
+import MyIncidentsClientShell from "../../components/MyIncidentsClientShell";
 
 export default async function MyIncidentsPage() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
@@ -14,18 +15,5 @@ export default async function MyIncidentsPage() {
     redirect("/login");
   }
 
-  return (
-    <main className="page page--dashboard">
-      <section className="card dashboard-header dashboard-header--stacked">
-        <div>
-          <p className="eyebrow">Espacio privado ciudadano</p>
-          <h1>Mis incidencias</h1>
-          <p className="description">
-            Consulta el historial completo de tus incidencias registradas.
-          </p>
-        </div>
-      </section>
-      <MyIncidentsPageContent />
-    </main>
-  );
+  return <MyIncidentsClientShell />;
 }

@@ -1,57 +1,59 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "./AuthProvider";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 
 const TOPBAR_LINKS = [
-  { href: "/#accesibilidad", label: "Accesibilidad" },
-  { href: "/#mapa-del-sitio", label: "Mapa del sitio" },
+  { href: "/#accesibilidad", labelKey: "accessibility" },
+  { href: "/#mapa-del-sitio", labelKey: "sitemap" },
 ];
 
-const LANGUAGE_LINKS = ["ES", "PT", "EN"];
+const LANGUAGE_LINKS = ["es", "pt", "en"];
 
 const PUBLIC_MOBILE_NAV = [
-  { href: "/", label: "Inicio", icon: "home" },
-  { href: "/login", label: "Acceder", icon: "login" },
-  { href: "/registro", label: "Cuenta", icon: "register" },
-  { href: "/#ayuda-soporte", label: "Ayuda", icon: "help" },
+  { href: "/", labelKey: "home", icon: "home" },
+  { href: "/login", labelKey: "login", icon: "login" },
+  { href: "/registro", labelKey: "account", icon: "register" },
+  { href: "/#ayuda-soporte", labelKey: "help", icon: "help" },
 ];
 
 const AUTH_MOBILE_NAV = [
-  { href: "/", label: "Inicio", icon: "home" },
+  { href: "/", labelKey: "home", icon: "home" },
   {
     href: "/mis-incidencias",
-    label: "Mis casos",
+    labelKey: "myCases",
     icon: "cases",
   },
-  { href: "/ciudadano/dashboard#nueva-incidencia", label: "Nueva", icon: "plus" },
-  { href: "/ciudadano/dashboard#detalle-caso", label: "Perfil", icon: "profile" },
+  { href: "/ciudadano/dashboard#nueva-incidencia", labelKey: "newCase", icon: "plus" },
+  { href: "/ciudadano/dashboard#detalle-caso", labelKey: "profile", icon: "profile" },
 ];
 
 const FOOTER_LINK_GROUPS = [
   {
-    title: "Tramites en linea",
+    titleKey: "onlineServices",
     links: [
-      { href: "/#tramites", label: "Portal Tributario" },
-      { href: "/#tramites", label: "Guia de Tramites" },
-      { href: "/mis-incidencias", label: "Estado de expediente" },
+      { href: "/#tramites", labelKey: "taxPortal" },
+      { href: "/#tramites", labelKey: "proceduresGuide" },
+      { href: "/mis-incidencias", labelKey: "fileStatus" },
     ],
   },
   {
-    title: "Ayuda y soporte",
+    titleKey: "helpSupport",
     links: [
-      { href: "/#ayuda-soporte", label: "Centro de ayuda" },
-      { href: "/#ayuda-soporte", label: "Preguntas frecuentes" },
-      { href: "/#ayuda-soporte", label: "Canales de contacto" },
+      { href: "/#ayuda-soporte", labelKey: "helpCenter" },
+      { href: "/#ayuda-soporte", labelKey: "faq" },
+      { href: "/#ayuda-soporte", labelKey: "contactChannels" },
     ],
   },
   {
-    title: "Informacion institucional",
+    titleKey: "institutionalInfo",
     links: [
-      { href: "/#informacion-institucional", label: "Politica de privacidad" },
-      { href: "/#accesibilidad", label: "Accesibilidad" },
-      { href: "/#informacion-institucional", label: "Terminos de uso" },
+      { href: "/#informacion-institucional", labelKey: "privacy" },
+      { href: "/#accesibilidad", labelKey: "accessibility" },
+      { href: "/#informacion-institucional", labelKey: "terms" },
     ],
   },
 ];
@@ -129,9 +131,11 @@ function Icon({ name }) {
 
 export default function PortalShell({ children }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
+  const { locale, setLocale } = useLocale();
+  const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
   const authenticatedUser = user;
-  const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || "ciudadano";
+  const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || copy.dashboard.greetingFallback;
   const handleLogout = useCallback(async () => {
     try {
       await logout({ redirectTo: "/" });
@@ -140,40 +144,78 @@ export default function PortalShell({ children }) {
     }
   }, [logout]);
   const assistantHref = "/asistente";
-  const mainNav = [
-    { href: "/", label: "Inicio" },
-    {
-      href: hasActiveSession ? "/mis-incidencias" : "/login",
-      label: "Mis tramites e incidencias",
-    },
-    {
-      href: hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/login",
-      label: "Nuevo tramite o reporte",
-    },
-    { href: "/#ayuda-soporte", label: "Ayuda y soporte" },
-  ];
-  const mobileNav = hasActiveSession ? AUTH_MOBILE_NAV : PUBLIC_MOBILE_NAV;
+  const mainNav = useMemo(
+    () => [
+      { href: "/", label: copy.nav.home },
+      {
+        href: hasActiveSession ? "/mis-incidencias" : "/login",
+        label: copy.nav.myCases,
+      },
+      {
+        href: hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/login",
+        label: copy.nav.newRequest,
+      },
+      { href: "/#ayuda-soporte", label: copy.nav.help },
+    ],
+    [copy.nav.help, copy.nav.home, copy.nav.myCases, copy.nav.newRequest, hasActiveSession]
+  );
+  const mobileNav = useMemo(() => {
+    const source = hasActiveSession ? AUTH_MOBILE_NAV : PUBLIC_MOBILE_NAV;
+    return source.map((item) => ({
+      ...item,
+      label: copy.portal.mobile[item.labelKey],
+    }));
+  }, [copy.portal.mobile, hasActiveSession]);
+  const topbarLinks = useMemo(
+    () =>
+      TOPBAR_LINKS.map((item) => ({
+        ...item,
+        label: copy.topbar[item.labelKey],
+      })),
+    [copy.topbar]
+  );
+  const footerLinkGroups = useMemo(
+    () =>
+      FOOTER_LINK_GROUPS.map((group) => ({
+        title: copy.portal.footerGroups[group.titleKey],
+        links: group.links.map((link) => ({
+          href: link.href,
+          label: copy.portal.footerLinks[link.labelKey],
+        })),
+      })),
+    [copy.portal.footerGroups, copy.portal.footerLinks]
+  );
 
   return (
     <div className="app-shell">
       <a href="#contenido-principal" className="skip-link">
-        Saltar al contenido principal
+        {copy.portal.skipToContent}
       </a>
 
       <header className="portal-header">
         <div className="portal-topbar">
           <div className="portal-topbar__inner">
             <ul className="portal-topbar__links">
-              {TOPBAR_LINKS.map((item) => (
+              {topbarLinks.map((item) => (
                 <li key={item.label}>
                   <Link href={item.href}>{item.label}</Link>
                 </li>
               ))}
             </ul>
-            <ul className="portal-topbar__languages" aria-label="Idiomas disponibles">
+            <ul className="portal-topbar__languages" aria-label={copy.languageLabel}>
               {LANGUAGE_LINKS.map((language) => (
                 <li key={language}>
-                  <span lang={language.toLowerCase()}>{language}</span>
+                  <button
+                    type="button"
+                    className={`portal-language-button${
+                      locale === language ? " portal-language-button--active" : ""
+                    }`}
+                    onClick={() => setLocale(language)}
+                    aria-pressed={locale === language}
+                    lang={language}
+                  >
+                    {copy.languageShort[language]}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -182,17 +224,17 @@ export default function PortalShell({ children }) {
 
         <div className="portal-header__main">
           <div className="portal-header__inner">
-            <Link href="/" className="portal-brand" aria-label="Intendencia de Maldonado">
+            <Link href="/" className="portal-brand" aria-label={copy.portal.brandAriaLabel}>
               <span className="portal-brand__crest" aria-hidden="true">
                 IM
               </span>
               <span className="portal-brand__text">
-                <strong>Intendencia de Maldonado</strong>
-                <small>Portal de Tramites y Reportes</small>
+                <strong>{copy.portal.brandName}</strong>
+                <small>{copy.portal.brandSubtitle}</small>
               </span>
             </Link>
 
-            <nav className="portal-nav" aria-label="Navegacion principal">
+            <nav className="portal-nav" aria-label={copy.portal.mainNavAriaLabel}>
               <ul className="portal-nav__list">
                 {mainNav.map((item) => (
                   <li key={item.label}>
@@ -207,9 +249,11 @@ export default function PortalShell({ children }) {
             <div className="portal-header__actions">
               {hasActiveSession ? (
                 <>
-                  <span className="portal-user-chip">Hola, {shortName}</span>
+                  <span className="portal-user-chip">
+                    {copy.portal.greeting}, {shortName}
+                  </span>
                   <Link href="/ciudadano/dashboard" className="portal-action-link">
-                    Mi espacio
+                    {copy.portal.mySpace}
                   </Link>
                   <div className="portal-action-form">
                     <button
@@ -218,17 +262,17 @@ export default function PortalShell({ children }) {
                       onClick={handleLogout}
                       disabled={isLoadingAuth}
                     >
-                      {isLoadingAuth ? "Cerrando..." : "Cerrar sesion"}
+                      {isLoadingAuth ? copy.portal.loggingOut : copy.portal.logout}
                     </button>
                   </div>
                 </>
               ) : (
                 <>
                   <Link href="/login" className="portal-action-link">
-                    Iniciar sesion
+                    {copy.portal.login}
                   </Link>
                   <Link href="/registro" className="portal-action-link portal-action-link--primary">
-                    Crear cuenta
+                    {copy.portal.createAccount}
                   </Link>
                 </>
               )}
@@ -249,14 +293,14 @@ export default function PortalShell({ children }) {
               <span className="portal-footer__crest" aria-hidden="true">
                 IM
               </span>
-              <h2>Intendencia de Maldonado</h2>
+              <h2>{copy.portal.brandName}</h2>
             </div>
             <p>
-              Calle Florida 580, Maldonado
+              {copy.portal.footerAddress}
               <br />
               Tel. +598 4222 4220
               <br />
-              tramites@maldonado.gub.uy
+              {copy.portal.footerMail}
             </p>
             <ul className="portal-footer__social">
               {SOCIAL_LINKS.map((social) => (
@@ -269,7 +313,7 @@ export default function PortalShell({ children }) {
             </ul>
           </div>
 
-          {FOOTER_LINK_GROUPS.map((group) => (
+          {footerLinkGroups.map((group) => (
             <section key={group.title} className="portal-footer__column">
               <h3>{group.title}</h3>
               <ul>
@@ -283,11 +327,11 @@ export default function PortalShell({ children }) {
           ))}
         </div>
         <div className="portal-footer__legal">
-          <p>© 2026 Intendencia de Maldonado - Todos los derechos reservados.</p>
+          <p>{copy.portal.footerRights}</p>
         </div>
       </footer>
 
-      <Link href={assistantHref} className="floating-chat-button" aria-label="Hablar con el asistente">
+      <Link href={assistantHref} className="floating-chat-button" aria-label={copy.portal.floatingChatLabel}>
         <span className="floating-chat-button__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4.5 5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.2l-3.9 2.9a.5.5 0 0 1-.8-.4v-2.5H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.5 1v9.5h1a1 1 0 0 1 1 1V18l2.9-2.2a1 1 0 0 1 .6-.2H19V6H5Zm3.2 3h7.6v1.5H8.2V9Zm0 3h5.6v1.5H8.2V12Z" />
@@ -298,7 +342,7 @@ export default function PortalShell({ children }) {
         </span>
       </Link>
 
-      <nav className="mobile-bottom-nav" aria-label="Navegacion inferior movil">
+      <nav className="mobile-bottom-nav" aria-label={copy.portal.mobileNavAriaLabel}>
         <ul className="mobile-bottom-nav__list">
           {mobileNav.map((item) => (
             <li key={item.label}>
@@ -323,7 +367,7 @@ export default function PortalShell({ children }) {
                     <Icon name="login" />
                   </span>
                   <span className="mobile-bottom-nav__label">
-                    {isLoadingAuth ? "Saliendo..." : "Salir"}
+                    {isLoadingAuth ? copy.portal.mobile.exiting : copy.portal.mobile.exit}
                   </span>
                 </button>
               </div>

@@ -1,12 +1,14 @@
 "use client";
 
 import {
-  STATUS_LABELS,
-  STATUS_STEPS,
   buildHistoryEntries,
   formatDate,
   formatIncidentCode,
+  getStatusLabels,
+  getStatusSteps,
 } from "../lib/incidentDisplay";
+import { useLocale } from "./LocaleProvider";
+import { getLocaleCopy } from "../lib/uiTranslations";
 
 export default function IncidentCaseDetail({
   incident = null,
@@ -20,11 +22,15 @@ export default function IncidentCaseDetail({
   isBackButtonDisabled = false,
   emptyStateMessage = "Selecciona una incidencia reciente para ver su informacion detallada.",
 }) {
+  const { locale } = useLocale();
+  const copy = getLocaleCopy(locale);
+  const statusLabels = getStatusLabels(locale);
+  const statusSteps = getStatusSteps(locale);
   const shouldRenderLevelThreeHeading = headingLevel === 3;
-  const selectedStatusIndex = STATUS_STEPS.findIndex(
+  const selectedStatusIndex = statusSteps.findIndex(
     (status) => status.value === incident?.status
   );
-  const historyEntries = buildHistoryEntries(incident);
+  const historyEntries = buildHistoryEntries(incident, locale);
 
   return (
     <>
@@ -46,7 +52,7 @@ export default function IncidentCaseDetail({
           onClick={onBackButtonClick}
           disabled={isBackButtonDisabled}
         >
-          {backButtonLabel || "Volver al listado"}
+          {backButtonLabel || copy.incident.backToList}
         </button>
       ) : null}
 
@@ -57,38 +63,38 @@ export default function IncidentCaseDetail({
       ) : (
         <>
           <p className="small detail-selected-hint">
-            Caso seleccionado: <strong>{formatIncidentCode(incident.id)}</strong>
+            {copy.incident.caseSelected}: <strong>{formatIncidentCode(incident.id)}</strong>
           </p>
           <div className="case-detail-grid">
             <p className="small">
-              <strong>Codigo:</strong> {formatIncidentCode(incident.id)}
+              <strong>{copy.incident.code}:</strong> {formatIncidentCode(incident.id)}
             </p>
             <p className="small">
-              <strong>Categoria:</strong> {incident.category}
+              <strong>{copy.incident.category}:</strong> {incident.category}
             </p>
             <p className="small">
-              <strong>Ubicacion:</strong> {incident.location}
+              <strong>{copy.incident.location}:</strong> {incident.location}
             </p>
             <p className="small">
-              <strong>Fecha de registro:</strong> {formatDate(incident.createdAt)}
+              <strong>{copy.incident.createdAt}:</strong> {formatDate(incident.createdAt, locale)}
             </p>
             <p className="small">
-              <strong>Estado actual:</strong>{" "}
-              {STATUS_LABELS[incident.status] || incident.status}
+              <strong>{copy.incident.currentStatus}:</strong>{" "}
+              {statusLabels[incident.status] || incident.status}
             </p>
             <p className="small">
-              <strong>Ultima actualizacion:</strong>{" "}
-              {formatDate(incident.updatedAt || incident.createdAt)}
+              <strong>{copy.incident.lastUpdate}:</strong>{" "}
+              {formatDate(incident.updatedAt || incident.createdAt, locale)}
             </p>
           </div>
           <p className="small">
-            <strong>Descripcion completa:</strong> {incident.description}
+            <strong>{copy.incident.fullDescription}:</strong> {incident.description}
           </p>
 
           <div className="timeline-section">
-            <h3>Progreso del caso</h3>
-            <ol className="timeline-steps" aria-label="Timeline del caso">
-              {STATUS_STEPS.map((step, index) => {
+            <h3>{copy.incident.caseProgress}</h3>
+            <ol className="timeline-steps" aria-label={copy.incident.caseTimelineAria}>
+              {statusSteps.map((step, index) => {
                 const stepState =
                   index < selectedStatusIndex
                     ? "done"
@@ -109,7 +115,7 @@ export default function IncidentCaseDetail({
           </div>
 
           <div className="updates-section">
-            <h3>Historial de actualizaciones</h3>
+            <h3>{copy.incident.updatesHistory}</h3>
             <ul className="updates-list">
               {historyEntries.map((entry) => (
                 <li key={entry.id} className="updates-item">
