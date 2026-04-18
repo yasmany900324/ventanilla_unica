@@ -135,6 +135,7 @@ export default function PortalShell({ children }) {
   const { locale, setLocale } = useLocale();
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
+  const isAdministrator = user?.role === "administrador";
   const authenticatedUser = user;
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || copy.dashboard.greetingFallback;
   const handleLogout = useCallback(async () => {
@@ -250,6 +251,11 @@ export default function PortalShell({ children }) {
                   <Link href="/ciudadano/dashboard" className="portal-action-link">
                     {copy.portal.mySpace}
                   </Link>
+                  {isAdministrator ? (
+                    <Link href="/admin/dashboard" className="portal-action-link">
+                      {copy.portal.adminDashboard}
+                    </Link>
+                  ) : null}
                   <div className="portal-action-form">
                     <button
                       type="button"

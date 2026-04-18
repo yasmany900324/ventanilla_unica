@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAuthenticatedUser } from "../../../../../lib/auth";
+import { requireAdministrator } from "../../../../../lib/auth";
 import { getChatbotFunnelMetrics } from "../../../../../lib/chatbotTelemetry";
 
 export async function GET(request) {
   try {
-    const authenticatedUser = await requireAuthenticatedUser(request);
-    if (!authenticatedUser) {
-      return NextResponse.json({ error: "Sesion no valida." }, { status: 401 });
+    const administrator = await requireAdministrator(request);
+    if (!administrator) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

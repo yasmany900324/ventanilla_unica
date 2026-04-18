@@ -36,7 +36,7 @@ En Vercel estas variables se inyectan automaticamente al conectar una base de da
 - `POST /api/incidents`: crea incidencia con estado inicial `recibido`
 - `PATCH /api/incidents/:id/advance`: avanza estado (`recibido -> en proceso -> resuelto`)
 - `POST /api/chatbot/message`: procesa un mensaje del chatbot via Dialogflow (server-side)
-- `GET /api/chatbot/metrics`: metricas de embudo del chatbot (requiere sesion)
+- `GET /api/chatbot/metrics`: metricas de embudo del chatbot (solo administradores)
 
 ## Integracion del chatbot con Dialogflow
 
@@ -121,7 +121,7 @@ El backend registra eventos del flujo conversacional para medir conversion en re
   - `redirect_offered`
   - `service_error`
 
-### Consultar metricas
+### Consultar metricas (solo administradores)
 
 `GET /api/chatbot/metrics?windowDays=7`
 
