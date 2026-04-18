@@ -173,6 +173,7 @@ function getChatEntryContext(searchParams) {
   const id = normalizeContextParam(searchParams.get("id"), 60);
   const title = normalizeContextParam(searchParams.get("title"), 120);
   const description = normalizeContextParam(searchParams.get("description"), 180);
+  const category = normalizeContextParam(searchParams.get("category"), 40).toLowerCase();
   if (!title) {
     return null;
   }
@@ -182,6 +183,7 @@ function getChatEntryContext(searchParams) {
     id,
     title,
     description,
+    category,
   };
 }
 
@@ -194,7 +196,31 @@ function buildContextAutoPrompt({ context, copy }) {
     return copy.contextualEntry.procedurePrompt.replace("{title}", context.title);
   }
 
-  return copy.contextualEntry.incidentPrompt.replace("{title}", context.title);
+  const categoryLabel = context.category || context.title;
+  return copy.contextualEntry.incidentPrompt.replace("{title}", categoryLabel);
+}
+
+function normalizeContextEntryPayload(context) {
+  if (!context) {
+    return null;
+  }
+
+  const kind = context.type === "tramite" ? "tramite" : context.type === "incidencia" ? "incidencia" : "";
+  if (!kind) {
+    return null;
+  }
+
+  const title = normalizeContextParam(context.title, 120);
+  if (!title) {
+    return null;
+  }
+
+  return {
+    kind,
+    title,
+    description: normalizeContextParam(context.description, 180),
+    category: normalizeContextParam(context.category, 40).toLowerCase(),
+  };
 }
 
 function buildContextWelcomeMessage({ context, copy }) {
@@ -248,20 +274,6 @@ function ChatHeader({ copy }) {
   );
 }
 
-function ChatMeta({ message, copy }) {
-  if (message.sender !== "bot" || (!message.intent && !message.action && !message.confidence)) {
-    return null;
-  }
-
-  return (
-    <div className="assistant-message__meta">
-      {message.intent ? <span>{copy.meta.intent}: {message.intent}</span> : null}
-      {message.confidence ? <span>{copy.meta.confidence}: {message.confidence}</span> : null}
-      {message.action ? <span>{copy.meta.action}: {message.action}</span> : null}
-    </div>
-  );
-}
-
 function ChatMessageBubble({
   message,
   onChipClick,
@@ -280,7 +292,6 @@ function ChatMessageBubble({
           <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
         <p>{message.text}</p>
-        <ChatMeta message={message} copy={copy} />
 
         {isBot && message.needsClarification ? (
           <p className="assistant-message__clarification">
@@ -472,6 +483,7 @@ export default function AssistantChatPage() {
     () => buildContextAutoPrompt({ context: entryContext, copy: uiCopy }),
     [entryContext, uiCopy]
   );
+  const contextEntryPayload = useMemo(() => normalizeContextEntryPayload(entryContext), [entryContext]);
   const contextTriggerKey = useMemo(() => {
     if (!entryContext) {
       return "";
@@ -590,6 +602,7 @@ export default function AssistantChatPage() {
     rawValue,
     command = DEFAULT_CHAT_COMMAND,
     appendUserMessage,
+    contextEntry = null,
   }) => {
     const text = normalizeInput(rawValue);
     if ((!text && command === DEFAULT_CHAT_COMMAND) || isSending) {
@@ -615,8 +628,9 @@ export default function AssistantChatPage() {
         body: JSON.stringify({
           text,
           sessionId: sessionId || undefined,
-          preferredLocale: sessionLocale || undefined,
+          preferredLocale: sessionLocale || locale || "es",
           command,
+          contextEntry,
         }),
       });
 
@@ -670,7 +684,7 @@ export default function AssistantChatPage() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, sessionId, sessionLocale, uiCopy.fallbackReply, uiCopy.networkError]);
+  }, [isSending, locale, sessionId, sessionLocale, uiCopy.fallbackReply, uiCopy.networkError]);
 
   useEffect(() => {
     const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
@@ -697,10 +711,11 @@ export default function AssistantChatPage() {
     contextualPromptSentRef.current = contextTriggerKey;
     void submitMessage({
       rawValue: contextAutoPrompt,
-      command: DEFAULT_CHAT_COMMAND,
+      command: "start_contextual_flow",
       appendUserMessage: false,
+      contextEntry: contextEntryPayload,
     });
-  }, [contextAutoPrompt, contextTriggerKey, isSending, submitMessage]);
+  }, [contextAutoPrompt, contextEntryPayload, contextTriggerKey, isSending, submitMessage]);
 
   const handleSendMessage = async (rawValue) => {
     await submitMessage({
@@ -773,7 +788,7 @@ export default function AssistantChatPage() {
   };
 
   const characterCount = inputValue.length;
-  const showQuickReplies = messages.some((message) => message.sender === "bot") && !isSending;
+  const showQuickReplies = messages.some((message) => message.sender === "bot") && !isSending && !entryContext;
 
   return (
     <main className="page page--assistant" lang={locale}>
