@@ -36,6 +36,7 @@ En Vercel estas variables se inyectan automaticamente al conectar una base de da
 - `POST /api/incidents`: crea incidencia con estado inicial `recibido`
 - `PATCH /api/incidents/:id/advance`: avanza estado (`recibido -> en proceso -> resuelto`)
 - `POST /api/chatbot/message`: procesa un mensaje del chatbot via Dialogflow (server-side)
+- `GET /api/chatbot/metrics`: metricas de embudo del chatbot (requiere sesion)
 
 ## Integracion del chatbot con Dialogflow
 
@@ -98,3 +99,38 @@ npm run dev
    - "Donde consulto el estado de mi solicitud?"
 
 Si Dialogflow no detecta con buena confianza, el backend responde con `needsClarification: true` y un texto de repregunta para pedir mas contexto.
+
+## Telemetria del embudo conversacional
+
+El backend registra eventos del flujo conversacional para medir conversion en reporte de incidencias.
+
+- Tabla: `chatbot_telemetry_events` (si hay Postgres disponible).
+- Fallback: buffer en memoria cuando no hay DB.
+- Eventos instrumentados:
+  - `turn_received`
+  - `intent_detected`
+  - `mode_resolved`
+  - `ask_field`
+  - `confirmation_ready`
+  - `confirmation_resumed`
+  - `edit_requested`
+  - `auth_required`
+  - `incident_created`
+  - `cancelled`
+  - `fallback_clarification`
+  - `redirect_offered`
+  - `service_error`
+
+### Consultar metricas
+
+`GET /api/chatbot/metrics?windowDays=7`
+
+Respuesta:
+- `totals.events`
+- `totals.uniqueSessions`
+- `funnel.enteredIncidentFlow`
+- `funnel.readyForConfirmation`
+- `funnel.authRequired`
+- `funnel.confirmed`
+- `funnel.incidentCreated`
+- `funnel.incidentCreationConversion`
