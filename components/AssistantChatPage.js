@@ -57,6 +57,61 @@ function formatMessageTime(dateInput) {
   });
 }
 
+function normalizeChipLabel(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function extractPayloadChips(fulfillmentMessages) {
+  if (!Array.isArray(fulfillmentMessages)) {
+    return [];
+  }
+
+  const chipSet = new Set();
+  const addChip = (candidate) => {
+    const normalized = normalizeChipLabel(candidate);
+    if (normalized) {
+      chipSet.add(normalized);
+    }
+  };
+
+  fulfillmentMessages.forEach((message) => {
+    if (message?.type !== "payload" || !message.payload || typeof message.payload !== "object") {
+      return;
+    }
+
+    const payload = message.payload;
+    if (Array.isArray(payload?.richContent)) {
+      payload.richContent.forEach((group) => {
+        if (!Array.isArray(group)) {
+          return;
+        }
+
+        group.forEach((item) => {
+          if (item?.type !== "chips" || !Array.isArray(item.options)) {
+            return;
+          }
+
+          item.options.forEach((option) => {
+            addChip(option?.text);
+          });
+        });
+      });
+    }
+
+    if (Array.isArray(payload?.suggestions)) {
+      payload.suggestions.forEach((suggestion) => {
+        addChip(suggestion?.title || suggestion?.text);
+      });
+    }
+  });
+
+  return Array.from(chipSet);
+}
+
 function ChatHeader() {
   return (
     <header className="assistant-chat-header">
@@ -111,7 +166,7 @@ function ChatMeta({ message }) {
   );
 }
 
-function ChatMessageBubble({ message }) {
+function ChatMessageBubble({ message, onChipClick, disabled }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
 
@@ -139,6 +194,24 @@ function ChatMessageBubble({ message }) {
             <Link href={message.redirectTo} className="assistant-message__redirect">
               {message.redirectLabel || "Ir al flujo sugerido"}
             </Link>
+          </div>
+        ) : null}
+
+        {isBot && Array.isArray(message.suggestedReplies) && message.suggestedReplies.length > 0 ? (
+          <div className="assistant-chat-quick-replies" aria-label="Sugerencias del asistente">
+            <div className="assistant-chat-quick-replies__list">
+              {message.suggestedReplies.map((suggestedReply) => (
+                <button
+                  key={`${message.id}-${suggestedReply}`}
+                  type="button"
+                  className="assistant-prompt-chip"
+                  onClick={() => onChipClick(suggestedReply)}
+                  disabled={disabled}
+                >
+                  {suggestedReply}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -365,6 +438,10 @@ export default function AssistantChatPage() {
         throw new Error(data?.error || "No pudimos contactar al asistente.");
       }
 
+      const fulfillmentMessages = Array.isArray(data?.fulfillmentMessages)
+        ? data.fulfillmentMessages
+        : [];
+      const suggestedReplies = extractPayloadChips(fulfillmentMessages);
       if (data?.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
       }
@@ -378,6 +455,8 @@ export default function AssistantChatPage() {
           intent: data?.intent || null,
           confidence: formatConfidence(data?.confidence),
           action: data?.action || null,
+          fulfillmentMessages,
+          suggestedReplies,
           redirectTo: data?.redirectTo || null,
           redirectLabel: data?.redirectLabel || null,
           needsClarification: Boolean(data?.needsClarification),
@@ -453,7 +532,12 @@ export default function AssistantChatPage() {
             aria-label="Mensajes del chatbot"
           >
             {messages.map((message) => (
-              <ChatMessageBubble key={message.id} message={message} />
+              <ChatMessageBubble
+                key={message.id}
+                message={message}
+                onChipClick={handleSendMessage}
+                disabled={isSending}
+              />
             ))}
 
             {isSending ? <TypingIndicator /> : null}
