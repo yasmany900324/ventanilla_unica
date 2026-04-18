@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdministrator } from "../../../../../lib/auth";
-import { getChatbotFunnelMetrics } from "../../../../../lib/chatbotTelemetry";
+import { requireAdministrator } from "../../../../lib/auth";
+import { getChatbotFunnelMetrics } from "../../../../lib/chatbotTelemetry";
 
 export async function GET(request) {
   try {
