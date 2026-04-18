@@ -10,6 +10,7 @@ const MAX_MESSAGE_LENGTH = 500;
 const MAX_TEXTAREA_HEIGHT = 168;
 const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
 const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
+const DEFAULT_CHAT_COMMAND = "none";
 
 function createLocalMessage(partial) {
   return {
@@ -102,6 +103,33 @@ function extractPayloadChips(fulfillmentMessages) {
   return Array.from(chipSet);
 }
 
+function normalizeActionOptions(actionOptions) {
+  if (!Array.isArray(actionOptions)) {
+    return [];
+  }
+
+  return actionOptions
+    .map((option) => {
+      if (!option || typeof option !== "object") {
+        return null;
+      }
+
+      const label = normalizeChipLabel(option.label);
+      const command = normalizeChipLabel(option.command) || DEFAULT_CHAT_COMMAND;
+      const value = normalizeChipLabel(option.value);
+      if (!label) {
+        return null;
+      }
+
+      return {
+        label,
+        command,
+        value,
+      };
+    })
+    .filter(Boolean);
+}
+
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
@@ -155,7 +183,13 @@ function ChatMeta({ message, copy }) {
   );
 }
 
-function ChatMessageBubble({ message, onChipClick, disabled, copy }) {
+function ChatMessageBubble({
+  message,
+  onChipClick,
+  onActionOptionClick,
+  disabled,
+  copy,
+}) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
 
@@ -197,6 +231,23 @@ function ChatMessageBubble({ message, onChipClick, disabled, copy }) {
                   disabled={disabled}
                 >
                   {suggestedReply}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {isBot && Array.isArray(message.actionOptions) && message.actionOptions.length > 0 ? (
+          <div className="assistant-chat-quick-replies" aria-label={copy.dynamicSuggestions}>
+            <div className="assistant-chat-quick-replies__list">
+              {message.actionOptions.map((actionOption) => (
+                <button
+                  key={`${message.id}-${actionOption.command}-${actionOption.value || actionOption.label}`}
+                  type="button"
+                  className="assistant-prompt-chip"
+                  onClick={() => onActionOptionClick(actionOption)}
+                  disabled={disabled}
+                >
+                  {actionOption.label}
                 </button>
               ))}
             </div>
@@ -331,7 +382,10 @@ export default function AssistantChatPage() {
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
   const initializedSessionRef = useRef(false);
-  const lastFailedInputRef = useRef("");
+  const lastFailedInputRef = useRef({
+    rawValue: "",
+    command: DEFAULT_CHAT_COMMAND,
+  });
   const [messages, setMessages] = useState([
     createLocalMessage({
       sender: "bot",
@@ -430,14 +484,18 @@ export default function AssistantChatPage() {
     return Boolean(normalizeInput(inputValue)) && !isSending;
   }, [inputValue, isSending]);
 
-  const submitMessage = async ({ rawValue, appendUserMessage }) => {
+  const submitMessage = async ({
+    rawValue,
+    command = DEFAULT_CHAT_COMMAND,
+    appendUserMessage,
+  }) => {
     const text = normalizeInput(rawValue);
-    if (!text || isSending) {
+    if ((!text && command === DEFAULT_CHAT_COMMAND) || isSending) {
       return;
     }
 
     setServiceError(false);
-    if (appendUserMessage) {
+    if (appendUserMessage && text) {
       setInputValue("");
       setMessages((previousMessages) => [
         ...previousMessages,
@@ -456,6 +514,7 @@ export default function AssistantChatPage() {
           text,
           sessionId: sessionId || undefined,
           preferredLocale: sessionLocale || undefined,
+          command,
         }),
       });
 
@@ -468,6 +527,7 @@ export default function AssistantChatPage() {
         ? data.fulfillmentMessages
         : [];
       const suggestedReplies = extractPayloadChips(fulfillmentMessages);
+      const actionOptions = normalizeActionOptions(data?.actionOptions);
       if (data?.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
       }
@@ -486,14 +546,24 @@ export default function AssistantChatPage() {
           action: data?.action || null,
           fulfillmentMessages,
           suggestedReplies,
+          actionOptions,
+          nextStep: data?.nextStep || null,
+          mode: data?.mode || null,
+          draft: data?.draft || null,
           redirectTo: data?.redirectTo || null,
           redirectLabel: data?.redirectLabel || null,
           needsClarification: Boolean(data?.needsClarification),
         }),
       ]);
-      lastFailedInputRef.current = "";
+      lastFailedInputRef.current = {
+        rawValue: "",
+        command: DEFAULT_CHAT_COMMAND,
+      };
     } catch (error) {
-      lastFailedInputRef.current = text;
+      lastFailedInputRef.current = {
+        rawValue: text,
+        command,
+      };
       setServiceError(true);
     } finally {
       setIsSending(false);
@@ -501,16 +571,47 @@ export default function AssistantChatPage() {
   };
 
   const handleSendMessage = async (rawValue) => {
-    await submitMessage({ rawValue, appendUserMessage: true });
+    await submitMessage({
+      rawValue,
+      command: DEFAULT_CHAT_COMMAND,
+      appendUserMessage: true,
+    });
   };
 
-  const handleRetry = async () => {
-    if (!lastFailedInputRef.current || isSending) {
+  const handleActionOption = async (actionOption) => {
+    if (!actionOption || isSending) {
+      return;
+    }
+
+    const command = actionOption.command || DEFAULT_CHAT_COMMAND;
+    if (command !== DEFAULT_CHAT_COMMAND) {
+      await submitMessage({
+        rawValue: "",
+        command,
+        appendUserMessage: false,
+      });
       return;
     }
 
     await submitMessage({
-      rawValue: lastFailedInputRef.current,
+      rawValue: actionOption.value || actionOption.label,
+      command: DEFAULT_CHAT_COMMAND,
+      appendUserMessage: true,
+    });
+  };
+
+  const handleRetry = async () => {
+    const lastFailedInput = lastFailedInputRef.current;
+    if (
+      (!lastFailedInput?.rawValue && lastFailedInput?.command === DEFAULT_CHAT_COMMAND) ||
+      isSending
+    ) {
+      return;
+    }
+
+    await submitMessage({
+      rawValue: lastFailedInput.rawValue,
+      command: lastFailedInput.command || DEFAULT_CHAT_COMMAND,
       appendUserMessage: false,
     });
   };
@@ -565,6 +666,7 @@ export default function AssistantChatPage() {
                 key={message.id}
                 message={message}
                 onChipClick={handleSendMessage}
+                onActionOptionClick={handleActionOption}
                 disabled={isSending}
                 copy={uiCopy}
               />
