@@ -1988,6 +1988,12 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.portal-footer__contact--mobile,
+.portal-footer__quick-links,
+.portal-footer__mobile-accordion {
+  display: none;
+}
+
 .portal-footer__column h3 {
   margin: 0;
   font-size: 0.9rem;
@@ -2040,6 +2046,7 @@ button:disabled {
   font-weight: 700;
   box-shadow: 0 12px 20px rgba(12, 33, 74, 0.34);
   z-index: 36;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .floating-chat-button:hover {
@@ -2753,12 +2760,173 @@ textarea:focus-visible {
 
   .portal-footer__inner {
     grid-template-columns: 1fr;
-    padding-bottom: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 0.9rem;
+    gap: 0.6rem;
+  }
+
+  .portal-footer {
+    margin-bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .portal-footer__brand {
+    display: grid;
+    gap: 0.42rem;
+  }
+
+  .portal-footer__brand-head {
+    max-width: clamp(122px, 38vw, 168px);
+  }
+
+  .portal-footer__brand p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .portal-footer__contact--desktop {
+    display: none;
+  }
+
+  .portal-footer__contact--mobile {
+    display: block;
+  }
+
+  .portal-footer__quick-links {
+    list-style: none;
+    margin: 0.22rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.12rem;
+  }
+
+  .portal-footer__quick-links a {
+    display: inline-flex;
+    min-height: 2rem;
+    align-items: center;
+    color: #eff5ff;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .portal-footer__quick-links a:hover,
+  .portal-footer__quick-links a:focus-visible {
+    text-decoration: underline;
+  }
+
+  .portal-footer__social {
+    margin-top: 0.25rem;
+    gap: 0.3rem;
+    opacity: 0.84;
+  }
+
+  .portal-footer__social a {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.64rem;
+  }
+
+  .portal-footer__column--desktop {
+    display: none;
+  }
+
+  .portal-footer__mobile-accordion {
+    display: grid;
+    gap: 0.1rem;
+  }
+
+  .portal-footer__accordion-item {
+    border-top: 1px solid rgba(206, 221, 250, 0.18);
+    padding-top: 0.35rem;
+  }
+
+  .portal-footer__accordion-heading {
+    margin: 0;
+  }
+
+  .portal-footer__accordion-trigger {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #f4f8ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .portal-footer__accordion-trigger:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .portal-footer__accordion-trigger:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  .portal-footer__accordion-icon {
+    flex-shrink: 0;
+    color: #cfdef8;
+    font-size: 0.74rem;
+    transition: transform 0.2s ease;
+  }
+
+  .portal-footer__accordion-trigger[aria-expanded="true"] .portal-footer__accordion-icon {
+    transform: rotate(90deg);
+  }
+
+  .portal-footer__accordion-panel ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.22rem;
+    gap: 0.15rem;
+    display: grid;
+  }
+
+  .portal-footer__accordion-panel a {
+    display: inline-flex;
+    min-height: 2rem;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #d8e6ff;
+    text-decoration: none;
+  }
+
+  .portal-footer__accordion-panel a:hover,
+  .portal-footer__accordion-panel a:focus-visible {
+    text-decoration: underline;
+  }
+
+  .portal-footer__accordion-panel[hidden] {
+    display: none;
+  }
+
+  .portal-footer__legal {
+    padding: 0.62rem 0.8rem 0.78rem;
+  }
+
+  .portal-footer__legal p {
+    font-size: 0.74rem;
   }
 
   .floating-chat-button {
-    bottom: 5.9rem;
+    bottom: calc(5.9rem + env(safe-area-inset-bottom, 0px));
     right: 0.75rem;
+    width: 3.1rem;
+    height: 3.1rem;
+  }
+
+  .floating-chat-button--footer-aware {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(0.4rem);
   }
 
   .mobile-bottom-nav {
@@ -2776,6 +2944,7 @@ textarea:focus-visible {
   .mobile-bottom-nav__list {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .mobile-bottom-nav__link,
