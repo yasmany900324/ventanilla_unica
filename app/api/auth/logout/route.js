@@ -17,6 +17,6 @@ export async function POST(request) {
 
     return response;
   } catch (error) {
-    return NextResponse.json({ error: "No se pudo cerrar sesion." }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo cerrar sesión." }, { status: 500 });
   }
 }

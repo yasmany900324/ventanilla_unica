@@ -41,7 +41,7 @@ import {
 } from "../../../../lib/chatbotTelemetry";
 
 const FALLBACK_REPLY =
-  "No logre identificar con claridad tu solicitud. Contame si quieres reportar un problema, iniciar un tramite o consultar el estado de una gestion.";
+  "No logré identificar con claridad tu solicitud. Cuéntame si quieres reportar un problema, iniciar un trámite o consultar el estado de una gestión.";
 const MIN_CONFIDENCE_TO_REDIRECT = 0.45;
 const EMPTY_INCIDENT_DRAFT = {
   category: "",
@@ -53,7 +53,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   return NextResponse.json(
-    { error: "Metodo no permitido. Usa POST para enviar mensajes al chatbot." },
+    { error: "Método no permitido. Usa POST para enviar mensajes al chatbot." },
     { status: 405 }
   );
 }
@@ -65,7 +65,7 @@ export async function POST(request) {
     body = await request.json();
   } catch (error) {
     return NextResponse.json(
-      { error: "La solicitud no tiene un formato JSON valido." },
+      { error: "La solicitud no tiene un formato JSON válido." },
       { status: 400 }
     );
   }
@@ -353,7 +353,7 @@ export async function POST(request) {
         },
         actionOptions: [],
         redirectTo: "/login",
-        redirectLabel: effectiveLocale === "en" ? "Sign in" : effectiveLocale === "pt" ? "Entrar" : "Iniciar sesion",
+        redirectLabel: effectiveLocale === "en" ? "Sign in" : effectiveLocale === "pt" ? "Entrar" : "Iniciar sesión",
         needsClarification: false,
       });
     }
@@ -444,7 +444,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error:
-            "Ocurrio un error al crear la incidencia desde el chat. Intenta nuevamente en unos segundos.",
+            "Ocurrió un error al crear la incidencia desde el chat. Intenta nuevamente en unos segundos.",
         },
         { status: 500 }
       );
@@ -648,7 +648,7 @@ export async function POST(request) {
     });
     return NextResponse.json(
       {
-        error: "El asistente no esta disponible temporalmente.",
+        error: "El asistente no está disponible temporalmente.",
       },
       { status: 503 }
     );
@@ -801,7 +801,7 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        error: "Ocurrio un error al procesar tu mensaje. Intenta nuevamente en unos segundos.",
+        error: "Ocurrió un error al procesar tu mensaje. Intenta nuevamente en unos segundos.",
       },
       { status: 500 }
     );

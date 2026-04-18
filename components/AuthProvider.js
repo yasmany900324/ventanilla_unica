@@ -78,7 +78,7 @@ export function AuthProvider({ initialUser = null, children }) {
         const data = await readJsonSafe(response);
 
         if (!response.ok) {
-          throw new Error(data.error || "No se pudo iniciar sesion.");
+          throw new Error(data.error || "No se pudo iniciar sesión.");
         }
 
         // Temporary trace log while validating auth synchronization flow.
@@ -142,7 +142,7 @@ export function AuthProvider({ initialUser = null, children }) {
         const data = await readJsonSafe(response);
 
         if (!response.ok) {
-          throw new Error(data.error || "No se pudo cerrar sesion.");
+          throw new Error(data.error || "No se pudo cerrar sesión.");
         }
 
         // Temporary trace log while validating auth synchronization flow.

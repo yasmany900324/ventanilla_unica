@@ -16,11 +16,11 @@ export default function IncidentCaseDetail({
   headingId = undefined,
   headingLevel = 2,
   title = "Detalle y seguimiento del caso",
-  description = "Aqui se muestra la informacion del caso seleccionado.",
+  description = "Aquí se muestra la información del caso seleccionado.",
   backButtonLabel = "",
   onBackButtonClick = null,
   isBackButtonDisabled = false,
-  emptyStateMessage = "Selecciona una incidencia reciente para ver su informacion detallada.",
+  emptyStateMessage = "Selecciona una incidencia reciente para ver su información detallada.",
 }) {
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);

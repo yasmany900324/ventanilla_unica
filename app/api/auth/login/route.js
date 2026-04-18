@@ -32,7 +32,7 @@ export async function POST(request) {
     return response;
   } catch (error) {
     return NextResponse.json(
-      { error: "No se pudo iniciar sesion." },
+      { error: "No se pudo iniciar sesión." },
       { status: 500 }
     );
   }
