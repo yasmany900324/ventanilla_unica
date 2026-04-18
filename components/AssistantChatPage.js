@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
@@ -485,20 +485,6 @@ export default function AssistantChatPage() {
   }, [sessionLocale]);
 
   useEffect(() => {
-    const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
-    if (shouldResume !== "1" || isSending) {
-      return;
-    }
-
-    safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
-    void submitMessage({
-      rawValue: "",
-      command: "resume_incident_confirmation",
-      appendUserMessage: false,
-    });
-  }, [isSending]);
-
-  useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) {
       return;
@@ -528,7 +514,7 @@ export default function AssistantChatPage() {
     return Boolean(normalizeInput(inputValue)) && !isSending;
   }, [inputValue, isSending]);
 
-  const submitMessage = async ({
+  const submitMessage = useCallback(async ({
     rawValue,
     command = DEFAULT_CHAT_COMMAND,
     appendUserMessage,
@@ -612,7 +598,21 @@ export default function AssistantChatPage() {
     } finally {
       setIsSending(false);
     }
-  };
+  }, [isSending, sessionId, sessionLocale, uiCopy.fallbackReply, uiCopy.networkError]);
+
+  useEffect(() => {
+    const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
+    if (shouldResume !== "1" || isSending) {
+      return;
+    }
+
+    safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
+    void submitMessage({
+      rawValue: "",
+      command: "resume_incident_confirmation",
+      appendUserMessage: false,
+    });
+  }, [isSending, submitMessage]);
 
   const handleSendMessage = async (rawValue) => {
     await submitMessage({
