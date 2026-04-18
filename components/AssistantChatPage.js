@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
@@ -153,6 +154,59 @@ function safeRemoveLocalStorageItem(key) {
   }
 
   window.localStorage.removeItem(key);
+}
+
+function normalizeContextParam(value, maxLength = 120) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function getChatEntryContext(searchParams) {
+  const rawType = normalizeContextParam(searchParams.get("type"), 24).toLowerCase();
+  if (rawType !== "tramite" && rawType !== "incidencia") {
+    return null;
+  }
+
+  const id = normalizeContextParam(searchParams.get("id"), 60);
+  const title = normalizeContextParam(searchParams.get("title"), 120);
+  const description = normalizeContextParam(searchParams.get("description"), 180);
+  if (!title) {
+    return null;
+  }
+
+  return {
+    type: rawType,
+    id,
+    title,
+    description,
+  };
+}
+
+function buildContextAutoPrompt({ context, copy }) {
+  if (!context || !copy?.contextualEntry) {
+    return "";
+  }
+
+  if (context.type === "tramite") {
+    return copy.contextualEntry.procedurePrompt.replace("{title}", context.title);
+  }
+
+  return copy.contextualEntry.incidentPrompt.replace("{title}", context.title);
+}
+
+function buildContextWelcomeMessage({ context, copy }) {
+  if (!context || !copy?.contextualEntry) {
+    return copy.welcome;
+  }
+
+  if (context.type === "tramite") {
+    return copy.contextualEntry.procedureMessage.replace("{title}", context.title);
+  }
+
+  return copy.contextualEntry.incidentMessage.replace("{title}", context.title);
 }
 
 function ChatHeader({ copy }) {
@@ -406,12 +460,30 @@ function ChatComposer({
 }
 
 export default function AssistantChatPage() {
+  const searchParams = useSearchParams();
   const { locale } = useLocale();
   const uiCopy = getLocaleCopy(locale).chat;
+  const entryContext = useMemo(() => getChatEntryContext(searchParams), [searchParams]);
+  const contextualWelcomeMessage = useMemo(
+    () => buildContextWelcomeMessage({ context: entryContext, copy: uiCopy }),
+    [entryContext, uiCopy]
+  );
+  const contextAutoPrompt = useMemo(
+    () => buildContextAutoPrompt({ context: entryContext, copy: uiCopy }),
+    [entryContext, uiCopy]
+  );
+  const contextTriggerKey = useMemo(() => {
+    if (!entryContext) {
+      return "";
+    }
+
+    return `${entryContext.type}|${entryContext.id}|${entryContext.title}`;
+  }, [entryContext]);
   const quickPrompts = uiCopy.quickPrompts;
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
   const initializedSessionRef = useRef(false);
+  const contextualPromptSentRef = useRef("");
   const lastFailedInputRef = useRef({
     rawValue: "",
     command: DEFAULT_CHAT_COMMAND,
@@ -419,7 +491,7 @@ export default function AssistantChatPage() {
   const [messages, setMessages] = useState([
     createLocalMessage({
       sender: "bot",
-      text: uiCopy.welcome,
+      text: contextualWelcomeMessage,
     }),
   ]);
   useEffect(() => {
@@ -434,12 +506,12 @@ export default function AssistantChatPage() {
       return [
         {
           ...firstMessage,
-          text: uiCopy.welcome,
+          text: contextualWelcomeMessage,
         },
         ...rest,
       ];
     });
-  }, [uiCopy.welcome]);
+  }, [contextualWelcomeMessage]);
 
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -613,6 +685,22 @@ export default function AssistantChatPage() {
       appendUserMessage: false,
     });
   }, [isSending, submitMessage]);
+
+  useEffect(() => {
+    if (!contextAutoPrompt || !contextTriggerKey || isSending) {
+      return;
+    }
+    if (contextualPromptSentRef.current === contextTriggerKey) {
+      return;
+    }
+
+    contextualPromptSentRef.current = contextTriggerKey;
+    void submitMessage({
+      rawValue: contextAutoPrompt,
+      command: DEFAULT_CHAT_COMMAND,
+      appendUserMessage: false,
+    });
+  }, [contextAutoPrompt, contextTriggerKey, isSending, submitMessage]);
 
   const handleSendMessage = async (rawValue) => {
     await submitMessage({

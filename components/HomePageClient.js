@@ -5,6 +5,40 @@ import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
+function normalizeCardId(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .slice(0, 64);
+}
+
+function resolveCardType(item) {
+  if (item?.badgeType === "anonymous") {
+    return "incidencia";
+  }
+
+  return "tramite";
+}
+
+function buildAssistantCardHref(item) {
+  const params = new URLSearchParams();
+  params.set("type", resolveCardType(item));
+  params.set("id", normalizeCardId(item?.title || "") || "item");
+  params.set("title", item?.title || "");
+
+  if (item?.description) {
+    params.set("description", item.description);
+  }
+
+  return `/asistente?${params.toString()}`;
+}
+
 export default function HomePageClient() {
   const { isAuthenticated } = useAuth();
   const { locale } = useLocale();
@@ -78,7 +112,10 @@ export default function HomePageClient() {
 
         <div className="home-frequent__grid">
           {copy.home.frequentServices.map((item) => {
-            const href = item.badgeType === "identity" && !hasActiveSession ? "/login" : assistantHref;
+            const href =
+              item.badgeType === "identity" && !hasActiveSession
+                ? "/login"
+                : buildAssistantCardHref(item);
 
             return (
               <article key={item.title} className="frequent-card">
