@@ -55,7 +55,7 @@ export default function AdminDashboardPage() {
       setErrorMessage("");
 
       try {
-        const response = await fetch(`/api/chatbot/metrics?windowDays=${windowDays}`, {
+        const response = await fetch(`/api/chatbot/metrics?windowDays=${windowDays}&locale=${locale}`, {
           signal: abortController.signal,
         });
         const data = await response.json();
@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
             return;
           }
 
-          throw new Error(data?.error || copy.adminDashboard.loadMetricsError);
+          throw new Error(data?.error || copy.admin.loadError);
         }
 
         setMetrics(data);
@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        setErrorMessage(error.message || copy.adminDashboard.loadMetricsError);
+        setErrorMessage(error.message || copy.admin.loadError);
       } finally {
         if (!abortController.signal.aborted) {
           setIsLoading(false);
@@ -87,7 +87,7 @@ export default function AdminDashboardPage() {
     return () => {
       abortController.abort();
     };
-  }, [copy.adminDashboard.loadMetricsError, isAdministrator, router, user, windowDays]);
+  }, [copy.admin.loadError, isAdministrator, locale, router, user, windowDays]);
 
   const orderedEventCounts = useMemo(() => {
     const counts = metrics?.eventCounts || {};
@@ -103,13 +103,13 @@ export default function AdminDashboardPage() {
       <section className="card dashboard-header">
         <div>
           <p className="eyebrow">{copy.portal.adminDashboard}</p>
-          <h1>{copy.adminDashboard.title}</h1>
-          <p className="description">{copy.adminDashboard.description}</p>
+          <h1>{copy.admin.title}</h1>
+          <p className="description">{copy.admin.description}</p>
         </div>
       </section>
 
       <section className="card dashboard-section">
-        <label htmlFor="admin-window-days">{copy.adminDashboard.windowLabel}</label>
+        <label htmlFor="admin-window-days">{copy.admin.analysisWindow}</label>
         <select
           id="admin-window-days"
           value={windowDays}
@@ -118,7 +118,7 @@ export default function AdminDashboardPage() {
         >
           {WINDOW_DAY_OPTIONS.map((option) => (
             <option key={option} value={option}>
-              {copy.adminDashboard.windowLastDays(option)}
+              {copy.admin.lastDaysLabel(option)}
             </option>
           ))}
         </select>
@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
 
       {isLoading ? (
         <section className="card">
-          <p className="info-message">{copy.adminDashboard.loadingMetrics}</p>
+          <p className="info-message">{copy.admin.loadingMetrics}</p>
         </section>
       ) : null}
 
@@ -138,52 +138,54 @@ export default function AdminDashboardPage() {
 
       {!isLoading && !errorMessage && funnel ? (
         <>
-          <section className="summary-grid" aria-label={copy.adminDashboard.funnelSummaryAria}>
+          <section className="summary-grid" aria-label={copy.admin.funnelSummaryAria}>
             <MetricCard
-              label={copy.adminDashboard.funnelMetrics.enteredIncidentFlow}
+              label={copy.admin.cards.enteredIncidentFlow}
               value={funnel.enteredIncidentFlow}
             />
-            <MetricCard label={copy.adminDashboard.funnelMetrics.askedField} value={funnel.askedField} />
+            <MetricCard label={copy.admin.cards.askedField} value={funnel.askedField} />
             <MetricCard
-              label={copy.adminDashboard.funnelMetrics.readyForConfirmation}
+              label={copy.admin.cards.readyForConfirmation}
               value={funnel.readyForConfirmation}
             />
-            <MetricCard label={copy.adminDashboard.funnelMetrics.authRequired} value={funnel.authRequired} />
-            <MetricCard label={copy.adminDashboard.funnelMetrics.confirmed} value={funnel.confirmed} />
+            <MetricCard label={copy.admin.cards.authRequired} value={funnel.authRequired} />
+            <MetricCard label={copy.admin.cards.confirmed} value={funnel.confirmed} />
             <MetricCard
-              label={copy.adminDashboard.funnelMetrics.incidentCreated}
+              label={copy.admin.cards.incidentCreated}
               value={funnel.incidentCreated}
             />
             <MetricCard
-              label={copy.adminDashboard.funnelMetrics.incidentCreationConversion}
+              label={copy.admin.cards.incidentCreationConversion}
               value={formatPercent(funnel.incidentCreationConversion)}
             />
-            <MetricCard label={copy.adminDashboard.funnelMetrics.cancelled} value={funnel.cancelled} />
+            <MetricCard label={copy.admin.cards.cancelled} value={funnel.cancelled} />
           </section>
 
           <section className="card dashboard-section">
-            <h2>{copy.adminDashboard.activityTotalsTitle}</h2>
-            <p className="small">{copy.adminDashboard.totalEvents(metrics?.totals?.events || 0)}</p>
+            <h2>{copy.admin.totalsTitle}</h2>
             <p className="small">
-              {copy.adminDashboard.totalUniqueSessions(metrics?.totals?.uniqueSessions || 0)}
+              {copy.admin.totalsEvents}: {metrics?.totals?.events || 0}
+            </p>
+            <p className="small">
+              {copy.admin.totalsUniqueSessions}: {metrics?.totals?.uniqueSessions || 0}
             </p>
           </section>
 
           <section className="card dashboard-section">
-            <h2>{copy.adminDashboard.frequentEventsTitle}</h2>
+            <h2>{copy.admin.frequentEventsTitle}</h2>
             {orderedEventCounts.length ? (
-              <ul className="incident-list incident-list--full" aria-label={copy.adminDashboard.telemetryEventsAria}>
+              <ul className="incident-list incident-list--full" aria-label={copy.admin.telemetryEventsAria}>
                 {orderedEventCounts.map(([eventName, count]) => (
                   <li key={eventName} className="incident-card incident-card--list">
                     <div className="incident-card__main">
                       <p className="incident-card__meta">{eventName}</p>
-                      <p className="incident-card__description">{copy.adminDashboard.occurrences(count)}</p>
+                      <p className="incident-card__description">{copy.admin.occurrencesLabel(count)}</p>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="empty-message">{copy.adminDashboard.emptyEventsWindow}</p>
+              <p className="empty-message">{copy.admin.emptyWindowEvents}</p>
             )}
           </section>
         </>
