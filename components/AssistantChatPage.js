@@ -20,6 +20,8 @@ const ERROR_TEXT =
 
 const MAX_TEXTAREA_HEIGHT = 168;
 const TYPING_STATUS_TEXT = "El asistente esta escribiendo una respuesta.";
+const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
+const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
 
 function createLocalMessage(partial) {
   return {
@@ -350,6 +352,7 @@ export default function AssistantChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [serviceError, setServiceError] = useState(false);
   const [sessionId, setSessionId] = useState("");
+  const [sessionLocale, setSessionLocale] = useState("");
 
   useEffect(() => {
     if (initializedSessionRef.current) {
@@ -361,9 +364,14 @@ export default function AssistantChatPage() {
       return;
     }
 
-    const existingSessionId = window.localStorage.getItem("chatbot_session_id");
+    const existingSessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
     if (existingSessionId) {
       setSessionId(existingSessionId);
+    }
+
+    const existingSessionLocale = window.localStorage.getItem(SESSION_LOCALE_STORAGE_KEY);
+    if (existingSessionLocale) {
+      setSessionLocale(existingSessionLocale);
     }
   }, []);
 
@@ -372,8 +380,16 @@ export default function AssistantChatPage() {
       return;
     }
 
-    window.localStorage.setItem("chatbot_session_id", sessionId);
+    window.localStorage.setItem(SESSION_ID_STORAGE_KEY, sessionId);
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionLocale || typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(SESSION_LOCALE_STORAGE_KEY, sessionLocale);
+  }, [sessionLocale]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -430,6 +446,7 @@ export default function AssistantChatPage() {
         body: JSON.stringify({
           text,
           sessionId: sessionId || undefined,
+          preferredLocale: sessionLocale || undefined,
         }),
       });
 
@@ -444,6 +461,9 @@ export default function AssistantChatPage() {
       const suggestedReplies = extractPayloadChips(fulfillmentMessages);
       if (data?.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
+      }
+      if (typeof data?.locale === "string" && data.locale && data.locale !== sessionLocale) {
+        setSessionLocale(data.locale);
       }
       setMessages((previousMessages) => [
         ...previousMessages,
