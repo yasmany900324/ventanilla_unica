@@ -10,6 +10,7 @@ const MAX_MESSAGE_LENGTH = 500;
 const MAX_TEXTAREA_HEIGHT = 168;
 const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
 const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
+const CHATBOT_RESUME_PENDING_KEY = "chatbot_resume_pending";
 const DEFAULT_CHAT_COMMAND = "none";
 
 function createLocalMessage(partial) {
@@ -130,6 +131,30 @@ function normalizeActionOptions(actionOptions) {
     .filter(Boolean);
 }
 
+function safeSetLocalStorageItem(key, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(key, value);
+}
+
+function safeGetLocalStorageItem(key) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(key) || "";
+}
+
+function safeRemoveLocalStorageItem(key) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(key);
+}
+
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
@@ -187,6 +212,7 @@ function ChatMessageBubble({
   message,
   onChipClick,
   onActionOptionClick,
+  onRedirectClick,
   disabled,
   copy,
 }) {
@@ -213,7 +239,11 @@ function ChatMessageBubble({
             <p className="assistant-message__redirect-text">
               {copy.redirectIntro}
             </p>
-            <Link href={message.redirectTo} className="assistant-message__redirect">
+            <Link
+              href={message.redirectTo}
+              className="assistant-message__redirect"
+              onClick={() => onRedirectClick(message)}
+            >
               {message.redirectLabel || copy.redirectCta}
             </Link>
           </div>
@@ -427,12 +457,12 @@ export default function AssistantChatPage() {
       return;
     }
 
-    const existingSessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
+    const existingSessionId = safeGetLocalStorageItem(SESSION_ID_STORAGE_KEY);
     if (existingSessionId) {
       setSessionId(existingSessionId);
     }
 
-    const existingSessionLocale = window.localStorage.getItem(SESSION_LOCALE_STORAGE_KEY);
+    const existingSessionLocale = safeGetLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
     if (existingSessionLocale) {
       setSessionLocale(existingSessionLocale);
     }
@@ -443,7 +473,7 @@ export default function AssistantChatPage() {
       return;
     }
 
-    window.localStorage.setItem(SESSION_ID_STORAGE_KEY, sessionId);
+    safeSetLocalStorageItem(SESSION_ID_STORAGE_KEY, sessionId);
   }, [sessionId]);
 
   useEffect(() => {
@@ -451,8 +481,22 @@ export default function AssistantChatPage() {
       return;
     }
 
-    window.localStorage.setItem(SESSION_LOCALE_STORAGE_KEY, sessionLocale);
+    safeSetLocalStorageItem(SESSION_LOCALE_STORAGE_KEY, sessionLocale);
   }, [sessionLocale]);
+
+  useEffect(() => {
+    const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
+    if (shouldResume !== "1" || isSending) {
+      return;
+    }
+
+    safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
+    void submitMessage({
+      rawValue: "",
+      command: "resume_incident_confirmation",
+      appendUserMessage: false,
+    });
+  }, [isSending]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -616,6 +660,14 @@ export default function AssistantChatPage() {
     });
   };
 
+  const handleRedirectClick = (message) => {
+    if (message?.nextStep?.type !== "auth_required") {
+      return;
+    }
+
+    safeSetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY, "1");
+  };
+
   const handleInputChange = (event) => {
     setInputValue(event.target.value.slice(0, MAX_MESSAGE_LENGTH));
   };
@@ -667,6 +719,7 @@ export default function AssistantChatPage() {
                 message={message}
                 onChipClick={handleSendMessage}
                 onActionOptionClick={handleActionOption}
+                onRedirectClick={handleRedirectClick}
                 disabled={isSending}
                 copy={uiCopy}
               />

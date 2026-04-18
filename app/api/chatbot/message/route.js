@@ -21,7 +21,9 @@ import { createIncident } from "../../../../lib/incidents";
 import {
   buildAuthRequiredReply,
   buildCancelledIncidentReply,
+  buildIncidentConfirmationActionOptions,
   buildIncidentCreatedReply,
+  buildIncidentResumeReply,
   buildIncidentFlowFromDialogTurn,
 } from "../../../../lib/chatbotConversationOrchestrator";
 import {
@@ -121,6 +123,91 @@ export async function POST(request) {
         field: null,
       },
       actionOptions: [],
+      redirectTo: null,
+      redirectLabel: null,
+      needsClarification: false,
+    });
+  }
+
+  if (command === "resume_incident_confirmation") {
+    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
+    const missingFields = computeMissingIncidentFields(normalizedDraft);
+    if (missingFields.length > 0) {
+      const nextField = missingFields[0];
+      await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+        draft: normalizedDraft,
+        pendingField: nextField,
+        lastAction: command,
+      });
+
+      const partialFlow = buildIncidentFlowFromDialogTurn({
+        text: "",
+        locale: effectiveLocale,
+        shouldAskClarification: false,
+        dialogflowResponse: {
+          action: "crear_incidencia",
+          intent: "crear_incidencia",
+          parameters: {},
+        },
+        sessionSnapshot: {
+          ...persistedSessionSnapshot,
+          draft: normalizedDraft,
+          state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+          pendingField: nextField,
+        },
+      });
+
+      return NextResponse.json({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: partialFlow.replyText || FALLBACK_REPLY,
+        intent: persistedSessionSnapshot.lastIntent,
+        confidence: persistedSessionSnapshot.lastConfidence,
+        fulfillmentMessages: [],
+        action: command,
+        parameters: {},
+        mode: partialFlow.mode,
+        draft: {
+          ...normalizeIncidentDraft(partialFlow.draft),
+          missingFields: computeMissingIncidentFields(partialFlow.draft),
+        },
+        nextStep: partialFlow.nextStep,
+        actionOptions: partialFlow.actionOptions,
+        redirectTo: null,
+        redirectLabel: null,
+        needsClarification: false,
+      });
+    }
+
+    await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      state: CHATBOT_CONVERSATION_STATES.AWAITING_INCIDENT_CONFIRMATION,
+      draft: normalizedDraft,
+      pendingField: null,
+      lastAction: command,
+    });
+
+    return NextResponse.json({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildIncidentResumeReply(effectiveLocale),
+      intent: persistedSessionSnapshot.lastIntent,
+      confidence: persistedSessionSnapshot.lastConfidence,
+      fulfillmentMessages: [],
+      action: command,
+      parameters: {},
+      mode: "incident",
+      draft: {
+        ...normalizedDraft,
+        missingFields: [],
+      },
+      nextStep: {
+        type: "confirm_incident",
+        field: null,
+      },
+      actionOptions: buildIncidentConfirmationActionOptions(effectiveLocale),
       redirectTo: null,
       redirectLabel: null,
       needsClarification: false,
@@ -281,6 +368,149 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+  }
+
+  if (command === "edit_incident_category") {
+    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
+    await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+      draft: normalizedDraft,
+      pendingField: "category",
+      lastAction: command,
+    });
+    const partialFlow = buildIncidentFlowFromDialogTurn({
+      text: "",
+      locale: effectiveLocale,
+      shouldAskClarification: false,
+      dialogflowResponse: {
+        action: "crear_incidencia",
+        intent: "crear_incidencia",
+        parameters: {},
+      },
+      sessionSnapshot: {
+        ...persistedSessionSnapshot,
+        draft: normalizedDraft,
+        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+        pendingField: "category",
+      },
+    });
+    return NextResponse.json({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: partialFlow.replyText || FALLBACK_REPLY,
+      intent: persistedSessionSnapshot.lastIntent,
+      confidence: persistedSessionSnapshot.lastConfidence,
+      fulfillmentMessages: [],
+      action: command,
+      parameters: {},
+      mode: partialFlow.mode,
+      draft: {
+        ...normalizeIncidentDraft(partialFlow.draft),
+        missingFields: computeMissingIncidentFields(partialFlow.draft),
+      },
+      nextStep: partialFlow.nextStep,
+      actionOptions: partialFlow.actionOptions,
+      redirectTo: null,
+      redirectLabel: null,
+      needsClarification: false,
+    });
+  }
+
+  if (command === "edit_incident_description") {
+    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
+    await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+      draft: normalizedDraft,
+      pendingField: "description",
+      lastAction: command,
+    });
+
+    const partialFlow = buildIncidentFlowFromDialogTurn({
+      text: "",
+      locale: effectiveLocale,
+      shouldAskClarification: false,
+      dialogflowResponse: {
+        action: "crear_incidencia",
+        intent: "crear_incidencia",
+        parameters: {},
+      },
+      sessionSnapshot: {
+        ...persistedSessionSnapshot,
+        draft: normalizedDraft,
+        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+        pendingField: "description",
+      },
+    });
+    return NextResponse.json({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: partialFlow.replyText || FALLBACK_REPLY,
+      intent: persistedSessionSnapshot.lastIntent,
+      confidence: persistedSessionSnapshot.lastConfidence,
+      fulfillmentMessages: [],
+      action: command,
+      parameters: {},
+      mode: partialFlow.mode,
+      draft: {
+        ...normalizeIncidentDraft(partialFlow.draft),
+        missingFields: computeMissingIncidentFields(partialFlow.draft),
+      },
+      nextStep: partialFlow.nextStep,
+      actionOptions: partialFlow.actionOptions,
+      redirectTo: null,
+      redirectLabel: null,
+      needsClarification: false,
+    });
+  }
+
+  if (command === "edit_incident_location") {
+    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
+    await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+      draft: normalizedDraft,
+      pendingField: "location",
+      lastAction: command,
+    });
+
+    const partialFlow = buildIncidentFlowFromDialogTurn({
+      text: "",
+      locale: effectiveLocale,
+      shouldAskClarification: false,
+      dialogflowResponse: {
+        action: "crear_incidencia",
+        intent: "crear_incidencia",
+        parameters: {},
+      },
+      sessionSnapshot: {
+        ...persistedSessionSnapshot,
+        draft: normalizedDraft,
+        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
+        pendingField: "location",
+      },
+    });
+    return NextResponse.json({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: partialFlow.replyText || FALLBACK_REPLY,
+      intent: persistedSessionSnapshot.lastIntent,
+      confidence: persistedSessionSnapshot.lastConfidence,
+      fulfillmentMessages: [],
+      action: command,
+      parameters: {},
+      mode: partialFlow.mode,
+      draft: {
+        ...normalizeIncidentDraft(partialFlow.draft),
+        missingFields: computeMissingIncidentFields(partialFlow.draft),
+      },
+      nextStep: partialFlow.nextStep,
+      actionOptions: partialFlow.actionOptions,
+      redirectTo: null,
+      redirectLabel: null,
+      needsClarification: false,
+    });
   }
 
   if (!isDialogflowConfigured()) {
