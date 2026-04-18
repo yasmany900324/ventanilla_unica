@@ -20,7 +20,7 @@ export async function GET(request) {
     );
   } catch (error) {
     return NextResponse.json(
-      { error: "No se pudo obtener la sesion actual." },
+      { error: "No se pudo obtener la sesión actual." },
       {
         status: 500,
         headers: { "Cache-Control": "no-store, must-revalidate" },

@@ -10,15 +10,15 @@ import {
 const METRICS_MESSAGES = {
   es: {
     forbidden: "No autorizado.",
-    loadError: "No se pudieron obtener metricas del chatbot.",
+    loadError: "No se pudieron obtener métricas del chatbot.",
   },
   en: {
     forbidden: "Unauthorized.",
     loadError: "Could not load chatbot metrics.",
   },
   pt: {
-    forbidden: "Nao autorizado.",
-    loadError: "Nao foi possivel obter metricas do chatbot.",
+    forbidden: "Não autorizado.",
+    loadError: "Não foi possível obter métricas do chatbot.",
   },
 };
 
