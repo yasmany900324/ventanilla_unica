@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import IncidentForm from "./IncidentForm";
 import IncidentListItem from "./IncidentListItem";
 import IncidentCaseDetail from "./IncidentCaseDetail";
 import { useAuth } from "./AuthProvider";
@@ -21,6 +20,7 @@ export default function CitizenDashboard() {
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
   const dashboardCopy = copy.dashboard;
+  const assistantHref = "/asistente";
   const requestedIncidentId = searchParams.get("incidentId");
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
@@ -121,32 +121,6 @@ export default function CitizenDashboard() {
     return initialSummary;
   }, [incidents]);
 
-  const handleCreateIncident = async (newIncidentData) => {
-    setErrorMessage("");
-
-    const response = await fetch("/api/incidents", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newIncidentData),
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      const message = data.error || dashboardCopy.createIncidentError;
-      setErrorMessage(message);
-      throw new Error(message);
-    }
-
-    setIncidents((previousIncidents) => [data.incident, ...previousIncidents]);
-    setSelectedIncidentId(data.incident.id);
-  };
-
   return (
     <main className="page page--dashboard">
       <section className="card dashboard-header">
@@ -158,7 +132,7 @@ export default function CitizenDashboard() {
           <p className="description">{dashboardCopy.description}</p>
         </div>
         <div className="hero-actions">
-          <Link href="#nueva-incidencia" className="button-link">
+          <Link href={assistantHref} className="button-link">
             {dashboardCopy.newIncident}
           </Link>
         </div>
@@ -190,10 +164,14 @@ export default function CitizenDashboard() {
       <section id="nueva-incidencia" className="card dashboard-section">
         <h2>{dashboardCopy.registerIncidentTitle}</h2>
         <p className="small">{dashboardCopy.registerIncidentDescription}</p>
-        <IncidentForm
-          onSubmit={handleCreateIncident}
-          submitLabel={dashboardCopy.submitIncident}
-        />
+        <div className="hero-actions">
+          <Link href={assistantHref} className="button-link">
+            {dashboardCopy.submitIncident}
+          </Link>
+          <Link href={assistantHref} className="button-link button-link--secondary">
+            {copy.home.assistantCta}
+          </Link>
+        </div>
       </section>
 
       <section id="mis-incidencias-recientes" className="card recent-incidents-card">

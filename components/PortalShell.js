@@ -28,7 +28,7 @@ const AUTH_MOBILE_NAV = [
     labelKey: "myCases",
     icon: "cases",
   },
-  { href: "/ciudadano/dashboard#nueva-incidencia", labelKey: "newCase", icon: "plus" },
+  { href: "/asistente", labelKey: "newCase", icon: "plus" },
   { href: "/ciudadano/dashboard#detalle-caso", labelKey: "profile", icon: "profile" },
 ];
 
@@ -154,7 +154,7 @@ export default function PortalShell({ children }) {
         label: copy.nav.myCases,
       },
       {
-        href: hasActiveSession ? "/ciudadano/dashboard#nueva-incidencia" : "/login",
+        href: hasActiveSession ? assistantHref : "/login",
         label: copy.nav.newRequest,
       },
       { href: "/#ayuda-soporte", label: copy.nav.help },
