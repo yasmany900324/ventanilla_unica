@@ -46,6 +46,10 @@ import {
 } from "../../../../lib/chatbotTelemetry";
 import { interpretUserMessage } from "../../../../lib/llmService";
 import {
+  hasProcedureSpecificSignals,
+  normalizeIntentLookup,
+} from "../../../../lib/chatbotIntentUtils";
+import {
   findMatchingProcedure,
   getProcedureByCode,
   ensureProcedureCatalogSchema,
@@ -137,20 +141,6 @@ function normalizeProcedureText(value, maxLength = 320) {
   }
 
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
-}
-
-function normalizeIntentLookup(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function shouldSwitchToStatusIntent({ text, interpretation }) {
@@ -300,32 +290,6 @@ function buildIncidentStartReply() {
 
 function buildUnsupportedProcedureReply() {
   return "Lo siento, de momento no puedo ayudarte con este trámite.";
-}
-
-function hasProcedureSpecificSignals(text) {
-  const normalized = normalizeIntentLookup(text);
-  if (!normalized) {
-    return false;
-  }
-
-  const genericProcedureSignals = new Set([
-    "quiero iniciar un tramite",
-    "necesito hacer un tramite",
-    "necesito realizar una gestion",
-    "quiero realizar una gestion",
-    "iniciar tramite",
-    "iniciar un tramite",
-    "hacer un tramite",
-    "tramite",
-    "trámite",
-    "quiero gestionar un tramite",
-    "quiero hacer un tramite",
-  ]);
-  if (genericProcedureSignals.has(normalized)) {
-    return false;
-  }
-
-  return normalized.length >= 18 || normalized.split(" ").length >= 4;
 }
 
 function buildProcedureCatalogIntroReply(procedures) {
