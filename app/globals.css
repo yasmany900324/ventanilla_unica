@@ -1684,10 +1684,16 @@ button:disabled {
 .admin-tabs {
   display: inline-flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .admin-tabs__button {
+  flex: 0 0 auto;
   background: #eef2ff;
   color: #1e3a8a;
   border: 1px solid #c7d2fe;
@@ -1705,6 +1711,15 @@ button:disabled {
   background: #1e40af;
   color: #ffffff;
   border-color: #1e40af;
+}
+
+.admin-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.admin-tabs::-webkit-scrollbar-thumb {
+  background: #c7d2fe;
+  border-radius: 999px;
 }
 
 .admin-procedures-layout {
