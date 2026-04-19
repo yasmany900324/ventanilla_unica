@@ -264,9 +264,6 @@ export default function HomePageClient() {
   const hasActiveSession = isAuthenticated;
   const startProcedureHref =
     "/asistente?type=tramite&id=iniciar-tramite&title=Iniciar+un+tramite";
-  const reportHref =
-    "/asistente?type=incidencia&id=reportar-incidencia&title=Reportar+una+incidencia";
-  const trackingHref = hasActiveSession ? "/mis-incidencias" : "/login";
   const accessTitle = copy.home.accessTitle;
   const accessDescription = hasActiveSession
     ? copy.home.accessDescriptionActive
@@ -297,12 +294,6 @@ export default function HomePageClient() {
           <div className="home-hero__actions">
             <Link href={startProcedureHref} className="home-cta home-cta--primary">
               {copy.home.ctaStartProcedure}
-            </Link>
-            <Link href={reportHref} className="home-cta home-cta--secondary">
-              {copy.home.ctaReportProblem}
-            </Link>
-            <Link href={trackingHref} className="home-cta home-cta--secondary">
-              {copy.home.ctaCheckStatus}
             </Link>
           </div>
         </div>
