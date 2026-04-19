@@ -23,10 +23,9 @@ Variables de entorno requeridas:
 
 - `POSTGRES_URL`
 - `POSTGRES_URL_NON_POOLING`
-- `DIALOGFLOW_PROJECT_ID`
-- `GOOGLE_CLIENT_EMAIL`
-- `GOOGLE_PRIVATE_KEY`
-- `DIALOGFLOW_LANGUAGE_CODE` (opcional, por defecto `es`)
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL_INTERPRETER` (opcional, por defecto `gpt-4.1-mini`)
+- `APP_DEFAULT_LOCALE` (opcional, por defecto `es`)
 
 En Vercel estas variables se inyectan automaticamente al conectar una base de datos Neon/Postgres al proyecto.
 
@@ -35,26 +34,18 @@ En Vercel estas variables se inyectan automaticamente al conectar una base de da
 - `GET /api/incidents`: lista incidencias
 - `POST /api/incidents`: crea incidencia con estado inicial `recibido`
 - `PATCH /api/incidents/:id/advance`: avanza estado (`recibido -> en proceso -> resuelto`)
-- `POST /api/chatbot/message`: procesa un mensaje del chatbot via Dialogflow (server-side)
+- `POST /api/chatbot/message`: procesa un mensaje del chatbot via backend + LLM (server-side)
 - `GET /api/chatbot/metrics`: metricas de embudo del chatbot (solo administradores)
 
-## Integracion del chatbot con Dialogflow
+## Integracion del chatbot con backend + LLM
 
-La integracion del asistente sigue una arquitectura segura para prototipo:
+La integracion del asistente sigue una arquitectura de control en backend:
 
 1. El frontend envia mensajes a `POST /api/chatbot/message`.
-2. El route handler de Next.js valida y sanitiza la entrada.
-3. El servidor llama a Dialogflow usando `@google-cloud/dialogflow`.
-4. Se retorna una respuesta estructurada al frontend con:
-   - `replyText`
-   - `intent`
-   - `confidence`
-   - `fulfillmentMessages`
-   - `action`
-   - `parameters`
-   - `redirectTo`
-   - `redirectLabel`
-   - `needsClarification`
+2. El route handler valida y sanitiza la entrada.
+3. El servidor usa una capa LLM para interpretar lenguaje natural y extraer datos estructurados.
+4. El backend orquesta el flujo conversacional por pasos, valida datos y decide el siguiente paso.
+5. Se retorna una respuesta estructurada al frontend para renderizar.
 
 ### Flujo de UI
 
@@ -63,18 +54,19 @@ La integracion del asistente sigue una arquitectura segura para prototipo:
 - El chat mantiene historial local en estado del componente.
 - El `sessionId` se conserva en `localStorage` para continuidad de la conversacion.
 
-### Mapeo de intents/actions a rutas internas
+### Flujo prioritario implementado
 
-El mapeo centralizado vive en:
+Caso: **Árbol caído / ramas peligrosas**
 
-- `lib/chatbotIntentRoutes.js`
-
-Ejemplos actuales:
-
-- `crear_incidencia` -> `/asistente`
-- `consultar_tramite` -> `/mis-incidencias`
-
-Puedes extender los mapas `ACTION_ROUTE_MAP` e `INTENT_ROUTE_MAP` segun tus intents reales de Dialogflow.
+Secuencia:
+1. ubicacion
+2. descripcion
+3. riesgo
+4. foto opcional (adjuntar o omitir)
+5. resumen
+6. confirmacion
+7. creacion de incidencia
+8. cierre
 
 ### Prueba local rapida
 
@@ -84,7 +76,7 @@ Puedes extender los mapas `ACTION_ROUTE_MAP` e `INTENT_ROUTE_MAP` segun tus inte
 cp .env.example .env.local
 ```
 
-2. Completa credenciales reales de Dialogflow en `.env.local`.
+2. Completa credenciales reales de OpenAI en `.env.local`.
 3. Inicia app:
 
 ```bash
@@ -98,7 +90,7 @@ npm run dev
    - "Quiero crear una incidencia"
    - "Donde consulto el estado de mi solicitud?"
 
-Si Dialogflow no detecta con buena confianza, el backend responde con `needsClarification: true` y un texto de repregunta para pedir mas contexto.
+Si la capa LLM no devuelve una interpretacion valida o falla por timeout/error, el backend aplica fallback deterministico y responde con repregunta controlada.
 
 ## Telemetria del embudo conversacional
 
@@ -106,19 +98,17 @@ El backend registra eventos del flujo conversacional para medir conversion en re
 
 - Tabla: `chatbot_telemetry_events` (si hay Postgres disponible).
 - Fallback: buffer en memoria cuando no hay DB.
-- Eventos instrumentados:
+- Eventos instrumentados (minimos):
   - `turn_received`
-  - `intent_detected`
-  - `mode_resolved`
-  - `ask_field`
+  - `flow_activated`
+  - `entities_accepted`
+  - `entities_rejected`
+  - `low_confidence_reprompt`
   - `confirmation_ready`
-  - `confirmation_resumed`
-  - `edit_requested`
-  - `auth_required`
   - `incident_created`
+  - `llm_fallback_used`
   - `cancelled`
-  - `fallback_clarification`
-  - `redirect_offered`
+  - `auth_required`
   - `service_error`
 
 ### Consultar metricas (solo administradores)
