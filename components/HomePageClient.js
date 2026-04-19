@@ -264,11 +264,6 @@ export default function HomePageClient() {
   const hasActiveSession = isAuthenticated;
   const startProcedureHref =
     "/asistente?type=tramite&id=iniciar-tramite&title=Iniciar+un+tramite";
-  const accessTitle = copy.home.accessTitle;
-  const accessDescription = hasActiveSession
-    ? copy.home.accessDescriptionActive
-    : copy.home.accessDescriptionInactive;
-  const identityHref = hasActiveSession ? "/ciudadano/dashboard" : "/login";
   const primaryHelpItem = copy.home.helpItems[0] || null;
   const secondaryHelpItems = copy.home.helpItems.slice(1);
 
@@ -360,25 +355,6 @@ export default function HomePageClient() {
               </li>
             ))}
           </ol>
-        </article>
-
-        <article className="card home-access-card">
-          <span className="home-access-card__label">{copy.home.accessLabel}</span>
-          <h2>{accessTitle}</h2>
-          <p>{accessDescription}</p>
-          <ul>
-            {copy.home.citizenActions.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-          <div className="home-access-card__actions">
-            <Link href={identityHref} className="home-cta home-cta--inline-primary">
-              {copy.home.loginCta}
-            </Link>
-            <Link href="/registro" className="home-cta home-cta--inline-secondary">
-              {copy.home.registerNowCta}
-            </Link>
-          </div>
         </article>
 
         <article id="ayuda-soporte" className="card home-help-card">
