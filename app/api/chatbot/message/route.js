@@ -270,6 +270,10 @@ function buildStatusReply() {
   return "Entiendo. Te ayudo a consultar el estado de tu solicitud. Puedes revisar tus casos en 'Mis incidencias' o indicarme el número de ticket para orientarte.";
 }
 
+function buildIncidentStartReply() {
+  return "Bien, cuéntame qué sucede para ayudarte a registrar la incidencia.";
+}
+
 function buildUnsupportedProcedureReply() {
   return "Lo siento, de momento no puedo ayudarte con este trámite.";
 }
@@ -1009,6 +1013,7 @@ export async function POST(request) {
   }
 
   const switchToProcedure = shouldSwitchToProcedureFlow({ text, interpretation });
+  const switchToIncident = shouldSwitchToIncidentFlow({ text, interpretation });
   const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
 
   if (switchToStatus) {
@@ -1036,6 +1041,84 @@ export async function POST(request) {
       nextStepField: null,
       redirectTo: "/mis-incidencias",
       redirectLabel: "Ver mis incidencias",
+      needsClarification: false,
+    });
+  }
+
+  if (switchToIncident && !isTreeFlowActive(snapshot) && !isProcedureFlowActive(snapshot)) {
+    const seedData = {
+      ...EMPTY_COLLECTED_DATA,
+      category: "infraestructura",
+      subcategory: "arbol_caido_ramas_peligrosas",
+    };
+    const mergedFromIntent = mergeCollectedDataFromInterpretation({
+      collectedData: seedData,
+      interpretation,
+      text,
+      currentStep: CHATBOT_CURRENT_STEPS.DESCRIPTION,
+    });
+    const hasDescription = Boolean(mergedFromIntent.collectedData?.description);
+    const nextStep = hasDescription
+      ? getNextTreeFlowStep(mergedFromIntent.collectedData)
+      : CHATBOT_CURRENT_STEPS.DESCRIPTION;
+    const nextState =
+      nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
+        ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
+        : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
+    const savedSnapshot = await setConversationState(
+      sessionId,
+      createTreeFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: mergedFromIntent.collectedData,
+        currentStep: nextStep,
+        confirmationState: nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none",
+        lastInterpretation: interpretation,
+        lastIntent: "report_incident",
+        lastAction: "switch_to_incident",
+        lastConfidence: interpretation?.intent?.confidence || null,
+        state: nextState,
+      })
+    );
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ENTERED_INCIDENT_FLOW,
+      mode: "incident",
+      outcome: "explicit_incident_intent",
+    });
+
+    if (nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+        funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
+        mode: "incident",
+        outcome: "ready_after_incident_intent_start",
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildIncidentResumeReply(mergedFromIntent.collectedData),
+        snapshot: savedSnapshot,
+        actionOptions: buildConfirmationActionOptions(),
+        nextStepType: "confirm_incident",
+        nextStepField: null,
+      });
+    }
+
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText:
+        nextStep === CHATBOT_CURRENT_STEPS.DESCRIPTION
+          ? buildIncidentStartReply()
+          : buildQuestionForStep({
+              step: nextStep,
+              suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
+            }),
+      snapshot: savedSnapshot,
+      actionOptions: nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+      nextStepType: "ask_field",
+      nextStepField: nextStep,
       needsClarification: false,
     });
   }
