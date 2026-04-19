@@ -161,19 +161,6 @@ export default function CitizenDashboard() {
         </article>
       </section>
 
-      <section id="nueva-incidencia" className="card dashboard-section">
-        <h2>{dashboardCopy.registerIncidentTitle}</h2>
-        <p className="small">{dashboardCopy.registerIncidentDescription}</p>
-        <div className="hero-actions">
-          <Link href={assistantHref} className="button-link">
-            {dashboardCopy.submitIncident}
-          </Link>
-          <Link href={assistantHref} className="button-link button-link--secondary">
-            {copy.home.assistantCta}
-          </Link>
-        </div>
-      </section>
-
       <section id="mis-incidencias-recientes" className="card recent-incidents-card">
         <h2>{dashboardCopy.recentIncidentsTitle}</h2>
         <p className="small">{dashboardCopy.recentIncidentsDescription}</p>
