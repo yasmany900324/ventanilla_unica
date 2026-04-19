@@ -262,7 +262,6 @@ export default function HomePageClient() {
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
-  const assistantHref = "/asistente";
   const startProcedureHref =
     "/asistente?type=tramite&id=iniciar-tramite&title=Iniciar+un+tramite";
   const reportHref =
@@ -273,20 +272,6 @@ export default function HomePageClient() {
     ? copy.home.accessDescriptionActive
     : copy.home.accessDescriptionInactive;
   const identityHref = hasActiveSession ? "/ciudadano/dashboard" : "/login";
-  const assistantQuickActions = [
-    {
-      label: copy.home.ctaStartProcedureLong,
-      href: startProcedureHref,
-    },
-    {
-      label: copy.home.ctaReportProblemLong,
-      href: reportHref,
-    },
-    {
-      label: copy.home.ctaCheckStatus,
-      href: trackingHref,
-    },
-  ];
   const primaryHelpItem = copy.home.helpItems[0] || null;
   const secondaryHelpItems = copy.home.helpItems.slice(1);
 
@@ -321,21 +306,6 @@ export default function HomePageClient() {
             </Link>
           </div>
         </div>
-
-        <aside className="home-assistant-card" aria-label={copy.home.assistantTitle}>
-          <span className="home-assistant-card__icon" aria-hidden="true">
-            AI
-          </span>
-          <h2>{copy.home.assistantTitle}</h2>
-          <p>{copy.home.assistantDescription}</p>
-          <ul className="home-assistant-card__quick-actions">
-            {assistantQuickActions.map((item) => (
-              <li key={item.label}>
-                <Link href={item.href}>{item.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </aside>
       </section>
 
       <section id="tramites" className="home-frequent card" aria-labelledby="frequent-title">
