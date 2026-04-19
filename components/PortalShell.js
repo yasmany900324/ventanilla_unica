@@ -310,9 +310,6 @@ export default function PortalShell({ children }) {
             <div className="portal-header__actions">
               {hasActiveSession ? (
                 <>
-                  <Link href="/ciudadano/dashboard" className="portal-action-link portal-action-link--primary">
-                    {copy.portal.mySpace}
-                  </Link>
                   <details className="portal-user-menu">
                     <summary className="portal-user-menu__trigger">
                       <span className="portal-user-menu__name">
@@ -323,6 +320,9 @@ export default function PortalShell({ children }) {
                       </span>
                     </summary>
                     <div className="portal-user-menu__panel">
+                      <Link href="/ciudadano/dashboard" className="portal-user-menu__link">
+                        {copy.portal.mySpace}
+                      </Link>
                       <Link href="/mis-incidencias" className="portal-user-menu__link">
                         {copy.nav.myCases}
                       </Link>

@@ -153,9 +153,6 @@ export default function HomePageClient() {
               </li>
             ))}
           </ul>
-          <Link href={assistantHref} className="home-cta home-cta--assistant">
-            {copy.home.assistantCta}
-          </Link>
         </aside>
       </section>
 
