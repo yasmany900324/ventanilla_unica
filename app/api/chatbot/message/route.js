@@ -24,9 +24,7 @@ import {
   buildConfirmationActionOptions,
   buildIncidentCreatedReply,
   buildIncidentResumeReply,
-  buildProcedureDetailsReply,
   buildProcedureStartReply,
-  buildProcedureSummaryReply,
   buildPhotoActionOptions,
   buildQuestionForStep,
   buildTreeFlowSeedFromContext,
@@ -47,6 +45,16 @@ import {
   trackChatbotEvent,
 } from "../../../../lib/chatbotTelemetry";
 import { interpretUserMessage } from "../../../../lib/llmService";
+import {
+  findMatchingProcedure,
+  getProcedureByCode,
+  ensureProcedureCatalogSchema,
+  normalizeProcedureCollectedData,
+  getProcedureMissingFieldsFromDefinition,
+  getProcedureFieldDefinition,
+  validateProcedureFieldInput,
+  buildProcedureSummaryText,
+} from "../../../../lib/procedureCatalog";
 
 export const runtime = "nodejs";
 
@@ -59,6 +67,9 @@ const EMPTY_COLLECTED_DATA = {
   photoStatus: "not_requested",
   procedureName: "",
   procedureDetails: "",
+  procedureCode: "",
+  procedureCategory: "",
+  procedureRequiredFields: [],
 };
 
 function getDefaultSnapshot() {
@@ -116,43 +127,7 @@ function buildModeFromSnapshot(snapshot) {
 }
 
 function getProcedureMissingFields(collectedData) {
-  const missing = [];
-  if (!collectedData?.procedureName) {
-    missing.push("procedureName");
-  }
-  if (!collectedData?.procedureDetails) {
-    missing.push("procedureDetails");
-  }
-  return missing;
-}
-
-function isMeaningfulProcedureName(text) {
-  if (!text || typeof text !== "string") {
-    return false;
-  }
-
-  const normalized = text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!normalized) {
-    return false;
-  }
-
-  const genericProcedurePhrases = new Set([
-    "quiero iniciar un tramite",
-    "necesito hacer un tramite",
-    "iniciar tramite",
-    "iniciar un tramite",
-    "hacer un tramite",
-    "tramite",
-    "trámite",
-    "necesito iniciar un tramite",
-  ]);
-  return !genericProcedurePhrases.has(normalized);
+  return getProcedureMissingFieldsFromDefinition(collectedData?.procedureRequiredFields, collectedData);
 }
 
 function normalizeProcedureText(value, maxLength = 320) {
@@ -201,23 +176,32 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
 }
 
 function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
-  const options = [
+  if (isCompleted) {
+    return [
+      {
+        label: "Confirmar datos del trámite",
+        command: "confirm",
+        value: "",
+        commandField: null,
+      },
+      {
+        label: "Consultar estado de trámite",
+        command: "none",
+        value: "Quiero consultar el estado de un trámite.",
+        commandField: null,
+      },
+    ];
+  }
+
+  if (!nextMissingField) {
+    return [];
+  }
+
+  return [
     {
-      label: "Buscar trámite",
-      command: "none",
-      value: "Quiero buscar un trámite específico.",
-      commandField: null,
-    },
-    {
-      label: "Ver categorías de trámites",
-      command: "none",
-      value: "Quiero ver categorías de trámites disponibles.",
-      commandField: null,
-    },
-    {
-      label: "Describir lo que necesito gestionar",
-      command: "none",
-      value: "Te describo lo que necesito gestionar.",
+      label: "Cancelar",
+      command: "cancel",
+      value: "",
       commandField: null,
     },
     {
@@ -227,23 +211,6 @@ function buildProcedureActionOptions({ nextMissingField = null, isCompleted = fa
       commandField: null,
     },
   ];
-
-  if (isCompleted) {
-    return options.filter((option) =>
-      option.label === "Buscar trámite" ||
-      option.label === "Ver categorías de trámites" ||
-      option.label === "Consultar estado de trámite"
-    );
-  }
-  if (nextMissingField === "procedureDetails") {
-    return options.filter((option) =>
-      option.label === "Describir lo que necesito gestionar" ||
-      option.label === "Ver categorías de trámites" ||
-      option.label === "Consultar estado de trámite"
-    );
-  }
-
-  return options;
 }
 
 function buildClarificationActionOptions() {
@@ -300,6 +267,50 @@ function buildStatusActionOptions() {
 
 function buildStatusReply() {
   return "Entiendo. Te ayudo a consultar el estado de tu solicitud. Puedes revisar tus casos en 'Mis incidencias' o indicarme el número de ticket para orientarte.";
+}
+
+function buildUnsupportedProcedureReply() {
+  return "Lo siento, de momento no puedo ayudarte con este trámite.";
+}
+
+function buildProcedureCompletedReply(activeProcedure) {
+  const completionFromCatalog = activeProcedure?.flowDefinition?.completionMessage;
+  if (typeof completionFromCatalog === "string" && completionFromCatalog.trim()) {
+    return completionFromCatalog.trim();
+  }
+  const procedureName = activeProcedure?.name || "el trámite";
+  return `Perfecto. Confirmé los datos para ${procedureName} y cerré esta conversación de forma guiada.`;
+}
+
+function buildProcedureFieldPrompt(fieldDefinition) {
+  if (!fieldDefinition || typeof fieldDefinition !== "object") {
+    return "Para continuar con este trámite, indícame el siguiente dato requerido.";
+  }
+
+  if (fieldDefinition.prompt) {
+    return fieldDefinition.prompt;
+  }
+
+  return `Para continuar, indícame ${fieldDefinition.label || "el dato requerido"}.`;
+}
+
+function mapProcedureFieldToStep(fieldName) {
+  if (fieldName === "procedureName") {
+    return CHATBOT_CURRENT_STEPS.LOCATION;
+  }
+  if (fieldName === "procedureDetails") {
+    return CHATBOT_CURRENT_STEPS.DESCRIPTION;
+  }
+  return CHATBOT_CURRENT_STEPS.DESCRIPTION;
+}
+
+function buildProcedureFieldValidationReply(validationError, fieldDefinition) {
+  const safeError =
+    typeof validationError === "string" && validationError.trim()
+      ? validationError.trim()
+      : "El valor ingresado no es válido para este campo.";
+  const prompt = buildProcedureFieldPrompt(fieldDefinition);
+  return `${safeError}\n\n${prompt}`;
 }
 
 function buildChatResponse({
@@ -396,6 +407,7 @@ export async function POST(request) {
   } = validationResult.value;
 
   const authenticatedUser = await requireAuthenticatedUser(request);
+  await ensureProcedureCatalogSchema();
   let snapshot = (await getSessionSnapshot(sessionId)) || getDefaultSnapshot();
   if (authenticatedUser?.id && snapshot.userId !== authenticatedUser.id) {
     await setSessionUserId(sessionId, authenticatedUser.id);
@@ -507,18 +519,21 @@ export async function POST(request) {
   }
 
   if (effectiveCommand === "cancel") {
+    const wasProcedureFlow = isProcedureFlowActive(snapshot);
     await clearIncidentDraft(sessionId);
     const clearedSnapshot = await getSessionSnapshot(sessionId);
     await trackEvent({
       eventName: CHATBOT_TELEMETRY_EVENTS.CANCELLED,
       funnelStep: CHATBOT_FUNNEL_STEPS.CANCELLED,
-      mode: "incident",
+      mode: buildModeFromSnapshot(snapshot),
       outcome: "cancelled_by_user",
     });
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildCancelledIncidentReply(),
+      replyText: wasProcedureFlow
+        ? "Listo, cancelé este trámite en curso. Si quieres, puedo ayudarte a iniciar otro trámite o reportar una incidencia."
+        : buildCancelledIncidentReply(),
       snapshot: clearedSnapshot || getDefaultSnapshot(),
       nextStepType: "cancelled",
       nextStepField: null,
@@ -810,6 +825,108 @@ export async function POST(request) {
     }
   }
 
+  if (effectiveCommand === "confirm" && isProcedureFlowActive(snapshot)) {
+    const activeProcedure = await getProcedureByCode(snapshot.collectedData?.procedureCode);
+    if (!activeProcedure) {
+      const closedSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "none",
+        collectedData: { ...EMPTY_COLLECTED_DATA },
+        lastInterpretation: snapshot.lastInterpretation,
+        lastIntent: "start_procedure",
+        lastAction: "procedure_catalog_entry_missing",
+        lastConfidence: snapshot.lastConfidence,
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildUnsupportedProcedureReply(),
+        snapshot: closedSnapshot,
+        actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+      });
+    }
+
+    const normalizedProcedureData = normalizeProcedureCollectedData({
+      ...snapshot.collectedData,
+      procedureCode: activeProcedure.code,
+      procedureName: activeProcedure.name,
+      procedureCategory: activeProcedure.category || "",
+      procedureRequiredFields: activeProcedure.requiredFields || [],
+    });
+    const missingFields = getProcedureMissingFields(normalizedProcedureData);
+    if (missingFields.length > 0) {
+      const missingField = missingFields[0];
+      const fieldDefinition = getProcedureFieldDefinition(
+        normalizedProcedureData.procedureRequiredFields,
+        missingField
+      );
+      const updatedProcedureSnapshot = await setConversationState(
+        sessionId,
+        createProcedureFlowSnapshotPatch({
+          locale: effectiveLocale,
+          userId: authenticatedUser?.id || snapshot.userId || null,
+          collectedData: normalizedProcedureData,
+          currentStep: mapProcedureFieldToStep(missingField),
+          confirmationState: "none",
+          lastInterpretation: snapshot.lastInterpretation || {},
+          lastIntent: "start_procedure",
+          lastAction: "confirm_with_missing_fields",
+          lastConfidence: snapshot.lastConfidence || null,
+          state: CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE,
+        })
+      );
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildProcedureFieldPrompt(fieldDefinition),
+        snapshot: updatedProcedureSnapshot,
+        actionOptions: buildProcedureActionOptions({
+          nextMissingField: missingField,
+          isCompleted: false,
+        }),
+        nextStepType: "ask_field",
+        nextStepField: missingField,
+      });
+    }
+
+    const closedProcedureSnapshot = await setConversationState(
+      sessionId,
+      createProcedureFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: normalizedProcedureData,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "confirmed",
+        lastInterpretation: snapshot.lastInterpretation || {},
+        lastIntent: "start_procedure",
+        lastAction: "procedure_confirmed",
+        lastConfidence: snapshot.lastConfidence || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+      })
+    );
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+      mode: "procedure",
+      outcome: "procedure_confirmed",
+      details: activeProcedure.code,
+    });
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildProcedureCompletedReply(activeProcedure),
+      snapshot: closedProcedureSnapshot,
+      actionOptions: [],
+      nextStepType: "closed",
+      nextStepField: null,
+    });
+  }
+
   let interpretation = snapshot.lastInterpretation || {};
   let llmMeta = { source: "fallback", reason: "not_called" };
   if (text) {
@@ -835,8 +952,7 @@ export async function POST(request) {
     }
   }
 
-  const switchToProcedure =
-    shouldSwitchToProcedureFlow({ text, interpretation }) && !isProcedureFlowActive(snapshot);
+  const switchToProcedure = shouldSwitchToProcedureFlow({ text, interpretation });
   const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
 
   if (switchToStatus) {
@@ -868,59 +984,105 @@ export async function POST(request) {
     });
   }
 
-  if (switchToProcedure) {
-    const normalizedText = normalizeProcedureText(text, 320);
-    const normalizedProcedureName = normalizeProcedureText(normalizedText, 160);
-    const currentProcedureName = snapshot?.collectedData?.procedureName || "";
-    const currentProcedureDetails = snapshot?.collectedData?.procedureDetails || "";
-    const procedureName =
-      currentProcedureName ||
-      (isMeaningfulProcedureName(normalizedProcedureName) ? normalizedProcedureName : "");
-    const procedureDetails = currentProcedureDetails || "";
-    const procedureMissing = getProcedureMissingFields({
-      procedureName,
-      procedureDetails,
+  if (switchToProcedure && !isProcedureFlowActive(snapshot)) {
+    const procedureMatch = await findMatchingProcedure({
+      text,
+      interpretation,
     });
-    const procedureStep =
-      procedureMissing[0] === "procedureDetails" ? CHATBOT_CURRENT_STEPS.DESCRIPTION : CHATBOT_CURRENT_STEPS.LOCATION;
+    if (!procedureMatch) {
+      const closedSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "none",
+        collectedData: { ...EMPTY_COLLECTED_DATA },
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "unsupported_procedure",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+        mode: "procedure",
+        outcome: "unsupported_procedure",
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildUnsupportedProcedureReply(),
+        snapshot: closedSnapshot,
+        actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+      });
+    }
+
+    const collectedData = normalizeProcedureCollectedData({
+      ...EMPTY_COLLECTED_DATA,
+      procedureCode: procedureMatch.code,
+      procedureName: procedureMatch.name,
+      procedureCategory: procedureMatch.category || "",
+      procedureRequiredFields: procedureMatch.requiredFields || [],
+    });
+    const missingFields = getProcedureMissingFields(collectedData);
+    const nextField = missingFields[0] || null;
+    const nextStep = nextField
+      ? mapProcedureFieldToStep(nextField)
+      : CHATBOT_CURRENT_STEPS.CONFIRMATION;
     const procedureSnapshot = await setConversationState(
       sessionId,
       createProcedureFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
-        collectedData: {
-          ...EMPTY_COLLECTED_DATA,
-          procedureName,
-          procedureDetails,
-        },
-        currentStep: procedureStep,
-        confirmationState: "none",
+        collectedData,
+        currentStep: nextStep,
+        confirmationState: nextField ? "none" : "ready",
         lastInterpretation: interpretation,
         lastIntent: "start_procedure",
-        lastAction: "switch_to_procedure",
-        lastConfidence: interpretation?.intent?.confidence || null,
+        lastAction: "switch_to_procedure_catalog",
+        lastConfidence: procedureMatch.matchScore ?? interpretation?.intent?.confidence ?? null,
       })
     );
+
     await trackEvent({
       eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
       mode: "procedure",
-      outcome: snapshot?.flowKey === FLOW_KEY_TREE ? "switch_incident_to_procedure" : "procedure_text_detection",
+      outcome: "procedure_catalog_match",
+      details: procedureMatch.code,
     });
-    const procedureReply =
-      procedureMissing[0] === "procedureDetails"
-        ? buildProcedureDetailsReply(procedureName)
-        : buildProcedureStartReply();
+
+    if (!nextField) {
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildProcedureSummaryText({
+          procedureName: collectedData.procedureName,
+          requiredFields: collectedData.procedureRequiredFields,
+          collectedData,
+        }),
+        snapshot: procedureSnapshot,
+        actionOptions: buildProcedureActionOptions({
+          isCompleted: true,
+        }),
+        nextStepType: "procedure_confirm",
+        nextStepField: null,
+      });
+    }
+
+    const fieldDefinition = getProcedureFieldDefinition(collectedData.procedureRequiredFields, nextField);
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: procedureReply,
+      replyText: `${buildProcedureStartReply()}\n\n${buildProcedureFieldPrompt(fieldDefinition)}`,
       snapshot: procedureSnapshot,
       actionOptions: buildProcedureActionOptions({
-        nextMissingField: procedureMissing[0] || "procedureName",
-        isCompleted: procedureMissing.length === 0,
+        nextMissingField: nextField,
+        isCompleted: false,
       }),
       nextStepType: "ask_field",
-      nextStepField: procedureMissing[0] || "procedureName",
+      nextStepField: nextField,
       needsClarification: false,
     });
   }
@@ -994,38 +1156,67 @@ export async function POST(request) {
       });
     }
 
-    const normalizedText = typeof text === "string" ? text.replace(/\s+/g, " ").trim() : "";
-    const procedureData = {
+    const activeProcedure = await getProcedureByCode(snapshot.collectedData?.procedureCode);
+    if (!activeProcedure) {
+      const closedSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "none",
+        collectedData: { ...EMPTY_COLLECTED_DATA },
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "procedure_catalog_entry_missing",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildUnsupportedProcedureReply(),
+        snapshot: closedSnapshot,
+        actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+      });
+    }
+
+    const normalizedText = typeof text === "string" ? normalizeProcedureText(text, 320) : "";
+    const procedureData = normalizeProcedureCollectedData({
       ...snapshot.collectedData,
-      procedureName: snapshot.collectedData?.procedureName || "",
-      procedureDetails: snapshot.collectedData?.procedureDetails || "",
-    };
+      procedureCode: activeProcedure.code,
+      procedureName: activeProcedure.name,
+      procedureCategory: activeProcedure.category || "",
+      procedureRequiredFields: activeProcedure.requiredFields || [],
+    });
+
+    const procedureMissingBefore = getProcedureMissingFields(procedureData);
+    const currentMissingField = procedureMissingBefore[0] || null;
+    const currentFieldDefinition = getProcedureFieldDefinition(
+      procedureData.procedureRequiredFields,
+      currentMissingField
+    );
     let hasProcedureUpdate = false;
-    if (normalizedText) {
-      if (!procedureData.procedureName) {
-        if (isMeaningfulProcedureName(normalizedText)) {
-          procedureData.procedureName = normalizeProcedureText(normalizedText, 160);
-          hasProcedureUpdate = true;
-        }
-      } else if (!procedureData.procedureDetails) {
-        procedureData.procedureDetails = normalizeProcedureText(normalizedText, 320);
+    let validationError = null;
+    if (normalizedText && currentMissingField) {
+      const validationResult = validateProcedureFieldInput({
+        fieldDefinition: currentFieldDefinition,
+        inputValue: normalizedText,
+      });
+      if (validationResult.ok) {
+        procedureData[currentMissingField] = validationResult.normalizedValue;
         hasProcedureUpdate = true;
-      } else if (effectiveCommand === "edit_field" && effectiveCommandField === "description") {
-        procedureData.procedureDetails = normalizeProcedureText(normalizedText, 320);
-        hasProcedureUpdate = true;
-      } else if (effectiveCommand === "edit_field" && effectiveCommandField === "location") {
-        procedureData.procedureName = normalizeProcedureText(normalizedText, 160);
-        hasProcedureUpdate = true;
+      } else {
+        validationError = validationResult.error;
       }
     }
 
     const procedureMissing = getProcedureMissingFields(procedureData);
-    const procedureStep =
-      procedureMissing[0] === "procedureDetails"
-        ? CHATBOT_CURRENT_STEPS.DESCRIPTION
-        : procedureMissing[0] === "procedureName"
-          ? CHATBOT_CURRENT_STEPS.LOCATION
-          : CHATBOT_CURRENT_STEPS.CONFIRMATION;
+    const nextMissingField = procedureMissing[0] || null;
+    const procedureStep = nextMissingField
+      ? mapProcedureFieldToStep(nextMissingField)
+      : CHATBOT_CURRENT_STEPS.CONFIRMATION;
     const updatedProcedureSnapshot = await setConversationState(
       sessionId,
       createProcedureFlowSnapshotPatch({
@@ -1043,11 +1234,12 @@ export async function POST(request) {
 
     if (procedureMissing.length === 0) {
       const replyText = hasProcedureUpdate
-        ? buildProcedureSummaryReply({
+        ? buildProcedureSummaryText({
             procedureName: procedureData.procedureName,
-            procedureDetails: procedureData.procedureDetails,
+            requiredFields: procedureData.procedureRequiredFields,
+            collectedData: procedureData,
           })
-        : "Ya tengo la información inicial del trámite. Siguiente paso: puedo ayudarte a buscar el trámite exacto por nombre o por categoría, o consultar su estado.";
+        : "Ya tengo toda la información requerida para este trámite. Si está correcto, confirma para continuar.";
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
@@ -1056,26 +1248,29 @@ export async function POST(request) {
         actionOptions: buildProcedureActionOptions({
           isCompleted: true,
         }),
-        nextStepType: "procedure_guided",
+        nextStepType: "procedure_confirm",
         nextStepField: null,
       });
     }
 
-    const procedureReply =
-      procedureMissing[0] === "procedureName"
-        ? buildProcedureStartReply()
-        : buildProcedureDetailsReply(procedureData.procedureName);
+    const nextFieldDefinition = getProcedureFieldDefinition(
+      procedureData.procedureRequiredFields,
+      nextMissingField
+    );
+    const procedureReply = validationError
+      ? buildProcedureFieldValidationReply(validationError, currentFieldDefinition || nextFieldDefinition)
+      : buildProcedureFieldPrompt(nextFieldDefinition);
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
       replyText: procedureReply,
       snapshot: updatedProcedureSnapshot,
       actionOptions: buildProcedureActionOptions({
-        nextMissingField: procedureMissing[0],
+        nextMissingField,
         isCompleted: false,
       }),
       nextStepType: "ask_field",
-      nextStepField: procedureMissing[0],
+      nextStepField: nextMissingField,
     });
   }
 
@@ -1083,40 +1278,91 @@ export async function POST(request) {
     isTreeFlowActive(snapshot) &&
     shouldSwitchToProcedureFlow({ text, interpretation })
   ) {
+    const procedureMatch = await findMatchingProcedure({
+      text,
+      interpretation,
+    });
+    if (!procedureMatch) {
+      const closedSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "none",
+        collectedData: { ...EMPTY_COLLECTED_DATA },
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "unsupported_procedure",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildUnsupportedProcedureReply(),
+        snapshot: closedSnapshot,
+        actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+      });
+    }
+    const collectedData = normalizeProcedureCollectedData({
+      ...EMPTY_COLLECTED_DATA,
+      procedureCode: procedureMatch.code,
+      procedureName: procedureMatch.name,
+      procedureCategory: procedureMatch.category || "",
+      procedureRequiredFields: procedureMatch.requiredFields || [],
+    });
+    const missingFields = getProcedureMissingFields(collectedData);
+    const nextMissingField = missingFields[0] || null;
     const procedureSnapshot = await setConversationState(
       sessionId,
       createProcedureFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
-        collectedData: {
-          ...EMPTY_COLLECTED_DATA,
-          procedureName: "",
-          procedureDetails: "",
-        },
-        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
-        confirmationState: "none",
+        collectedData,
+        currentStep: nextMissingField
+          ? mapProcedureFieldToStep(nextMissingField)
+          : CHATBOT_CURRENT_STEPS.CONFIRMATION,
+        confirmationState: nextMissingField ? "none" : "ready",
         lastInterpretation: interpretation,
         lastIntent: "start_procedure",
-        lastAction: "switch_incident_to_procedure",
-        lastConfidence: interpretation?.intent?.confidence || null,
+        lastAction: "switch_incident_to_procedure_catalog",
+        lastConfidence: procedureMatch.matchScore ?? interpretation?.intent?.confidence ?? null,
       })
     );
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
-      mode: "procedure",
-      outcome: "switch_incident_to_procedure_by_llm",
-    });
+    if (!nextMissingField) {
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildProcedureSummaryText({
+          procedureName: collectedData.procedureName,
+          requiredFields: collectedData.procedureRequiredFields,
+          collectedData,
+        }),
+        snapshot: procedureSnapshot,
+        actionOptions: buildProcedureActionOptions({
+          isCompleted: true,
+        }),
+        nextStepType: "procedure_confirm",
+        nextStepField: null,
+      });
+    }
+    const nextFieldDefinition = getProcedureFieldDefinition(
+      collectedData.procedureRequiredFields,
+      nextMissingField
+    );
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildProcedureStartReply(),
+      replyText: buildProcedureFieldPrompt(nextFieldDefinition),
       snapshot: procedureSnapshot,
       actionOptions: buildProcedureActionOptions({
-        nextMissingField: "procedureName",
+        nextMissingField,
         isCompleted: false,
       }),
       nextStepType: "ask_field",
-      nextStepField: "procedureName",
+      nextStepField: nextMissingField,
     });
   }
 
