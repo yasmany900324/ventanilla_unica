@@ -3113,6 +3113,13 @@ textarea:focus-visible {
     z-index: 46;
   }
 
+  button.mobile-bottom-nav__overlay,
+  button.mobile-bottom-nav__overlay:hover:not(:disabled),
+  button.mobile-bottom-nav__overlay:active:not(:disabled) {
+    background: transparent;
+    color: inherit;
+  }
+
   .mobile-bottom-nav__more-panel {
     position: absolute;
     right: 0.4rem;
