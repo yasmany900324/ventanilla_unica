@@ -168,12 +168,29 @@ export default function PortalShell({ children }) {
     [copy.nav.help, copy.nav.home, copy.nav.myCases, copy.nav.newRequest, hasActiveSession]
   );
   const mobileNav = useMemo(() => {
-    const source = hasActiveSession ? AUTH_MOBILE_NAV : PUBLIC_MOBILE_NAV;
-    return source.map((item) => ({
+    if (!hasActiveSession) {
+      return PUBLIC_MOBILE_NAV.map((item) => ({
+        ...item,
+        label: copy.portal.mobile[item.labelKey],
+      }));
+    }
+
+    const authenticatedNav = AUTH_MOBILE_NAV.map((item) => ({
       ...item,
       label: copy.portal.mobile[item.labelKey],
     }));
-  }, [copy.portal.mobile, hasActiveSession]);
+
+    if (isAdministrator) {
+      authenticatedNav.push({
+        href: "/admin/dashboard",
+        labelKey: "profile",
+        label: copy.portal.adminDashboard,
+        icon: "cases",
+      });
+    }
+
+    return authenticatedNav;
+  }, [copy.portal.adminDashboard, copy.portal.mobile, hasActiveSession, isAdministrator]);
   const topbarLinks = useMemo(
     () =>
       TOPBAR_LINKS.map((item) => ({
