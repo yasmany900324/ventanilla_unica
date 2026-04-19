@@ -321,12 +321,24 @@ export async function POST(request) {
 
   if (effectiveCommand === "edit_field" && isTreeFlowActive(snapshot)) {
     const targetStep = mapFieldToStep(effectiveCommandField);
+    const resetCollectedData = {
+      ...snapshot.collectedData,
+    };
+    if (targetStep === CHATBOT_CURRENT_STEPS.LOCATION) {
+      resetCollectedData.location = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.DESCRIPTION) {
+      resetCollectedData.description = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.RISK) {
+      resetCollectedData.risk = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.PHOTO) {
+      resetCollectedData.photoStatus = "not_requested";
+    }
     const updatedSnapshot = await setConversationState(
       sessionId,
       createTreeFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
-        collectedData: snapshot.collectedData,
+        collectedData: resetCollectedData,
         currentStep: targetStep,
         confirmationState: "none",
         lastInterpretation: snapshot.lastInterpretation,
@@ -695,6 +707,15 @@ export async function POST(request) {
     text,
     currentStep: snapshot.currentStep,
   });
+  if (effectiveCommand === "edit_field" && effectiveCommandField) {
+    if (effectiveCommandField === "location") {
+      mergedResult.collectedData.location = text;
+    } else if (effectiveCommandField === "description") {
+      mergedResult.collectedData.description = text;
+    } else if (effectiveCommandField === "risk") {
+      mergedResult.collectedData.risk = text;
+    }
+  }
   const mergedData = mergedResult.collectedData;
   const nextStep = getNextTreeFlowStep(mergedData);
   const isReadyForConfirmation = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION;
