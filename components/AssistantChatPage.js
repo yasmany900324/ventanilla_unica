@@ -119,6 +119,7 @@ function normalizeActionOptions(actionOptions) {
       const label = normalizeChipLabel(option.label);
       const command = normalizeChipLabel(option.command) || DEFAULT_CHAT_COMMAND;
       const value = normalizeChipLabel(option.value);
+      const commandField = normalizeChipLabel(option.commandField);
       if (!label) {
         return null;
       }
@@ -127,6 +128,7 @@ function normalizeActionOptions(actionOptions) {
         label,
         command,
         value,
+        commandField: commandField || null,
       };
     })
     .filter(Boolean);
@@ -499,6 +501,7 @@ export default function AssistantChatPage() {
   const lastFailedInputRef = useRef({
     rawValue: "",
     command: DEFAULT_CHAT_COMMAND,
+    commandField: null,
   });
   const [messages, setMessages] = useState([
     createLocalMessage({
@@ -601,6 +604,7 @@ export default function AssistantChatPage() {
   const submitMessage = useCallback(async ({
     rawValue,
     command = DEFAULT_CHAT_COMMAND,
+    commandField = null,
     appendUserMessage,
     contextEntry = null,
   }) => {
@@ -630,6 +634,7 @@ export default function AssistantChatPage() {
           sessionId: sessionId || undefined,
           preferredLocale: sessionLocale || locale || "es",
           command,
+          commandField,
           contextEntry,
         }),
       });
@@ -674,11 +679,13 @@ export default function AssistantChatPage() {
       lastFailedInputRef.current = {
         rawValue: "",
         command: DEFAULT_CHAT_COMMAND,
+        commandField: null,
       };
     } catch (error) {
       lastFailedInputRef.current = {
         rawValue: text,
         command,
+        commandField,
       };
       setServiceError(true);
     } finally {
@@ -695,7 +702,7 @@ export default function AssistantChatPage() {
     safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
     void submitMessage({
       rawValue: "",
-      command: "resume_incident_confirmation",
+      command: "resume_confirmation",
       appendUserMessage: false,
     });
   }, [isSending, submitMessage]);
@@ -735,6 +742,7 @@ export default function AssistantChatPage() {
       await submitMessage({
         rawValue: "",
         command,
+        commandField: actionOption.commandField || null,
         appendUserMessage: false,
       });
       return;
@@ -759,6 +767,7 @@ export default function AssistantChatPage() {
     await submitMessage({
       rawValue: lastFailedInput.rawValue,
       command: lastFailedInput.command || DEFAULT_CHAT_COMMAND,
+      commandField: lastFailedInput.commandField || null,
       appendUserMessage: false,
     });
   };

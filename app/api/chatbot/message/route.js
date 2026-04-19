@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "../../../../lib/auth";
 import {
   CHATBOT_CONVERSATION_STATES,
+  CHATBOT_CURRENT_STEPS,
   clearIncidentDraft,
   getSessionSnapshot,
   setConversationState,
+  setSessionUserId,
 } from "../../../../lib/chatSessionStore";
-import {
-  detectDialogflowIntent,
-  isDialogflowConfigured,
-  validateDialogflowMessagePayload,
-} from "../../../../lib/dialogflowService";
+import { validateChatMessagePayload } from "../../../../lib/chatbotPayloadValidation";
 import {
   getDefaultLocale,
   normalizeLocale,
@@ -19,75 +17,144 @@ import {
 import { detectLocaleFromText } from "../../../../lib/languageDetection";
 import { createIncident } from "../../../../lib/incidents";
 import {
+  FLOW_KEY_TREE,
   buildAuthRequiredReply,
   buildCancelledIncidentReply,
-  buildIncidentConfirmationActionOptions,
+  buildConfirmationActionOptions,
   buildIncidentCreatedReply,
   buildIncidentResumeReply,
-  buildIncidentFlowFromDialogTurn,
+  buildPhotoActionOptions,
+  buildQuestionForStep,
+  buildTreeFlowSeedFromContext,
+  createTreeFlowSnapshotPatch,
+  getNextTreeFlowStep,
+  isTreeFlowActive,
+  mergeCollectedDataFromInterpretation,
+  parseUserCommandFromText,
+  shouldActivateTreeFlow,
 } from "../../../../lib/chatbotConversationOrchestrator";
-import {
-  getChatbotRouteMetadata,
-  resolveChatbotRedirect,
-} from "../../../../lib/chatbotIntentRoutes";
-import {
-  computeMissingIncidentFields,
-  inferIncidentCategoryFromText,
-  normalizeIncidentDraft,
-} from "../../../../lib/chatbotIncidentMapper";
 import {
   CHATBOT_FUNNEL_STEPS,
   CHATBOT_TELEMETRY_EVENTS,
   trackChatbotEvent,
 } from "../../../../lib/chatbotTelemetry";
+import { interpretUserMessage } from "../../../../lib/llmService";
 
-const FALLBACK_REPLY =
-  "No logré identificar con claridad tu solicitud. Cuéntame si quieres reportar un problema, iniciar un trámite o consultar el estado de una gestión.";
-const MIN_CONFIDENCE_TO_REDIRECT = 0.45;
-const EMPTY_INCIDENT_DRAFT = {
-  category: "",
-  description: "",
-  location: "",
-};
 export const runtime = "nodejs";
 
-function getContextualReply({ contextEntry, locale }) {
-  const kindLabel = contextEntry.kind === "tramite" ? "tramite" : "incidencia";
-  if (locale === "en") {
-    if (kindLabel === "tramite") {
-      return `I understand you want to start the ${contextEntry.title} procedure. I will guide you step by step to begin.`;
-    }
-    return `I understand you want to report an incident of type ${contextEntry.title}. I will help you provide the required information.`;
-  }
-  if (locale === "pt") {
-    if (kindLabel === "tramite") {
-      return `Entendo que você deseja iniciar o trâmite de ${contextEntry.title}. Vou guiar você passo a passo para começar.`;
-    }
-    return `Entendo que você deseja reportar uma ocorrência do tipo ${contextEntry.title}. Vou ajudar você a registrar as informações necessárias.`;
-  }
-  if (kindLabel === "tramite") {
-    return `Entiendo que deseas iniciar el trámite de ${contextEntry.title}. Te voy a guiar paso a paso para comenzar.`;
-  }
-  return `Entiendo que deseas reportar una incidencia de tipo ${contextEntry.title}. Voy a ayudarte a registrar la información necesaria.`;
+const EMPTY_COLLECTED_DATA = {
+  category: "",
+  subcategory: "",
+  location: "",
+  description: "",
+  risk: "",
+  photoStatus: "not_requested",
+};
+
+function getDefaultSnapshot() {
+  return {
+    locale: null,
+    userId: null,
+    state: CHATBOT_CONVERSATION_STATES.IDLE,
+    flowKey: null,
+    currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+    confirmationState: "none",
+    collectedData: { ...EMPTY_COLLECTED_DATA },
+    missingFields: [],
+    lastInterpretation: {},
+    lastIntent: null,
+    lastAction: null,
+    lastConfidence: null,
+  };
 }
 
-function getContextualNextPrompt({ contextEntry, locale }) {
-  if (locale === "en") {
-    if (contextEntry.kind === "tramite") {
-      return "To guide you better, tell me briefly what you need this procedure for.";
-    }
-    return "Please share the exact location where this is happening.";
+function getRequiredMissingFields(collectedData) {
+  const missing = [];
+  if (!collectedData?.location) {
+    missing.push("location");
   }
-  if (locale === "pt") {
-    if (contextEntry.kind === "tramite") {
-      return "Para orientar melhor, conte em uma frase para que você precisa deste trâmite.";
-    }
-    return "Por favor, informe a localização exata onde isso está acontecendo.";
+  if (!collectedData?.description) {
+    missing.push("description");
   }
-  if (contextEntry.kind === "tramite") {
-    return "Para orientarte mejor, cuéntame en una frase para qué necesitas este trámite.";
+  if (!collectedData?.risk) {
+    missing.push("risk");
   }
-  return "Por favor, indícame la ubicación exacta donde está ocurriendo.";
+  return missing;
+}
+
+function mapFieldToStep(fieldName) {
+  if (fieldName === "location") {
+    return CHATBOT_CURRENT_STEPS.LOCATION;
+  }
+  if (fieldName === "description") {
+    return CHATBOT_CURRENT_STEPS.DESCRIPTION;
+  }
+  if (fieldName === "risk") {
+    return CHATBOT_CURRENT_STEPS.RISK;
+  }
+  return CHATBOT_CURRENT_STEPS.PHOTO;
+}
+
+function buildModeFromSnapshot(snapshot) {
+  if (snapshot?.flowKey === FLOW_KEY_TREE) {
+    return "incident";
+  }
+  return "unknown";
+}
+
+function buildChatResponse({
+  sessionId,
+  locale,
+  replyText,
+  snapshot,
+  actionOptions = [],
+  nextStepType,
+  nextStepField = null,
+  redirectTo = null,
+  redirectLabel = null,
+  needsClarification = false,
+  incident = null,
+}) {
+  const collectedData = snapshot?.collectedData || EMPTY_COLLECTED_DATA;
+  const missingFields = getRequiredMissingFields(collectedData);
+
+  return NextResponse.json({
+    sessionId,
+    locale,
+    replyText,
+    intent: snapshot?.lastIntent || null,
+    confidence: snapshot?.lastConfidence || null,
+    fulfillmentMessages: [],
+    action: snapshot?.lastAction || null,
+    parameters: {},
+    mode: buildModeFromSnapshot(snapshot),
+    draft: {
+      ...collectedData,
+      missingFields,
+    },
+    nextStep: {
+      type: nextStepType,
+      field: nextStepField,
+    },
+    actionOptions,
+    redirectTo,
+    redirectLabel,
+    needsClarification,
+    incident,
+  });
+}
+
+function resolveEffectiveLocale({ preferredLocale, sessionLocale, text, request }) {
+  const detectedTextLocale = detectLocaleFromText(text);
+  const selectedLocale =
+    preferredLocale ||
+    sessionLocale ||
+    detectedTextLocale ||
+    resolveLocaleFromAcceptLanguage(request.headers.get("accept-language")) ||
+    normalizeLocale(request.headers.get("accept-language")) ||
+    getDefaultLocale();
+
+  return normalizeLocale(selectedLocale) || getDefaultLocale();
 }
 
 export async function GET() {
@@ -99,467 +166,433 @@ export async function GET() {
 
 export async function POST(request) {
   let body = null;
-
   try {
     body = await request.json();
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "La solicitud no tiene un formato JSON válido." },
       { status: 400 }
     );
   }
 
-  const validationResult = validateDialogflowMessagePayload(body);
+  const validationResult = validateChatMessagePayload(body);
   if (!validationResult.ok) {
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
   }
 
-  const { text, sessionId, preferredLocale, command, contextEntry } = validationResult.value;
+  const {
+    text,
+    sessionId,
+    preferredLocale,
+    command: commandFromPayload,
+    commandField: commandFieldFromPayload,
+    contextEntry,
+  } = validationResult.value;
 
-  const headerLocale = normalizeLocale(request.headers.get("accept-language"));
-  const persistedSessionSnapshot =
-    (await getSessionSnapshot(sessionId)) || {
-      locale: null,
-      state: CHATBOT_CONVERSATION_STATES.IDLE,
-      draft: EMPTY_INCIDENT_DRAFT,
-      pendingField: null,
-      lastIntent: null,
-      lastAction: null,
-      lastConfidence: null,
+  const authenticatedUser = await requireAuthenticatedUser(request);
+  let snapshot = (await getSessionSnapshot(sessionId)) || getDefaultSnapshot();
+  if (authenticatedUser?.id && snapshot.userId !== authenticatedUser.id) {
+    await setSessionUserId(sessionId, authenticatedUser.id);
+    snapshot = {
+      ...snapshot,
+      userId: authenticatedUser.id,
     };
-  const persistedSessionLocale = persistedSessionSnapshot.locale;
-  const detectedTextLocale = detectLocaleFromText(text);
-  const selectedLocale =
-    preferredLocale ||
-    persistedSessionLocale ||
-    detectedTextLocale ||
-    resolveLocaleFromAcceptLanguage(request.headers.get("accept-language")) ||
-    headerLocale ||
-    getDefaultLocale();
-  const effectiveLocale = normalizeLocale(selectedLocale) || getDefaultLocale();
+  }
+
+  const effectiveLocale = resolveEffectiveLocale({
+    preferredLocale,
+    sessionLocale: snapshot.locale,
+    text,
+    request,
+  });
   const trackEvent = async (partialPayload) => {
     await trackChatbotEvent({
       sessionId,
       locale: effectiveLocale,
-      command,
+      userId: authenticatedUser?.id || snapshot.userId || null,
+      command: commandFromPayload,
       ...partialPayload,
     });
   };
 
   await trackEvent({
     eventName: CHATBOT_TELEMETRY_EVENTS.TURN_RECEIVED,
-    mode: "unknown",
+    mode: buildModeFromSnapshot(snapshot),
     details: text ? "user_turn_with_text" : "user_turn_command_only",
   });
 
-  if ((command === "start_contextual_flow" || command === "start_contextual_entry") && contextEntry) {
-    const effectiveContextLocale = "es";
-    const nextPrompt = getContextualNextPrompt({
+  let effectiveCommand = commandFromPayload;
+  let effectiveCommandField = commandFieldFromPayload;
+  if (effectiveCommand === "none" && text) {
+    const parsedCommand = parseUserCommandFromText(text);
+    if (parsedCommand.command !== "none") {
+      effectiveCommand = parsedCommand.command;
+      effectiveCommandField = parsedCommand.commandField;
+    }
+  }
+
+  const isTreeContextStart =
+    (effectiveCommand === "start_contextual_flow" ||
+      effectiveCommand === "start_contextual_entry") &&
+    contextEntry &&
+    shouldActivateTreeFlow({
+      interpretation: null,
+      text: `${contextEntry.title || ""} ${contextEntry.description || ""}`,
       contextEntry,
-      locale: effectiveContextLocale,
     });
-    const seededCategory =
-      contextEntry.kind === "incidencia"
-        ? contextEntry.category ||
-          inferIncidentCategoryFromText(`${contextEntry.title} ${contextEntry.description}`) ||
-          "infraestructura"
-        : "";
-    const seededDescription =
-      contextEntry.kind === "incidencia" && contextEntry.description
-        ? contextEntry.description
-        : "";
-    const seededDraft =
-      contextEntry.kind === "incidencia"
-        ? normalizeIncidentDraft({
-            category: seededCategory,
-            description: seededDescription,
-            location: "",
-          })
-        : EMPTY_INCIDENT_DRAFT;
-    const nextField =
-      contextEntry.kind === "incidencia"
-        ? computeMissingIncidentFields(seededDraft)[0] || "location"
-        : null;
-    const mode = contextEntry.kind === "incidencia" ? "incident" : "procedure";
 
-    await setConversationState(sessionId, {
-      locale: effectiveContextLocale,
-      state:
-        contextEntry.kind === "incidencia"
-          ? CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT
-          : CHATBOT_CONVERSATION_STATES.GUIDING_PROCEDURE,
-      draft: seededDraft,
-      pendingField: nextField,
-      lastIntent: contextEntry.kind === "incidencia" ? "crear_incidencia" : "iniciar_tramite",
-      lastAction: "start_contextual_entry",
+  if (isTreeContextStart) {
+    const seededData = buildTreeFlowSeedFromContext(contextEntry);
+    const nextStep = getNextTreeFlowStep(seededData);
+    const nextState =
+      nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
+        ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
+        : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
+    const confirmationState = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none";
+    const patch = createTreeFlowSnapshotPatch({
+      locale: effectiveLocale,
+      userId: authenticatedUser?.id || snapshot.userId || null,
+      collectedData: seededData,
+      currentStep: nextStep,
+      confirmationState,
+      lastInterpretation: {},
+      lastIntent: "report_incident",
+      lastAction: effectiveCommand,
       lastConfidence: null,
+      state: nextState,
     });
+    const savedSnapshot = await setConversationState(sessionId, patch);
     await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
-      mode,
-      action: "start_contextual_entry",
-      outcome: "context_initialized",
-      details: contextEntry.kind,
+      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ENTERED_INCIDENT_FLOW,
+      mode: "incident",
+      outcome: "home_card_context",
     });
 
-    return NextResponse.json({
+    if (nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+        funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
+        mode: "incident",
+        outcome: "ready_from_context",
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildIncidentResumeReply(savedSnapshot.collectedData),
+        snapshot: savedSnapshot,
+        actionOptions: buildConfirmationActionOptions(),
+        nextStepType: "confirm_incident",
+        nextStepField: null,
+      });
+    }
+
+    const actionOptions =
+      nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [];
+    return buildChatResponse({
       sessionId,
-      locale: effectiveContextLocale,
-      replyText: nextPrompt,
-      intent: contextEntry.kind === "incidencia" ? "crear_incidencia" : "iniciar_tramite",
-      confidence: null,
-      fulfillmentMessages: [],
-      action: "start_contextual_entry",
-      parameters: {},
-      mode,
-      draft: {
-        ...seededDraft,
-        missingFields: computeMissingIncidentFields(seededDraft),
-      },
-      nextStep:
-        contextEntry.kind === "incidencia"
-          ? {
-              type: "ask_field",
-              field: nextField || "location",
-            }
-          : {
-              type: "redirect",
-              field: null,
-            },
-      actionOptions: [],
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
+      locale: effectiveLocale,
+      replyText: buildQuestionForStep({ step: nextStep }),
+      snapshot: savedSnapshot,
+      actionOptions,
+      nextStepType: "ask_field",
+      nextStepField: nextStep,
     });
   }
 
-  if (command === "cancel_incident") {
+  if (effectiveCommand === "cancel") {
     await clearIncidentDraft(sessionId);
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: CHATBOT_CONVERSATION_STATES.IDLE,
-      draft: EMPTY_INCIDENT_DRAFT,
-      pendingField: null,
-      lastAction: command,
-    });
+    const clearedSnapshot = await getSessionSnapshot(sessionId);
     await trackEvent({
       eventName: CHATBOT_TELEMETRY_EVENTS.CANCELLED,
       funnelStep: CHATBOT_FUNNEL_STEPS.CANCELLED,
       mode: "incident",
-      action: command,
-      outcome: "draft_cleared",
+      outcome: "cancelled_by_user",
     });
-
-    return NextResponse.json({
+    return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildCancelledIncidentReply(effectiveLocale),
-      intent: persistedSessionSnapshot.lastIntent,
-      confidence: persistedSessionSnapshot.lastConfidence,
-      fulfillmentMessages: [],
-      action: command,
-      parameters: {},
-      mode: "incident",
-      draft: {
-        ...EMPTY_INCIDENT_DRAFT,
-        missingFields: computeMissingIncidentFields(EMPTY_INCIDENT_DRAFT),
-      },
-      nextStep: {
-        type: "cancelled",
-        field: null,
-      },
-      actionOptions: [],
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
+      replyText: buildCancelledIncidentReply(),
+      snapshot: clearedSnapshot || getDefaultSnapshot(),
+      nextStepType: "cancelled",
+      nextStepField: null,
     });
   }
 
-  if (command === "resume_incident_confirmation") {
-    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
-    const missingFields = computeMissingIncidentFields(normalizedDraft);
-    if (missingFields.length > 0) {
-      const nextField = missingFields[0];
-      await setConversationState(sessionId, {
-        locale: effectiveLocale,
-        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-        draft: normalizedDraft,
-        pendingField: nextField,
-        lastAction: command,
-      });
-      await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-        funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
-        mode: "incident",
-        action: command,
-        fieldName: nextField,
-        outcome: "resume_missing_fields",
-      });
-
-      const partialFlow = buildIncidentFlowFromDialogTurn({
-        text: "",
-        locale: effectiveLocale,
-        shouldAskClarification: false,
-        dialogflowResponse: {
-          action: "crear_incidencia",
-          intent: "crear_incidencia",
-          parameters: {},
-        },
-        sessionSnapshot: {
-          ...persistedSessionSnapshot,
-          draft: normalizedDraft,
-          state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-          pendingField: nextField,
-        },
-      });
-
-      return NextResponse.json({
-        sessionId,
-        locale: effectiveLocale,
-        replyText: partialFlow.replyText || FALLBACK_REPLY,
-        intent: persistedSessionSnapshot.lastIntent,
-        confidence: persistedSessionSnapshot.lastConfidence,
-        fulfillmentMessages: [],
-        action: command,
-        parameters: {},
-        mode: partialFlow.mode,
-        draft: {
-          ...normalizeIncidentDraft(partialFlow.draft),
-          missingFields: computeMissingIncidentFields(partialFlow.draft),
-        },
-        nextStep: partialFlow.nextStep,
-        actionOptions: partialFlow.actionOptions,
-        redirectTo: null,
-        redirectLabel: null,
-        needsClarification: false,
-      });
+  if (effectiveCommand === "edit_field" && isTreeFlowActive(snapshot)) {
+    const targetStep = mapFieldToStep(effectiveCommandField);
+    const resetCollectedData = {
+      ...snapshot.collectedData,
+    };
+    if (targetStep === CHATBOT_CURRENT_STEPS.LOCATION) {
+      resetCollectedData.location = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.DESCRIPTION) {
+      resetCollectedData.description = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.RISK) {
+      resetCollectedData.risk = "";
+    } else if (targetStep === CHATBOT_CURRENT_STEPS.PHOTO) {
+      resetCollectedData.photoStatus = "not_requested";
     }
+    const updatedSnapshot = await setConversationState(
+      sessionId,
+      createTreeFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: resetCollectedData,
+        currentStep: targetStep,
+        confirmationState: "none",
+        lastInterpretation: snapshot.lastInterpretation,
+        lastIntent: snapshot.lastIntent || "report_incident",
+        lastAction: effectiveCommand,
+        lastConfidence: snapshot.lastConfidence,
+        state: CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE,
+      })
+    );
 
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: CHATBOT_CONVERSATION_STATES.AWAITING_INCIDENT_CONFIRMATION,
-      draft: normalizedDraft,
-      pendingField: null,
-      lastAction: command,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_RESUMED,
-      funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
-      mode: "incident",
-      action: command,
-      outcome: "resume_ready",
-    });
-
-    return NextResponse.json({
+    return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildIncidentResumeReply(effectiveLocale),
-      intent: persistedSessionSnapshot.lastIntent,
-      confidence: persistedSessionSnapshot.lastConfidence,
-      fulfillmentMessages: [],
-      action: command,
-      parameters: {},
-      mode: "incident",
-      draft: {
-        ...normalizedDraft,
-        missingFields: [],
-      },
-      nextStep: {
-        type: "confirm_incident",
-        field: null,
-      },
-      actionOptions: buildIncidentConfirmationActionOptions(effectiveLocale),
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
+      replyText: buildQuestionForStep({ step: targetStep }),
+      snapshot: updatedSnapshot,
+      actionOptions:
+        targetStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+      nextStepType: "ask_field",
+      nextStepField: targetStep,
     });
   }
 
-  if (command === "confirm_incident") {
-    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
-    const missingFields = computeMissingIncidentFields(normalizedDraft);
-    if (missingFields.length > 0) {
-      const nextField = missingFields[0];
-      await setConversationState(sessionId, {
+  if (
+    (effectiveCommand === "set_photo_pending" || effectiveCommand === "skip_photo") &&
+    isTreeFlowActive(snapshot)
+  ) {
+    const updatedData = {
+      ...snapshot.collectedData,
+      photoStatus: effectiveCommand === "set_photo_pending" ? "pending_upload" : "skipped",
+    };
+    const nextStep = getNextTreeFlowStep(updatedData);
+    const nextState =
+      nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
+        ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
+        : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
+    const confirmationState = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none";
+
+    const updatedSnapshot = await setConversationState(
+      sessionId,
+      createTreeFlowSnapshotPatch({
         locale: effectiveLocale,
-        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-        draft: normalizedDraft,
-        pendingField: nextField,
-        lastAction: command,
-      });
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: updatedData,
+        currentStep: nextStep,
+        confirmationState,
+        lastInterpretation: snapshot.lastInterpretation,
+        lastIntent: snapshot.lastIntent || "report_incident",
+        lastAction: effectiveCommand,
+        lastConfidence: snapshot.lastConfidence,
+        state: nextState,
+      })
+    );
+
+    if (nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
       await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-        funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
+        eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+        funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
         mode: "incident",
-        action: command,
-        fieldName: nextField,
-        outcome: "confirm_with_missing_fields",
+        outcome: "ready_after_photo_step",
       });
-
-      const partialFlow = buildIncidentFlowFromDialogTurn({
-        text: "",
-        locale: effectiveLocale,
-        shouldAskClarification: false,
-        dialogflowResponse: {
-          action: "crear_incidencia",
-          intent: "crear_incidencia",
-          parameters: {},
-        },
-        sessionSnapshot: {
-          ...persistedSessionSnapshot,
-          draft: normalizedDraft,
-          state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-          pendingField: nextField,
-        },
-      });
-
-      return NextResponse.json({
+      return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: partialFlow.replyText || FALLBACK_REPLY,
-        intent: persistedSessionSnapshot.lastIntent,
-        confidence: persistedSessionSnapshot.lastConfidence,
-        fulfillmentMessages: [],
-        action: command,
-        parameters: {},
-        mode: partialFlow.mode,
-        draft: {
-          ...normalizeIncidentDraft(partialFlow.draft),
-          missingFields: computeMissingIncidentFields(partialFlow.draft),
-        },
-        nextStep: partialFlow.nextStep,
-        actionOptions: partialFlow.actionOptions,
-        redirectTo: null,
-        redirectLabel: null,
-        needsClarification: false,
+        replyText: buildIncidentResumeReply(updatedData),
+        snapshot: updatedSnapshot,
+        actionOptions: buildConfirmationActionOptions(),
+        nextStepType: "confirm_incident",
+        nextStepField: null,
       });
     }
 
-    const authenticatedUser = await requireAuthenticatedUser(request);
-    if (!authenticatedUser) {
-      await setConversationState(sessionId, {
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildQuestionForStep({ step: nextStep }),
+      snapshot: updatedSnapshot,
+      actionOptions:
+        nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+      nextStepType: "ask_field",
+      nextStepField: nextStep,
+    });
+  }
+
+  if (effectiveCommand === "resume_confirmation" && isTreeFlowActive(snapshot)) {
+    const missingFields = getRequiredMissingFields(snapshot.collectedData);
+    if (missingFields.length > 0) {
+      const nextStep = mapFieldToStep(missingFields[0]);
+      const updatedSnapshot = await setConversationState(
+        sessionId,
+        createTreeFlowSnapshotPatch({
+          locale: effectiveLocale,
+          userId: authenticatedUser?.id || snapshot.userId || null,
+          collectedData: snapshot.collectedData,
+          currentStep: nextStep,
+          confirmationState: "none",
+          lastInterpretation: snapshot.lastInterpretation,
+          lastIntent: snapshot.lastIntent || "report_incident",
+          lastAction: effectiveCommand,
+          lastConfidence: snapshot.lastConfidence,
+          state: CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE,
+        })
+      );
+
+      return buildChatResponse({
+        sessionId,
         locale: effectiveLocale,
-        state: CHATBOT_CONVERSATION_STATES.AWAITING_INCIDENT_CONFIRMATION,
-        draft: normalizedDraft,
-        pendingField: null,
-        lastAction: command,
+        replyText: buildQuestionForStep({ step: nextStep }),
+        snapshot: updatedSnapshot,
+        actionOptions:
+          nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+        nextStepType: "ask_field",
+        nextStepField: nextStep,
       });
+    }
+
+    const updatedSnapshot = await setConversationState(
+      sessionId,
+      createTreeFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: snapshot.collectedData,
+        currentStep: CHATBOT_CURRENT_STEPS.CONFIRMATION,
+        confirmationState: "ready",
+        lastInterpretation: snapshot.lastInterpretation,
+        lastIntent: snapshot.lastIntent || "report_incident",
+        lastAction: effectiveCommand,
+        lastConfidence: snapshot.lastConfidence,
+        state: CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION,
+      })
+    );
+
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildIncidentResumeReply(snapshot.collectedData),
+      snapshot: updatedSnapshot,
+      actionOptions: buildConfirmationActionOptions(),
+      nextStepType: "confirm_incident",
+      nextStepField: null,
+    });
+  }
+
+  if (effectiveCommand === "confirm" && isTreeFlowActive(snapshot)) {
+    const missingFields = getRequiredMissingFields(snapshot.collectedData);
+    if (missingFields.length > 0) {
+      const nextStep = mapFieldToStep(missingFields[0]);
+      const updatedSnapshot = await setConversationState(
+        sessionId,
+        createTreeFlowSnapshotPatch({
+          locale: effectiveLocale,
+          userId: authenticatedUser?.id || snapshot.userId || null,
+          collectedData: snapshot.collectedData,
+          currentStep: nextStep,
+          confirmationState: "none",
+          lastInterpretation: snapshot.lastInterpretation,
+          lastIntent: snapshot.lastIntent || "report_incident",
+          lastAction: effectiveCommand,
+          lastConfidence: snapshot.lastConfidence,
+          state: CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE,
+        })
+      );
+
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildQuestionForStep({ step: nextStep }),
+        snapshot: updatedSnapshot,
+        actionOptions:
+          nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+        nextStepType: "ask_field",
+        nextStepField: nextStep,
+      });
+    }
+
+    if (!authenticatedUser?.id) {
       await trackEvent({
         eventName: CHATBOT_TELEMETRY_EVENTS.AUTH_REQUIRED,
         funnelStep: CHATBOT_FUNNEL_STEPS.AUTH_REQUIRED,
         mode: "incident",
-        action: command,
-        hasAuth: true,
-        outcome: "auth_needed_before_creation",
+        outcome: "auth_required_before_creation",
       });
-
-      return NextResponse.json({
+      return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildAuthRequiredReply(effectiveLocale),
-        intent: persistedSessionSnapshot.lastIntent,
-        confidence: persistedSessionSnapshot.lastConfidence,
-        fulfillmentMessages: [],
-        action: command,
-        parameters: {},
-        mode: "incident",
-        draft: {
-          ...normalizedDraft,
-          missingFields: [],
-        },
-        nextStep: {
-          type: "auth_required",
-          field: null,
-        },
+        replyText: buildAuthRequiredReply(),
+        snapshot,
         actionOptions: [],
+        nextStepType: "auth_required",
+        nextStepField: null,
         redirectTo: "/login",
-        redirectLabel: effectiveLocale === "en" ? "Sign in" : effectiveLocale === "pt" ? "Entrar" : "Iniciar sesión",
-        needsClarification: false,
+        redirectLabel: "Iniciar sesión",
       });
     }
 
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+      funnelStep: CHATBOT_FUNNEL_STEPS.CONFIRMED,
+      mode: "incident",
+      outcome: "user_confirmed",
+    });
+
     try {
-      await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
-        funnelStep: CHATBOT_FUNNEL_STEPS.CONFIRMED,
-        mode: "incident",
-        action: command,
-        outcome: "user_confirmed_creation",
-      });
+      const descriptionWithRisk = `${snapshot.collectedData.description} (Riesgo: ${snapshot.collectedData.risk})`;
       const incident = await createIncident({
         userId: authenticatedUser.id,
-        category: normalizedDraft.category,
-        description: normalizedDraft.description,
-        location: normalizedDraft.location,
+        category: snapshot.collectedData.category || "infraestructura",
+        description: descriptionWithRisk,
+        location: snapshot.collectedData.location,
       });
 
-      await setConversationState(sessionId, {
+      const closedSnapshot = await setConversationState(sessionId, {
         locale: effectiveLocale,
-        state: CHATBOT_CONVERSATION_STATES.INCIDENT_CREATED,
-        draft: EMPTY_INCIDENT_DRAFT,
-        pendingField: null,
+        userId: authenticatedUser.id,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: FLOW_KEY_TREE,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "confirmed",
+        collectedData: snapshot.collectedData,
+        lastInterpretation: snapshot.lastInterpretation,
+        lastIntent: "report_incident",
         lastAction: "incident_created",
+        lastConfidence: snapshot.lastConfidence,
       });
       await trackEvent({
         eventName: CHATBOT_TELEMETRY_EVENTS.INCIDENT_CREATED,
         funnelStep: CHATBOT_FUNNEL_STEPS.INCIDENT_CREATED,
         mode: "incident",
-        action: "incident_created",
         outcome: "success",
         incidentId: incident.id,
-        userId: authenticatedUser.id,
       });
 
-      return NextResponse.json({
+      return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildIncidentCreatedReply({
-          locale: effectiveLocale,
-          incidentId: incident.id,
-        }),
-        intent: persistedSessionSnapshot.lastIntent,
-        confidence: persistedSessionSnapshot.lastConfidence,
-        fulfillmentMessages: [],
-        action: "incident_created",
-        parameters: {},
-        mode: "incident",
-        draft: {
-          ...EMPTY_INCIDENT_DRAFT,
-          missingFields: computeMissingIncidentFields(EMPTY_INCIDENT_DRAFT),
-        },
-        nextStep: {
-          type: "incident_created",
-          field: null,
-        },
+        replyText: buildIncidentCreatedReply({ incidentId: incident.id }),
+        snapshot: closedSnapshot,
         actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+        redirectTo: `/mis-incidencias?incidentId=${encodeURIComponent(incident.id)}`,
+        redirectLabel: "Ir a Mis incidencias",
         incident: {
           id: incident.id,
           status: incident.status,
           category: incident.category,
           location: incident.location,
         },
-        redirectTo: `/mis-incidencias?incidentId=${encodeURIComponent(incident.id)}`,
-        redirectLabel:
-          effectiveLocale === "en"
-            ? "View case status"
-            : effectiveLocale === "pt"
-              ? "Ver status do caso"
-              : "Ver estado del caso",
-        needsClarification: false,
       });
     } catch (error) {
-      console.error("[chatbot] Error creando incidencia desde chat.", {
-        sessionId,
-        userId: authenticatedUser.id,
-        message: error?.message,
-      });
       await trackEvent({
         eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
         mode: "incident",
-        action: command,
         outcome: "incident_creation_failed",
-        details: error?.message,
-        userId: authenticatedUser.id,
+        details: error?.message || null,
       });
       return NextResponse.json(
         {
@@ -571,359 +604,199 @@ export async function POST(request) {
     }
   }
 
-  if (command === "edit_incident_category") {
-    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-      draft: normalizedDraft,
-      pendingField: "category",
-      lastAction: command,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
-      mode: "incident",
-      action: command,
-      fieldName: "category",
-      outcome: "edit_requested",
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
-      mode: "incident",
-      action: command,
-      fieldName: "category",
-      outcome: "edit_prompted",
-    });
-    const partialFlow = buildIncidentFlowFromDialogTurn({
-      text: "",
-      locale: effectiveLocale,
-      shouldAskClarification: false,
-      dialogflowResponse: {
-        action: "crear_incidencia",
-        intent: "crear_incidencia",
-        parameters: {},
-      },
-      sessionSnapshot: {
-        ...persistedSessionSnapshot,
-        draft: normalizedDraft,
-        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-        pendingField: "category",
-      },
-    });
-    return NextResponse.json({
-      sessionId,
-      locale: effectiveLocale,
-      replyText: partialFlow.replyText || FALLBACK_REPLY,
-      intent: persistedSessionSnapshot.lastIntent,
-      confidence: persistedSessionSnapshot.lastConfidence,
-      fulfillmentMessages: [],
-      action: command,
-      parameters: {},
-      mode: partialFlow.mode,
-      draft: {
-        ...normalizeIncidentDraft(partialFlow.draft),
-        missingFields: computeMissingIncidentFields(partialFlow.draft),
-      },
-      nextStep: partialFlow.nextStep,
-      actionOptions: partialFlow.actionOptions,
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
-    });
-  }
-
-  if (command === "edit_incident_description") {
-    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-      draft: normalizedDraft,
-      pendingField: "description",
-      lastAction: command,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
-      mode: "incident",
-      action: command,
-      fieldName: "description",
-      outcome: "edit_requested",
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
-      mode: "incident",
-      action: command,
-      fieldName: "description",
-      outcome: "edit_prompted",
-    });
-
-    const partialFlow = buildIncidentFlowFromDialogTurn({
-      text: "",
-      locale: effectiveLocale,
-      shouldAskClarification: false,
-      dialogflowResponse: {
-        action: "crear_incidencia",
-        intent: "crear_incidencia",
-        parameters: {},
-      },
-      sessionSnapshot: {
-        ...persistedSessionSnapshot,
-        draft: normalizedDraft,
-        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-        pendingField: "description",
-      },
-    });
-    return NextResponse.json({
-      sessionId,
-      locale: effectiveLocale,
-      replyText: partialFlow.replyText || FALLBACK_REPLY,
-      intent: persistedSessionSnapshot.lastIntent,
-      confidence: persistedSessionSnapshot.lastConfidence,
-      fulfillmentMessages: [],
-      action: command,
-      parameters: {},
-      mode: partialFlow.mode,
-      draft: {
-        ...normalizeIncidentDraft(partialFlow.draft),
-        missingFields: computeMissingIncidentFields(partialFlow.draft),
-      },
-      nextStep: partialFlow.nextStep,
-      actionOptions: partialFlow.actionOptions,
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
-    });
-  }
-
-  if (command === "edit_incident_location") {
-    const normalizedDraft = normalizeIncidentDraft(persistedSessionSnapshot.draft);
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-      draft: normalizedDraft,
-      pendingField: "location",
-      lastAction: command,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.EDIT_REQUESTED,
-      mode: "incident",
-      action: command,
-      fieldName: "location",
-      outcome: "edit_requested",
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-      funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
-      mode: "incident",
-      action: command,
-      fieldName: "location",
-      outcome: "edit_prompted",
-    });
-
-    const partialFlow = buildIncidentFlowFromDialogTurn({
-      text: "",
-      locale: effectiveLocale,
-      shouldAskClarification: false,
-      dialogflowResponse: {
-        action: "crear_incidencia",
-        intent: "crear_incidencia",
-        parameters: {},
-      },
-      sessionSnapshot: {
-        ...persistedSessionSnapshot,
-        draft: normalizedDraft,
-        state: CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT,
-        pendingField: "location",
-      },
-    });
-    return NextResponse.json({
-      sessionId,
-      locale: effectiveLocale,
-      replyText: partialFlow.replyText || FALLBACK_REPLY,
-      intent: persistedSessionSnapshot.lastIntent,
-      confidence: persistedSessionSnapshot.lastConfidence,
-      fulfillmentMessages: [],
-      action: command,
-      parameters: {},
-      mode: partialFlow.mode,
-      draft: {
-        ...normalizeIncidentDraft(partialFlow.draft),
-        missingFields: computeMissingIncidentFields(partialFlow.draft),
-      },
-      nextStep: partialFlow.nextStep,
-      actionOptions: partialFlow.actionOptions,
-      redirectTo: null,
-      redirectLabel: null,
-      needsClarification: false,
-    });
-  }
-
-  if (!isDialogflowConfigured()) {
-    console.error("[chatbot] Dialogflow no configurado en entorno servidor.");
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
-      mode: "unknown",
-      outcome: "dialogflow_not_configured",
-    });
-    return NextResponse.json(
-      {
-        error: "El asistente no está disponible temporalmente.",
-      },
-      { status: 503 }
-    );
-  }
-
-  try {
-    const dialogflowResponse = await detectDialogflowIntent({
-      text,
-      sessionId,
-      languageCode: effectiveLocale,
-    });
-    const hasLowConfidence =
-      typeof dialogflowResponse.confidence === "number" &&
-      dialogflowResponse.confidence < MIN_CONFIDENCE_TO_REDIRECT;
-    const isFallbackIntent = dialogflowResponse.intent === "Default Fallback Intent";
-    const shouldAskClarification =
-      !dialogflowResponse.intent || hasLowConfidence || isFallbackIntent;
-    const conversationFlow = buildIncidentFlowFromDialogTurn({
+  let interpretation = snapshot.lastInterpretation || {};
+  let llmMeta = { source: "fallback", reason: "not_called" };
+  if (text) {
+    const llmResult = await interpretUserMessage({
       text,
       locale: effectiveLocale,
-      shouldAskClarification,
-      dialogflowResponse,
-      sessionSnapshot: persistedSessionSnapshot,
-    });
-    const normalizedDraft = normalizeIncidentDraft(conversationFlow.draft);
-    const missingFields = computeMissingIncidentFields(normalizedDraft);
-    const resolvedRedirect =
-      conversationFlow.nextStep?.type === "redirect"
-        ? resolveChatbotRedirect({
-            action: dialogflowResponse.action,
-            intentDisplayName: dialogflowResponse.intent,
-          })
-        : null;
-    const routeMetadata = getChatbotRouteMetadata(resolvedRedirect);
-    const replyText =
-      conversationFlow.replyText ||
-      (shouldAskClarification ? FALLBACK_REPLY : dialogflowResponse.replyText || FALLBACK_REPLY);
-
-    await setConversationState(sessionId, {
-      locale: effectiveLocale,
-      state: conversationFlow.state,
-      draft: normalizedDraft,
-      pendingField: conversationFlow.pendingField,
-      lastIntent: dialogflowResponse.intent,
-      lastAction: dialogflowResponse.action,
-      lastConfidence: dialogflowResponse.confidence,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.INTENT_DETECTED,
-      mode: conversationFlow.mode,
-      intent: dialogflowResponse.intent,
-      action: dialogflowResponse.action,
-      confidence: dialogflowResponse.confidence,
-      outcome: shouldAskClarification ? "low_confidence_or_fallback" : "intent_ok",
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
-      mode: conversationFlow.mode,
-      intent: dialogflowResponse.intent,
-      action: dialogflowResponse.action,
-      confidence: dialogflowResponse.confidence,
-      hasRedirect: Boolean(resolvedRedirect),
-      outcome: conversationFlow.nextStep?.type || "none",
-    });
-    if (conversationFlow.mode === "incident") {
-      await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
-        funnelStep: CHATBOT_FUNNEL_STEPS.ENTERED_INCIDENT_FLOW,
-        mode: conversationFlow.mode,
-        intent: dialogflowResponse.intent,
-        action: dialogflowResponse.action,
-        outcome: "incident_mode_active",
-      });
-      if (conversationFlow.nextStep?.type === "ask_field") {
-        await trackEvent({
-          eventName: CHATBOT_TELEMETRY_EVENTS.ASK_FIELD,
-          funnelStep: CHATBOT_FUNNEL_STEPS.ASKED_FIELD,
-          mode: conversationFlow.mode,
-          intent: dialogflowResponse.intent,
-          action: dialogflowResponse.action,
-          fieldName: conversationFlow.nextStep?.field || null,
-          outcome: "field_requested",
-        });
-      }
-      if (conversationFlow.nextStep?.type === "confirm_incident") {
-        await trackEvent({
-          eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
-          funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
-          mode: conversationFlow.mode,
-          intent: dialogflowResponse.intent,
-          action: dialogflowResponse.action,
-          outcome: "waiting_user_confirmation",
-        });
-      }
-    }
-    if (conversationFlow.mode === "fallback") {
-      await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.FALLBACK_CLARIFICATION,
-        mode: conversationFlow.mode,
-        intent: dialogflowResponse.intent,
-        action: dialogflowResponse.action,
-        confidence: dialogflowResponse.confidence,
-        outcome: "clarification_prompted",
-      });
-    }
-    if (resolvedRedirect) {
-      await trackEvent({
-        eventName: CHATBOT_TELEMETRY_EVENTS.REDIRECT_OFFERED,
-        mode: conversationFlow.mode,
-        intent: dialogflowResponse.intent,
-        action: dialogflowResponse.action,
-        hasRedirect: true,
-        outcome: resolvedRedirect,
-      });
-    }
-
-    return NextResponse.json({
-      sessionId: dialogflowResponse.sessionId,
-      locale: dialogflowResponse.languageCode || effectiveLocale,
-      replyText,
-      intent: dialogflowResponse.intent,
-      confidence: dialogflowResponse.confidence,
-      fulfillmentMessages: dialogflowResponse.fulfillmentMessages,
-      action: dialogflowResponse.action,
-      parameters: dialogflowResponse.parameters,
-      mode: conversationFlow.mode,
-      draft: {
-        ...normalizedDraft,
-        missingFields,
+      sessionContext: {
+        flowKey: snapshot.flowKey,
+        currentStep: snapshot.currentStep,
+        confirmationState: snapshot.confirmationState,
+        collectedData: snapshot.collectedData,
       },
-      nextStep: conversationFlow.nextStep,
-      actionOptions: conversationFlow.actionOptions,
-      redirectTo: resolvedRedirect || null,
-      redirectLabel: routeMetadata?.label || null,
-      needsClarification:
-        shouldAskClarification || conversationFlow.mode === "fallback",
     });
-  } catch (error) {
-    console.error("[chatbot] Error detectando intencion.", {
-      sessionId,
-      textLength: text.length,
-      message: error?.message,
-    });
-    await trackEvent({
-      eventName: CHATBOT_TELEMETRY_EVENTS.SERVICE_ERROR,
-      mode: "unknown",
-      outcome: "detect_intent_failed",
-      details: error?.message,
-    });
+    interpretation = llmResult.interpretation || {};
+    llmMeta = llmResult.meta || llmMeta;
 
-    return NextResponse.json(
-      {
-        error: "Ocurrió un error al procesar tu mensaje. Intenta nuevamente en unos segundos.",
-      },
-      { status: 500 }
-    );
+    if (llmMeta.source === "fallback") {
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.LLM_FALLBACK_USED,
+        mode: buildModeFromSnapshot(snapshot),
+        outcome: llmMeta.reason || "unknown",
+      });
+    }
   }
+
+  if (!isTreeFlowActive(snapshot)) {
+    const shouldActivate = shouldActivateTreeFlow({
+      interpretation,
+      text,
+      contextEntry,
+    });
+
+    if (!shouldActivate) {
+      await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.IDLE,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+        confirmationState: "none",
+        collectedData: snapshot.collectedData || EMPTY_COLLECTED_DATA,
+        lastInterpretation: interpretation,
+        lastIntent: interpretation?.intent?.kind || "unknown",
+        lastAction: effectiveCommand || "none",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText:
+          "Puedo ayudarte con reportes de Árbol caído / ramas peligrosas. Si quieres, cuéntame directamente la ubicación para empezar.",
+        snapshot: {
+          ...snapshot,
+          locale: effectiveLocale,
+          lastInterpretation: interpretation,
+          lastIntent: interpretation?.intent?.kind || "unknown",
+          lastAction: effectiveCommand || "none",
+          lastConfidence: interpretation?.intent?.confidence || null,
+        },
+        actionOptions: [],
+        nextStepType: "clarify",
+        nextStepField: null,
+        needsClarification: true,
+      });
+    }
+
+    const seedData = contextEntry
+      ? buildTreeFlowSeedFromContext(contextEntry)
+      : {
+          ...EMPTY_COLLECTED_DATA,
+          category: "infraestructura",
+          subcategory: "arbol_caido_ramas_peligrosas",
+        };
+    snapshot = await setConversationState(
+      sessionId,
+      createTreeFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: seedData,
+        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+        confirmationState: "none",
+        lastInterpretation: interpretation,
+        lastIntent: interpretation?.intent?.kind || "report_incident",
+        lastAction: effectiveCommand || "flow_activated",
+        lastConfidence: interpretation?.intent?.confidence || null,
+        state: CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE,
+      })
+    );
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+      funnelStep: CHATBOT_FUNNEL_STEPS.ENTERED_INCIDENT_FLOW,
+      mode: "incident",
+      outcome: "text_detection",
+    });
+  }
+
+  const mergedResult = mergeCollectedDataFromInterpretation({
+    collectedData: snapshot.collectedData,
+    interpretation,
+    text,
+    currentStep: snapshot.currentStep,
+  });
+  if (effectiveCommand === "edit_field" && effectiveCommandField) {
+    if (effectiveCommandField === "location") {
+      mergedResult.collectedData.location = text;
+    } else if (effectiveCommandField === "description") {
+      mergedResult.collectedData.description = text;
+    } else if (effectiveCommandField === "risk") {
+      mergedResult.collectedData.risk = text;
+    }
+  }
+  const mergedData = mergedResult.collectedData;
+  const nextStep = getNextTreeFlowStep(mergedData);
+  const isReadyForConfirmation = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION;
+
+  if (mergedResult.acceptedEntities.length > 0) {
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.ENTITIES_ACCEPTED,
+      mode: "incident",
+      outcome: mergedResult.acceptedEntities.join(","),
+    });
+  }
+  if (mergedResult.rejectedEntities.length > 0) {
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.ENTITIES_REJECTED,
+      mode: "incident",
+      outcome: mergedResult.rejectedEntities.join(","),
+    });
+  }
+
+  const currentStepHasLowConfidence = mergedResult.lowConfidenceFields.includes(nextStep);
+  if (currentStepHasLowConfidence) {
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.LOW_CONFIDENCE_REPROMPT,
+      mode: "incident",
+      fieldName: nextStep,
+      outcome: "reprompt",
+    });
+  }
+
+  const nextState = isReadyForConfirmation
+    ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
+    : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
+  const confirmationState = isReadyForConfirmation ? "ready" : "none";
+
+  const savedSnapshot = await setConversationState(
+    sessionId,
+    createTreeFlowSnapshotPatch({
+      locale: effectiveLocale,
+      userId: authenticatedUser?.id || snapshot.userId || null,
+      collectedData: mergedData,
+      currentStep: nextStep,
+      confirmationState,
+      lastInterpretation: interpretation,
+      lastIntent: interpretation?.intent?.kind || "report_incident",
+      lastAction: effectiveCommand === "none" ? "message" : effectiveCommand,
+      lastConfidence: interpretation?.intent?.confidence || null,
+      state: nextState,
+    })
+  );
+
+  if (isReadyForConfirmation) {
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.CONFIRMATION_READY,
+      funnelStep: CHATBOT_FUNNEL_STEPS.READY_FOR_CONFIRMATION,
+      mode: "incident",
+      outcome: "ready_after_data_capture",
+    });
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildIncidentResumeReply(mergedData),
+      snapshot: savedSnapshot,
+      actionOptions: buildConfirmationActionOptions(),
+      nextStepType: "confirm_incident",
+      nextStepField: null,
+    });
+  }
+
+  const replyText = buildQuestionForStep({
+    step: nextStep,
+    lowConfidence: currentStepHasLowConfidence,
+    suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
+  });
+  return buildChatResponse({
+    sessionId,
+    locale: effectiveLocale,
+    replyText,
+    snapshot: savedSnapshot,
+    actionOptions: nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+    nextStepType: "ask_field",
+    nextStepField: nextStep,
+    needsClarification: currentStepHasLowConfidence,
+  });
 }
