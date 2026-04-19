@@ -2139,30 +2139,9 @@ button:disabled {
 }
 
 .floating-chat-button__icon {
-  font-size: 0.63rem;
-  letter-spacing: 0.01em;
-}
-
-.floating-chat-button__icon svg {
-  width: 1.2rem;
-  height: 1.2rem;
-  fill: currentColor;
-}
-
-.floating-chat-button__badge {
-  position: absolute;
-  top: -0.15rem;
-  right: -0.15rem;
-  min-width: 1.05rem;
-  height: 1.05rem;
-  border-radius: 999px;
-  background: #e53e3e;
-  color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.64rem;
-  border: 2px solid #f7f9fc;
+  font-size: 1.7rem;
+  line-height: 1;
+  transform: translateY(-0.02rem);
 }
 
 .mobile-bottom-nav {

@@ -465,12 +465,7 @@ export default function PortalShell({ children }) {
         aria-label={copy.portal.floatingChatLabel}
       >
         <span className="floating-chat-button__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4.5 5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.2l-3.9 2.9a.5.5 0 0 1-.8-.4v-2.5H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.5 1v9.5h1a1 1 0 0 1 1 1V18l2.9-2.2a1 1 0 0 1 .6-.2H19V6H5Zm3.2 3h7.6v1.5H8.2V9Zm0 3h5.6v1.5H8.2V12Z" />
-          </svg>
-        </span>
-        <span className="floating-chat-button__badge" aria-hidden="true">
-          1
+          +
         </span>
       </Link>
 
