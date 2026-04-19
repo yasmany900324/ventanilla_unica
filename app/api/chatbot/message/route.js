@@ -315,7 +315,8 @@ function buildProcedureCatalogIntroReply(procedures) {
   }
 
   const listedNames = names.map((name) => `"${name}"`).join(", ");
-  return `Puedo ayudarte a iniciar estos trámites por el momento: ${listedNames}. Indícame cuál deseas iniciar.`;
+  const totalSupported = supported.length;
+  return `Actualmente puedo ayudarte con ${totalSupported} tipos de trámites: ${listedNames}. Indícame cuál deseas iniciar.`;
 }
 
 function buildProcedureCatalogActionOptions(procedures) {
