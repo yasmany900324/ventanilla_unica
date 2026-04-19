@@ -37,6 +37,7 @@ import {
   mergeCollectedDataFromInterpretation,
   parseUserCommandFromText,
   shouldActivateTreeFlow,
+  shouldSwitchToIncidentFlow,
   shouldSwitchToProcedureFlow,
   createProcedureFlowSnapshotPatch,
 } from "../../../../lib/chatbotConversationOrchestrator";
@@ -162,15 +163,143 @@ function normalizeProcedureText(value, maxLength = 320) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function buildProcedureActionOptions() {
-  return [
+function normalizeIntentLookup(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shouldSwitchToStatusIntent({ text, interpretation }) {
+  const normalized = normalizeIntentLookup(text);
+  if (normalized) {
+    const statusKeywords = [
+      "consultar estado",
+      "estado de tramite",
+      "estado del tramite",
+      "estado de solicitud",
+      "estado de mi solicitud",
+      "seguimiento",
+      "ver estado",
+      "consultar tramite",
+    ];
+    if (statusKeywords.some((keyword) => normalized.includes(keyword))) {
+      return true;
+    }
+  }
+
+  const intentKind = interpretation?.intent?.kind || "unknown";
+  const confidence = interpretation?.intent?.confidence || 0;
+  return intentKind === "check_status" && confidence >= 0.6;
+}
+
+function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
+  const options = [
     {
-      label: "Reportar incidencia",
+      label: "Buscar trámite",
       command: "none",
-      value: "Quiero reportar un problema de árbol caído",
+      value: "Quiero buscar un trámite específico.",
+      commandField: null,
+    },
+    {
+      label: "Ver categorías de trámites",
+      command: "none",
+      value: "Quiero ver categorías de trámites disponibles.",
+      commandField: null,
+    },
+    {
+      label: "Describir lo que necesito gestionar",
+      command: "none",
+      value: "Te describo lo que necesito gestionar.",
+      commandField: null,
+    },
+    {
+      label: "Consultar estado de trámite",
+      command: "none",
+      value: "Quiero consultar el estado de un trámite.",
       commandField: null,
     },
   ];
+
+  if (isCompleted) {
+    return options.filter((option) =>
+      option.label === "Buscar trámite" ||
+      option.label === "Ver categorías de trámites" ||
+      option.label === "Consultar estado de trámite"
+    );
+  }
+  if (nextMissingField === "procedureDetails") {
+    return options.filter((option) =>
+      option.label === "Describir lo que necesito gestionar" ||
+      option.label === "Ver categorías de trámites" ||
+      option.label === "Consultar estado de trámite"
+    );
+  }
+
+  return options;
+}
+
+function buildClarificationActionOptions() {
+  return [
+    {
+      label: "Iniciar trámite",
+      command: "none",
+      value: "Quiero iniciar un trámite.",
+      commandField: null,
+    },
+    {
+      label: "Reportar incidencia",
+      command: "none",
+      value: "Quiero reportar una incidencia.",
+      commandField: null,
+    },
+    {
+      label: "Consultar estado",
+      command: "none",
+      value: "Quiero consultar el estado de mi solicitud.",
+      commandField: null,
+    },
+  ];
+}
+
+function buildStatusActionOptions() {
+  return [
+    {
+      label: "Ver mis incidencias",
+      command: "none",
+      value: "Quiero ver mis incidencias.",
+      commandField: null,
+    },
+    {
+      label: "Consultar con número de ticket",
+      command: "none",
+      value: "Quiero consultar con mi número de ticket.",
+      commandField: null,
+    },
+    {
+      label: "Iniciar trámite",
+      command: "none",
+      value: "Quiero iniciar un trámite.",
+      commandField: null,
+    },
+    {
+      label: "Reportar incidencia",
+      command: "none",
+      value: "Quiero reportar una incidencia.",
+      commandField: null,
+    },
+  ];
+}
+
+function buildStatusReply() {
+  return "Entiendo. Te ayudo a consultar el estado de tu solicitud. Puedes revisar tus casos en 'Mis incidencias' o indicarme el número de ticket para orientarte.";
 }
 
 function buildChatResponse({
@@ -191,7 +320,9 @@ function buildChatResponse({
   const missingFields =
     mode === "procedure"
       ? getProcedureMissingFields(collectedData)
-      : getRequiredMissingFields(collectedData);
+      : mode === "incident"
+        ? getRequiredMissingFields(collectedData)
+        : [];
 
   return NextResponse.json({
     sessionId,
@@ -706,6 +837,37 @@ export async function POST(request) {
 
   const switchToProcedure =
     shouldSwitchToProcedureFlow({ text, interpretation }) && !isProcedureFlowActive(snapshot);
+  const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
+
+  if (switchToStatus) {
+    const statusSnapshot = await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      userId: authenticatedUser?.id || snapshot.userId || null,
+      state: CHATBOT_CONVERSATION_STATES.IDLE,
+      flowKey: null,
+      currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+      confirmationState: "none",
+      collectedData: snapshot.collectedData || EMPTY_COLLECTED_DATA,
+      lastInterpretation: interpretation,
+      lastIntent: "check_status",
+      lastAction: effectiveCommand === "none" ? "message" : effectiveCommand,
+      lastConfidence: interpretation?.intent?.confidence || null,
+    });
+
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildStatusReply(),
+      snapshot: statusSnapshot,
+      actionOptions: buildStatusActionOptions(),
+      nextStepType: "check_status",
+      nextStepField: null,
+      redirectTo: "/mis-incidencias",
+      redirectLabel: "Ver mis incidencias",
+      needsClarification: false,
+    });
+  }
+
   if (switchToProcedure) {
     const normalizedText = normalizeProcedureText(text, 320);
     const normalizedProcedureName = normalizeProcedureText(normalizedText, 160);
@@ -753,7 +915,10 @@ export async function POST(request) {
       locale: effectiveLocale,
       replyText: procedureReply,
       snapshot: procedureSnapshot,
-      actionOptions: buildProcedureActionOptions(),
+      actionOptions: buildProcedureActionOptions({
+        nextMissingField: procedureMissing[0] || "procedureName",
+        isCompleted: procedureMissing.length === 0,
+      }),
       nextStepType: "ask_field",
       nextStepField: procedureMissing[0] || "procedureName",
       needsClarification: false,
@@ -761,11 +926,13 @@ export async function POST(request) {
   }
 
   if (isProcedureFlowActive(snapshot)) {
-    const procedureSwitchToIncident = shouldActivateTreeFlow({
-      interpretation,
-      text,
-      contextEntry,
-    });
+    const procedureSwitchToIncident =
+      shouldSwitchToIncidentFlow({ text, interpretation }) ||
+      shouldActivateTreeFlow({
+        interpretation,
+        text,
+        contextEntry,
+      });
     if (procedureSwitchToIncident) {
       const treeSeed = {
         ...EMPTY_COLLECTED_DATA,
@@ -880,13 +1047,15 @@ export async function POST(request) {
             procedureName: procedureData.procedureName,
             procedureDetails: procedureData.procedureDetails,
           })
-        : "Ya tengo la información inicial del trámite. Siguiente acción: te indicaré cómo continuar con la clasificación específica, o puedes decirme si prefieres reportar una incidencia.";
+        : "Ya tengo la información inicial del trámite. Siguiente paso: puedo ayudarte a buscar el trámite exacto por nombre o por categoría, o consultar su estado.";
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
         replyText,
         snapshot: updatedProcedureSnapshot,
-        actionOptions: buildProcedureActionOptions(),
+        actionOptions: buildProcedureActionOptions({
+          isCompleted: true,
+        }),
         nextStepType: "procedure_guided",
         nextStepField: null,
       });
@@ -901,7 +1070,10 @@ export async function POST(request) {
       locale: effectiveLocale,
       replyText: procedureReply,
       snapshot: updatedProcedureSnapshot,
-      actionOptions: buildProcedureActionOptions(),
+      actionOptions: buildProcedureActionOptions({
+        nextMissingField: procedureMissing[0],
+        isCompleted: false,
+      }),
       nextStepType: "ask_field",
       nextStepField: procedureMissing[0],
     });
@@ -909,8 +1081,7 @@ export async function POST(request) {
 
   if (
     isTreeFlowActive(snapshot) &&
-    interpretation?.intent?.kind === "start_procedure" &&
-    (interpretation?.intent?.confidence || 0) >= 0.6
+    shouldSwitchToProcedureFlow({ text, interpretation })
   ) {
     const procedureSnapshot = await setConversationState(
       sessionId,
@@ -940,7 +1111,10 @@ export async function POST(request) {
       locale: effectiveLocale,
       replyText: buildProcedureStartReply(),
       snapshot: procedureSnapshot,
-      actionOptions: buildProcedureActionOptions(),
+      actionOptions: buildProcedureActionOptions({
+        nextMissingField: "procedureName",
+        isCompleted: false,
+      }),
       nextStepType: "ask_field",
       nextStepField: "procedureName",
     });
@@ -981,7 +1155,7 @@ export async function POST(request) {
           lastAction: effectiveCommand || "none",
           lastConfidence: interpretation?.intent?.confidence || null,
         },
-        actionOptions: [],
+        actionOptions: buildClarificationActionOptions(),
         nextStepType: "clarify",
         nextStepField: null,
         needsClarification: true,
