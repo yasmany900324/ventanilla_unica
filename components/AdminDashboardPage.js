@@ -45,57 +45,68 @@ function ProcedureStatusBadge({ isActive, copy }) {
   );
 }
 
-function ProcedureListItem({
+function ProcedureTableRow({
   procedure,
   copy,
   onEdit,
   onToggleStatus,
+  onDelete,
+  isDeleting,
   isToggling,
   isSaving,
 }) {
+  const updatedAtText = procedure.updatedAt
+    ? new Date(procedure.updatedAt).toLocaleDateString()
+    : "-";
+
   return (
-    <li className="incident-card incident-card--list">
-      <div className="incident-card__header">
-        <div className="incident-card__main">
-          <p className="incident-card__meta">{procedure.name}</p>
-          <p className="small">{procedure.code}</p>
-          {procedure.category ? <p className="small">{procedure.category}</p> : null}
-        </div>
+    <tr>
+      <td>
+        <p className="admin-procedure-table__primary">{procedure.name}</p>
+        {procedure.description ? (
+          <p className="admin-procedure-table__secondary">{procedure.description}</p>
+        ) : null}
+      </td>
+      <td className="admin-procedure-table__mono">{procedure.code}</td>
+      <td>{procedure.category || copy.noCategory}</td>
+      <td>
         <ProcedureStatusBadge isActive={Boolean(procedure.isActive)} copy={copy} />
-      </div>
-      {procedure.description ? (
-        <p className="incident-card__description">{procedure.description}</p>
-      ) : null}
-      <div className="admin-procedure-item__meta">
-        <p className="small">
-          {copy.aliasesLabel}: {(procedure.aliases || []).join(", ") || "-"}
-        </p>
-        <p className="small">
-          {copy.keywordsLabel}: {(procedure.keywords || []).join(", ") || "-"}
-        </p>
-        <p className="small">
-          {copy.requiredFieldsLabel}: {(procedure.requiredFields || []).length}
-        </p>
-      </div>
-      <div className="admin-procedure-item__actions">
-        <button
-          type="button"
-          className="button-inline"
-          onClick={() => onEdit(procedure)}
-          disabled={isSaving || isToggling}
-        >
-          {copy.save}
-        </button>
-        <button
-          type="button"
-          className="button-inline"
-          onClick={() => onToggleStatus(procedure)}
-          disabled={isSaving || isToggling}
-        >
-          {isToggling ? copy.statusToggling : copy.statusToggle}
-        </button>
-      </div>
-    </li>
+      </td>
+      <td>{(procedure.requiredFields || []).length}</td>
+      <td>{updatedAtText}</td>
+      <td>
+        <div className="admin-procedure-item__actions">
+          <button
+            type="button"
+            className="button-inline"
+            onClick={() => onEdit(procedure)}
+            disabled={isSaving || isToggling || isDeleting}
+          >
+            {copy.edit}
+          </button>
+          <button
+            type="button"
+            className="button-inline"
+            onClick={() => onToggleStatus(procedure)}
+            disabled={isSaving || isToggling || isDeleting}
+          >
+            {isToggling
+              ? copy.statusToggling
+              : procedure.isActive
+                ? copy.deactivate
+                : copy.activate}
+          </button>
+          <button
+            type="button"
+            className="button-inline button-inline--danger"
+            onClick={() => onDelete(procedure)}
+            disabled={isSaving || isToggling || isDeleting}
+          >
+            {isDeleting ? copy.deleting : copy.delete}
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -112,7 +123,7 @@ function ProcedureForm({
 
   return (
     <form className="card dashboard-section admin-procedure-form" onSubmit={onSubmit}>
-      <h2>{title}</h2>
+      <h3>{title}</h3>
       <label htmlFor="procedure-code">{copy.form.code}</label>
       <input
         id="procedure-code"
@@ -195,16 +206,9 @@ function ProcedureForm({
               ? copy.create
               : copy.save}
         </button>
-        {mode === "edit" ? (
-          <button
-            type="button"
-            className="button-inline"
-            onClick={onCancel}
-            disabled={isSaving}
-          >
-            {copy.cancel}
-          </button>
-        ) : null}
+        <button type="button" className="button-inline" onClick={onCancel} disabled={isSaving}>
+          {copy.cancel}
+        </button>
       </div>
     </form>
   );
@@ -243,12 +247,52 @@ function createProcedureFormState(procedure = null) {
   };
 }
 
+function getProcedureCopy(baseCopy) {
+  return {
+    ...baseCopy,
+    contextTitle: baseCopy.contextTitle || "Catálogo de tipos de trámites",
+    contextDescription:
+      baseCopy.contextDescription ||
+      "Un tipo de trámite define qué puede gestionar el chatbot y qué datos debe pedir en cada paso.",
+    catalogTitle: baseCopy.catalogTitle || "Catálogo actual",
+    catalogDescription:
+      baseCopy.catalogDescription ||
+      "Revisa y administra los tipos existentes antes de crear uno nuevo.",
+    summaryTotal: baseCopy.summaryTotal || "Total",
+    summaryActive: baseCopy.summaryActive || "Activos",
+    summaryInactive: baseCopy.summaryInactive || "Inactivos",
+    tableNameHeader: baseCopy.tableNameHeader || "Tipo de trámite",
+    tableCodeHeader: baseCopy.tableCodeHeader || "Código",
+    tableCategoryHeader: baseCopy.tableCategoryHeader || "Categoría",
+    tableStatusHeader: baseCopy.tableStatusHeader || "Estado",
+    tableRequiredFieldsHeader: baseCopy.tableRequiredFieldsHeader || "Campos",
+    tableUpdatedAtHeader: baseCopy.tableUpdatedAtHeader || "Actualizado",
+    tableActionsHeader: baseCopy.tableActionsHeader || "Acciones",
+    newProcedureCta: baseCopy.newProcedureCta || "Nuevo tipo de trámite",
+    hideFormCta: baseCopy.hideFormCta || "Ocultar formulario",
+    createSecondaryTitle: baseCopy.createSecondaryTitle || "Agregar nuevo tipo",
+    createSecondaryDescription:
+      baseCopy.createSecondaryDescription ||
+      "Cuando necesites ampliar el catálogo, crea un nuevo tipo de trámite desde aquí.",
+    edit: baseCopy.edit || "Editar",
+    activate: baseCopy.activate || "Activar",
+    deactivate: baseCopy.deactivate || "Desactivar",
+    delete: baseCopy.delete || "Eliminar",
+    deleting: baseCopy.deleting || "Eliminando...",
+    successDeleted: baseCopy.successDeleted || "Tipo de trámite eliminado correctamente.",
+    confirmDelete:
+      baseCopy.confirmDelete ||
+      "¿Seguro que quieres eliminar este tipo de trámite? Esta acción no se puede deshacer.",
+    noCategory: baseCopy.noCategory || "Sin categoría",
+  };
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
-  const procedureCopy = copy.admin.procedures;
+  const procedureCopy = getProcedureCopy(copy.admin.procedures);
   const [windowDays, setWindowDays] = useState(7);
   const [activeTab, setActiveTab] = useState(ADMIN_TABS.CHATBOT);
   const [isLoading, setIsLoading] = useState(true);
@@ -258,10 +302,12 @@ export default function AdminDashboardPage() {
   const [proceduresError, setProceduresError] = useState("");
   const [procedures, setProcedures] = useState([]);
   const [selectedProcedureCode, setSelectedProcedureCode] = useState("");
+  const [showProcedureForm, setShowProcedureForm] = useState(false);
   const [procedureFormState, setProcedureFormState] = useState(() => createProcedureFormState());
   const [isSavingProcedure, setIsSavingProcedure] = useState(false);
   const [procedureSuccessMessage, setProcedureSuccessMessage] = useState("");
   const [togglingCode, setTogglingCode] = useState("");
+  const [deletingCode, setDeletingCode] = useState("");
 
   const isAdministrator = user?.role === "administrador";
   const funnel = metrics?.funnel || null;
@@ -269,6 +315,17 @@ export default function AdminDashboardPage() {
     () => procedures.find((item) => item.code === selectedProcedureCode) || null,
     [procedures, selectedProcedureCode]
   );
+  const orderedEventCounts = useMemo(() => {
+    const counts = metrics?.eventCounts || {};
+    return Object.entries(counts).sort((firstEntry, secondEntry) => secondEntry[1] - firstEntry[1]);
+  }, [metrics?.eventCounts]);
+
+  const procedureSummary = useMemo(() => {
+    const total = procedures.length;
+    const active = procedures.filter((item) => item.isActive).length;
+    const inactive = total - active;
+    return { total, active, inactive };
+  }, [procedures]);
 
   useEffect(() => {
     if (user && !isAdministrator) {
@@ -333,7 +390,7 @@ export default function AdminDashboardPage() {
       setProcedureSuccessMessage("");
 
       try {
-        const response = await fetch(`/api/admin/procedures?locale=${locale}`, {
+        const response = await fetch(`/api/admin/procedures?locale=${locale}&includeInactive=true`, {
           signal: abortController.signal,
         });
         const data = await response.json();
@@ -363,11 +420,6 @@ export default function AdminDashboardPage() {
     return () => abortController.abort();
   }, [activeTab, isAdministrator, locale, procedureCopy.loadError, router, user]);
 
-  const orderedEventCounts = useMemo(() => {
-    const counts = metrics?.eventCounts || {};
-    return Object.entries(counts).sort((firstEntry, secondEntry) => secondEntry[1] - firstEntry[1]);
-  }, [metrics?.eventCounts]);
-
   const handleProcedureFieldChange = (fieldName, fieldValue) => {
     setProcedureFormState((previousState) => ({
       ...previousState,
@@ -378,11 +430,21 @@ export default function AdminDashboardPage() {
   const resetProcedureForm = () => {
     setSelectedProcedureCode("");
     setProcedureFormState(createProcedureFormState());
+    setShowProcedureForm(false);
+  };
+
+  const openCreateProcedureForm = () => {
+    setSelectedProcedureCode("");
+    setProcedureFormState(createProcedureFormState());
+    setShowProcedureForm(true);
+    setProcedureSuccessMessage("");
+    setProceduresError("");
   };
 
   const handleSelectProcedureToEdit = (procedure) => {
     setSelectedProcedureCode(procedure.code);
     setProcedureFormState(createProcedureFormState(procedure));
+    setShowProcedureForm(true);
     setProcedureSuccessMessage("");
     setProceduresError("");
   };
@@ -458,12 +520,16 @@ export default function AdminDashboardPage() {
 
           const updated = [...previousProcedures];
           updated[index] = savedProcedure;
-          return updated;
+          return updated.sort((firstItem, secondItem) =>
+            firstItem.name.localeCompare(secondItem.name, locale)
+          );
         });
       }
 
       setProcedureSuccessMessage(isEditMode ? procedureCopy.successSaved : procedureCopy.successCreated);
-      resetProcedureForm();
+      setSelectedProcedureCode("");
+      setProcedureFormState(createProcedureFormState());
+      setShowProcedureForm(false);
     } catch (error) {
       setProceduresError(error.message || procedureCopy.loadError);
     } finally {
@@ -498,9 +564,9 @@ export default function AdminDashboardPage() {
       const savedProcedure = data?.procedure;
       if (savedProcedure) {
         setProcedures((previousProcedures) =>
-          previousProcedures.map((item) =>
-            item.code === savedProcedure.code ? savedProcedure : item
-          )
+          previousProcedures
+            .map((item) => (item.code === savedProcedure.code ? savedProcedure : item))
+            .sort((firstItem, secondItem) => firstItem.name.localeCompare(secondItem.name, locale))
         );
       }
       setProcedureSuccessMessage(procedureCopy.successStatusUpdated);
@@ -508,6 +574,47 @@ export default function AdminDashboardPage() {
       setProceduresError(error.message || procedureCopy.loadError);
     } finally {
       setTogglingCode("");
+    }
+  };
+
+  const handleDeleteProcedure = async (procedure) => {
+    if (!procedure?.code) {
+      return;
+    }
+
+    if (!window.confirm(procedureCopy.confirmDelete)) {
+      return;
+    }
+
+    setProcedureSuccessMessage("");
+    setProceduresError("");
+    setDeletingCode(procedure.code);
+    try {
+      const response = await fetch("/api/admin/procedures", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: procedure.code }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || procedureCopy.loadError);
+      }
+
+      setProcedures((previousProcedures) =>
+        previousProcedures.filter((item) => item.code !== procedure.code)
+      );
+      if (selectedProcedureCode === procedure.code) {
+        setSelectedProcedureCode("");
+        setProcedureFormState(createProcedureFormState());
+        setShowProcedureForm(false);
+      }
+      setProcedureSuccessMessage(procedureCopy.successDeleted);
+    } catch (error) {
+      setProceduresError(error.message || procedureCopy.loadError);
+    } finally {
+      setDeletingCode("");
     }
   };
 
@@ -596,10 +703,7 @@ export default function AdminDashboardPage() {
                 />
                 <MetricCard label={copy.admin.cards.authRequired} value={funnel.authRequired} />
                 <MetricCard label={copy.admin.cards.confirmed} value={funnel.confirmed} />
-                <MetricCard
-                  label={copy.admin.cards.incidentCreated}
-                  value={funnel.incidentCreated}
-                />
+                <MetricCard label={copy.admin.cards.incidentCreated} value={funnel.incidentCreated} />
                 <MetricCard
                   label={copy.admin.cards.incidentCreationConversion}
                   value={formatPercent(funnel.incidentCreationConversion)}
@@ -640,8 +744,8 @@ export default function AdminDashboardPage() {
       ) : (
         <>
           <section className="card dashboard-section">
-            <h2>{procedureCopy.title}</h2>
-            <p className="small">{procedureCopy.description}</p>
+            <h2>{procedureCopy.contextTitle}</h2>
+            <p className="small">{procedureCopy.contextDescription}</p>
           </section>
 
           {procedureSuccessMessage ? (
@@ -656,15 +760,28 @@ export default function AdminDashboardPage() {
             </section>
           ) : null}
 
-          <ProcedureForm
-            mode={selectedProcedure ? "edit" : "create"}
-            copy={procedureCopy}
-            formState={procedureFormState}
-            onFieldChange={handleProcedureFieldChange}
-            onSubmit={submitProcedure}
-            onCancel={resetProcedureForm}
-            isSaving={isSavingProcedure}
-          />
+          <section className="summary-grid">
+            <MetricCard label={procedureCopy.summaryTotal} value={procedureSummary.total} />
+            <MetricCard label={procedureCopy.summaryActive} value={procedureSummary.active} />
+            <MetricCard label={procedureCopy.summaryInactive} value={procedureSummary.inactive} />
+          </section>
+
+          <section className="card dashboard-section admin-procedure-toolbar">
+            <div className="admin-procedure-toolbar__content">
+              <h3>{procedureCopy.catalogTitle}</h3>
+              <p className="small">{procedureCopy.catalogDescription}</p>
+            </div>
+            <div className="admin-procedure-toolbar__actions">
+              <button type="button" className="button-inline" onClick={openCreateProcedureForm}>
+                {procedureCopy.newProcedureCta}
+              </button>
+              {showProcedureForm ? (
+                <button type="button" className="button-inline" onClick={resetProcedureForm}>
+                  {procedureCopy.hideFormCta}
+                </button>
+              ) : null}
+            </div>
+          </section>
 
           {isLoadingProcedures ? (
             <section className="card">
@@ -672,26 +789,63 @@ export default function AdminDashboardPage() {
             </section>
           ) : null}
 
-          {!isLoadingProcedures && !proceduresError ? (
+          {!isLoadingProcedures && !proceduresError && procedures.length ? (
             <section className="card dashboard-section">
-              {procedures.length ? (
-                <ul className="incident-list incident-list--full" aria-label={procedureCopy.listAria}>
-                  {procedures.map((procedure) => (
-                    <ProcedureListItem
-                      key={procedure.code}
-                      procedure={procedure}
-                      copy={procedureCopy}
-                      onEdit={handleSelectProcedureToEdit}
-                      onToggleStatus={handleToggleProcedureStatus}
-                      isToggling={togglingCode === procedure.code}
-                      isSaving={isSavingProcedure}
-                    />
-                  ))}
-                </ul>
-              ) : (
-                <p className="empty-message">{procedureCopy.empty}</p>
-              )}
+              <div className="admin-procedure-table__container" aria-label={procedureCopy.listAria}>
+                <table className="admin-procedure-table">
+                  <thead>
+                    <tr>
+                      <th>{procedureCopy.tableNameHeader}</th>
+                      <th>{procedureCopy.tableCodeHeader}</th>
+                      <th>{procedureCopy.tableCategoryHeader}</th>
+                      <th>{procedureCopy.tableStatusHeader}</th>
+                      <th>{procedureCopy.tableRequiredFieldsHeader}</th>
+                      <th>{procedureCopy.tableUpdatedAtHeader}</th>
+                      <th>{procedureCopy.tableActionsHeader}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {procedures.map((procedure) => (
+                      <ProcedureTableRow
+                        key={procedure.code}
+                        procedure={procedure}
+                        copy={procedureCopy}
+                        onEdit={handleSelectProcedureToEdit}
+                        onToggleStatus={handleToggleProcedureStatus}
+                        onDelete={handleDeleteProcedure}
+                        isDeleting={deletingCode === procedure.code}
+                        isToggling={togglingCode === procedure.code}
+                        isSaving={isSavingProcedure}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
+          ) : null}
+
+          {!isLoadingProcedures && !proceduresError && !procedures.length ? (
+            <section className="card dashboard-section">
+              <p className="empty-message">{procedureCopy.empty}</p>
+              <p className="small">{procedureCopy.createSecondaryDescription}</p>
+              <div className="admin-procedure-item__actions">
+                <button type="button" className="button-inline" onClick={openCreateProcedureForm}>
+                  {procedureCopy.newProcedureCta}
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {showProcedureForm ? (
+            <ProcedureForm
+              mode={selectedProcedure ? "edit" : "create"}
+              copy={procedureCopy}
+              formState={procedureFormState}
+              onFieldChange={handleProcedureFieldChange}
+              onSubmit={submitProcedure}
+              onCancel={resetProcedureForm}
+              isSaving={isSavingProcedure}
+            />
           ) : null}
         </>
       )}
