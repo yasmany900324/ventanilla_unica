@@ -176,6 +176,30 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
   return intentKind === "check_status" && confidence >= 0.6;
 }
 
+function isGenericIncidentStartRequest(text) {
+  const normalized = normalizeIntentLookup(text);
+  if (!normalized) {
+    return false;
+  }
+
+  const genericIncidentSignals = [
+    "quiero crear una incidencia",
+    "quiero reportar una incidencia",
+    "quiero reportar un problema",
+    "quiero crear incidencia",
+    "crear incidencia",
+    "reportar incidencia",
+    "reportar problema",
+    "necesito reportar una incidencia",
+    "necesito crear una incidencia",
+  ];
+  if (genericIncidentSignals.some((signal) => normalized === signal)) {
+    return true;
+  }
+
+  return normalized === "incidencia" || normalized === "problema";
+}
+
 function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
   if (isCompleted) {
     return [
@@ -1046,6 +1070,7 @@ export async function POST(request) {
   }
 
   if (switchToIncident && !isTreeFlowActive(snapshot) && !isProcedureFlowActive(snapshot)) {
+    const isGenericIncidentStart = isGenericIncidentStartRequest(text);
     const seedData = {
       ...EMPTY_COLLECTED_DATA,
       category: "infraestructura",
@@ -1054,7 +1079,7 @@ export async function POST(request) {
     const mergedFromIntent = mergeCollectedDataFromInterpretation({
       collectedData: seedData,
       interpretation,
-      text,
+      text: isGenericIncidentStart ? "" : text,
       currentStep: CHATBOT_CURRENT_STEPS.DESCRIPTION,
     });
     const hasDescription = Boolean(mergedFromIntent.collectedData?.description);
