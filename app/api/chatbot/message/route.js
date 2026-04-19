@@ -269,6 +269,35 @@ function buildClarificationActionOptions() {
   ];
 }
 
+function buildStatusActionOptions() {
+  return [
+    {
+      label: "Ver mis incidencias",
+      command: "none",
+      value: "Quiero ver mis incidencias.",
+      commandField: null,
+    },
+    {
+      label: "Consultar con número de ticket",
+      command: "none",
+      value: "Quiero consultar con mi número de ticket.",
+      commandField: null,
+    },
+    {
+      label: "Iniciar trámite",
+      command: "none",
+      value: "Quiero iniciar un trámite.",
+      commandField: null,
+    },
+    {
+      label: "Reportar incidencia",
+      command: "none",
+      value: "Quiero reportar una incidencia.",
+      commandField: null,
+    },
+  ];
+}
+
 function buildStatusReply() {
   return "Entiendo. Te ayudo a consultar el estado de tu solicitud. Puedes revisar tus casos en 'Mis incidencias' o indicarme el número de ticket para orientarte.";
 }
@@ -291,7 +320,9 @@ function buildChatResponse({
   const missingFields =
     mode === "procedure"
       ? getProcedureMissingFields(collectedData)
-      : getRequiredMissingFields(collectedData);
+      : mode === "incident"
+        ? getRequiredMissingFields(collectedData)
+        : [];
 
   return NextResponse.json({
     sessionId,
@@ -828,7 +859,7 @@ export async function POST(request) {
       locale: effectiveLocale,
       replyText: buildStatusReply(),
       snapshot: statusSnapshot,
-      actionOptions: buildClarificationActionOptions(),
+      actionOptions: buildStatusActionOptions(),
       nextStepType: "check_status",
       nextStepField: null,
       redirectTo: "/mis-incidencias",
