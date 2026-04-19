@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
@@ -474,6 +474,8 @@ function ChatComposer({
 
 export default function AssistantChatPage() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const { locale } = useLocale();
   const uiCopy = getLocaleCopy(locale).chat;
   const entryContext = useMemo(() => getChatEntryContext(searchParams), [searchParams]);
@@ -493,6 +495,7 @@ export default function AssistantChatPage() {
 
     return `${entryContext.type}|${entryContext.id}|${entryContext.title}`;
   }, [entryContext]);
+  const restartKey = useMemo(() => normalizeContextParam(searchParams.get("restart"), 8), [searchParams]);
   const quickPrompts = uiCopy.quickPrompts;
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -596,6 +599,34 @@ export default function AssistantChatPage() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (restartKey !== "1") {
+      return;
+    }
+
+    safeRemoveLocalStorageItem(SESSION_ID_STORAGE_KEY);
+    safeRemoveLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
+    safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
+    contextualPromptSentRef.current = "";
+    lastFailedInputRef.current = {
+      rawValue: "",
+      command: DEFAULT_CHAT_COMMAND,
+      commandField: null,
+    };
+    setSessionId("");
+    setSessionLocale("");
+    setInputValue("");
+    setIsSending(false);
+    setServiceError(false);
+    setMessages([
+      createLocalMessage({
+        sender: "bot",
+        text: contextualWelcomeMessage,
+      }),
+    ]);
+    router.replace(pathname || "/asistente");
+  }, [contextualWelcomeMessage, pathname, restartKey, router]);
 
   const canSend = useMemo(() => {
     return Boolean(normalizeInput(inputValue)) && !isSending;

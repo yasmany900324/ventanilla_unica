@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import InstitutionalLogo from "./InstitutionalLogo";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
@@ -139,6 +140,8 @@ function Icon({ name }) {
 export default function PortalShell({ children }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const { locale, setLocale } = useLocale();
+  const pathname = usePathname();
+  const router = useRouter();
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
   const isAdministrator = user?.role === "administrador";
@@ -252,6 +255,16 @@ export default function PortalShell({ children }) {
     observer.observe(footerNode);
     return () => observer.disconnect();
   }, []);
+  const handleFloatingChatClick = useCallback(
+    (event) => {
+      if (pathname !== "/asistente") {
+        return;
+      }
+      event.preventDefault();
+      router.replace("/asistente?restart=1");
+    },
+    [pathname, router]
+  );
 
   return (
     <div className="app-shell">
@@ -463,6 +476,7 @@ export default function PortalShell({ children }) {
         href={assistantHref}
         className={`floating-chat-button${isFooterVisible ? " floating-chat-button--footer-aware" : ""}`}
         aria-label={copy.portal.floatingChatLabel}
+        onClick={handleFloatingChatClick}
       >
         <span className="floating-chat-button__icon" aria-hidden="true">
           +
