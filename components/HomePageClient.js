@@ -123,6 +123,64 @@ export default function HomePageClient() {
       </nav>
 
       <section className="home-hero" aria-labelledby="titulo-home">
+        <div className="home-hero__illustration" aria-hidden="true">
+          <svg viewBox="0 0 440 360" className="home-hero-illustration" role="presentation">
+            <g opacity="0.28" stroke="#cfe2ff" strokeWidth="2.2" fill="none" strokeLinecap="round">
+              <path d="M24 314h392" />
+              <path d="M34 274h54v40H34z" />
+              <path d="M96 246h66v68H96z" />
+              <path d="M170 222h54v92h-54z" />
+              <path d="M232 248h38v66h-38z" />
+              <path d="M278 230h52v84h-52z" />
+              <path d="M338 254h44v60h-44z" />
+              <rect x="52" y="160" width="92" height="52" rx="10" />
+              <path d="M72 184h48" />
+              <path d="M72 198h34" />
+              <path d="M328 172l20 20 36-34" />
+              <rect x="306" y="148" width="92" height="68" rx="14" />
+              <path d="M292 126c8-16 24-26 42-26 10 0 19 3 27 9" />
+              <path d="M232 140h22" />
+              <path d="M220 174h34" />
+            </g>
+            <g transform="translate(214 50)">
+              <ellipse cx="72" cy="250" rx="84" ry="22" fill="#b7d1ff" opacity="0.28" />
+              <path
+                d="M26 112c0-32 21-57 46-57s46 25 46 57v24H26z"
+                fill="#f3f8ff"
+                stroke="#9fc0f4"
+                strokeWidth="3"
+              />
+              <rect
+                x="37"
+                y="114"
+                width="70"
+                height="62"
+                rx="20"
+                fill="#ffffff"
+                stroke="#8fb3ee"
+                strokeWidth="3"
+              />
+              <circle cx="58" cy="142" r="6.8" fill="#2f66bf" />
+              <circle cx="86" cy="142" r="6.8" fill="#2f66bf" />
+              <path d="M57 162c7 7 23 7 30 0" stroke="#2f66bf" strokeWidth="4.5" strokeLinecap="round" />
+              <path
+                d="M8 132c0-27 16-48 38-56m108 56c0-27-16-48-38-56"
+                stroke="#8db2f1"
+                strokeWidth="7"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <rect x="-4" y="130" width="18" height="32" rx="9" fill="#d9e8ff" />
+              <rect x="142" y="130" width="18" height="32" rx="9" fill="#d9e8ff" />
+              <path
+                d="M52 176h40v38c0 10-8 18-18 18h-4c-10 0-18-8-18-18z"
+                fill="#dbe9ff"
+                stroke="#8fb3ee"
+                strokeWidth="3"
+              />
+            </g>
+          </svg>
+        </div>
         <div className="home-hero__content">
           <span className="home-hero__kicker">{copy.home.kicker}</span>
           <h1 id="titulo-home">{copy.home.title}</h1>
