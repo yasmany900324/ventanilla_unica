@@ -18,20 +18,27 @@ import { detectLocaleFromText } from "../../../../lib/languageDetection";
 import { createIncident } from "../../../../lib/incidents";
 import {
   FLOW_KEY_TREE,
+  FLOW_KEY_PROCEDURE,
   buildAuthRequiredReply,
   buildCancelledIncidentReply,
   buildConfirmationActionOptions,
   buildIncidentCreatedReply,
   buildIncidentResumeReply,
+  buildProcedureDetailsReply,
+  buildProcedureStartReply,
+  buildProcedureSummaryReply,
   buildPhotoActionOptions,
   buildQuestionForStep,
   buildTreeFlowSeedFromContext,
   createTreeFlowSnapshotPatch,
   getNextTreeFlowStep,
+  isProcedureFlowActive,
   isTreeFlowActive,
   mergeCollectedDataFromInterpretation,
   parseUserCommandFromText,
   shouldActivateTreeFlow,
+  shouldSwitchToProcedureFlow,
+  createProcedureFlowSnapshotPatch,
 } from "../../../../lib/chatbotConversationOrchestrator";
 import {
   CHATBOT_FUNNEL_STEPS,
@@ -49,6 +56,8 @@ const EMPTY_COLLECTED_DATA = {
   description: "",
   risk: "",
   photoStatus: "not_requested",
+  procedureName: "",
+  procedureDetails: "",
 };
 
 function getDefaultSnapshot() {
@@ -99,7 +108,69 @@ function buildModeFromSnapshot(snapshot) {
   if (snapshot?.flowKey === FLOW_KEY_TREE) {
     return "incident";
   }
+  if (snapshot?.flowKey === FLOW_KEY_PROCEDURE) {
+    return "procedure";
+  }
   return "unknown";
+}
+
+function getProcedureMissingFields(collectedData) {
+  const missing = [];
+  if (!collectedData?.procedureName) {
+    missing.push("procedureName");
+  }
+  if (!collectedData?.procedureDetails) {
+    missing.push("procedureDetails");
+  }
+  return missing;
+}
+
+function isMeaningfulProcedureName(text) {
+  if (!text || typeof text !== "string") {
+    return false;
+  }
+
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const genericProcedurePhrases = new Set([
+    "quiero iniciar un tramite",
+    "necesito hacer un tramite",
+    "iniciar tramite",
+    "iniciar un tramite",
+    "hacer un tramite",
+    "tramite",
+    "trámite",
+    "necesito iniciar un tramite",
+  ]);
+  return !genericProcedurePhrases.has(normalized);
+}
+
+function normalizeProcedureText(value, maxLength = 320) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function buildProcedureActionOptions() {
+  return [
+    {
+      label: "Reportar incidencia",
+      command: "none",
+      value: "Quiero reportar un problema de árbol caído",
+      commandField: null,
+    },
+  ];
 }
 
 function buildChatResponse({
@@ -116,7 +187,11 @@ function buildChatResponse({
   incident = null,
 }) {
   const collectedData = snapshot?.collectedData || EMPTY_COLLECTED_DATA;
-  const missingFields = getRequiredMissingFields(collectedData);
+  const mode = buildModeFromSnapshot(snapshot);
+  const missingFields =
+    mode === "procedure"
+      ? getProcedureMissingFields(collectedData)
+      : getRequiredMissingFields(collectedData);
 
   return NextResponse.json({
     sessionId,
@@ -127,7 +202,7 @@ function buildChatResponse({
     fulfillmentMessages: [],
     action: snapshot?.lastAction || null,
     parameters: {},
-    mode: buildModeFromSnapshot(snapshot),
+    mode,
     draft: {
       ...collectedData,
       missingFields,
@@ -629,6 +704,248 @@ export async function POST(request) {
     }
   }
 
+  const switchToProcedure =
+    shouldSwitchToProcedureFlow({ text, interpretation }) && !isProcedureFlowActive(snapshot);
+  if (switchToProcedure) {
+    const normalizedText = normalizeProcedureText(text, 320);
+    const normalizedProcedureName = normalizeProcedureText(normalizedText, 160);
+    const currentProcedureName = snapshot?.collectedData?.procedureName || "";
+    const currentProcedureDetails = snapshot?.collectedData?.procedureDetails || "";
+    const procedureName =
+      currentProcedureName ||
+      (isMeaningfulProcedureName(normalizedProcedureName) ? normalizedProcedureName : "");
+    const procedureDetails = currentProcedureDetails || "";
+    const procedureMissing = getProcedureMissingFields({
+      procedureName,
+      procedureDetails,
+    });
+    const procedureStep =
+      procedureMissing[0] === "procedureDetails" ? CHATBOT_CURRENT_STEPS.DESCRIPTION : CHATBOT_CURRENT_STEPS.LOCATION;
+    const procedureSnapshot = await setConversationState(
+      sessionId,
+      createProcedureFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: {
+          ...EMPTY_COLLECTED_DATA,
+          procedureName,
+          procedureDetails,
+        },
+        currentStep: procedureStep,
+        confirmationState: "none",
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "switch_to_procedure",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      })
+    );
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+      mode: "procedure",
+      outcome: snapshot?.flowKey === FLOW_KEY_TREE ? "switch_incident_to_procedure" : "procedure_text_detection",
+    });
+    const procedureReply =
+      procedureMissing[0] === "procedureDetails"
+        ? buildProcedureDetailsReply(procedureName)
+        : buildProcedureStartReply();
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: procedureReply,
+      snapshot: procedureSnapshot,
+      actionOptions: buildProcedureActionOptions(),
+      nextStepType: "ask_field",
+      nextStepField: procedureMissing[0] || "procedureName",
+      needsClarification: false,
+    });
+  }
+
+  if (isProcedureFlowActive(snapshot)) {
+    const procedureSwitchToIncident = shouldActivateTreeFlow({
+      interpretation,
+      text,
+      contextEntry,
+    });
+    if (procedureSwitchToIncident) {
+      const treeSeed = {
+        ...EMPTY_COLLECTED_DATA,
+        category: "infraestructura",
+        subcategory: "arbol_caido_ramas_peligrosas",
+      };
+      const mergedFromSwitch = mergeCollectedDataFromInterpretation({
+        collectedData: treeSeed,
+        interpretation,
+        text,
+        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+      });
+      const nextTreeStep = getNextTreeFlowStep(mergedFromSwitch.collectedData);
+      const switchedSnapshot = await setConversationState(
+        sessionId,
+        createTreeFlowSnapshotPatch({
+          locale: effectiveLocale,
+          userId: authenticatedUser?.id || snapshot.userId || null,
+          collectedData: mergedFromSwitch.collectedData,
+          currentStep: nextTreeStep,
+          confirmationState:
+            nextTreeStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none",
+          lastInterpretation: interpretation,
+          lastIntent: "report_incident",
+          lastAction: "switch_to_incident",
+          lastConfidence: interpretation?.intent?.confidence || null,
+        })
+      );
+      await trackEvent({
+        eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+        mode: "incident",
+        outcome: "switch_procedure_to_incident",
+      });
+
+      if (nextTreeStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
+        return buildChatResponse({
+          sessionId,
+          locale: effectiveLocale,
+          replyText: buildIncidentResumeReply(mergedFromSwitch.collectedData),
+          snapshot: switchedSnapshot,
+          actionOptions: buildConfirmationActionOptions(),
+          nextStepType: "confirm_incident",
+          nextStepField: null,
+        });
+      }
+
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildQuestionForStep({
+          step: nextTreeStep,
+          suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
+        }),
+        snapshot: switchedSnapshot,
+        actionOptions:
+          nextTreeStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+        nextStepType: "ask_field",
+        nextStepField: nextTreeStep,
+      });
+    }
+
+    const normalizedText = typeof text === "string" ? text.replace(/\s+/g, " ").trim() : "";
+    const procedureData = {
+      ...snapshot.collectedData,
+      procedureName: snapshot.collectedData?.procedureName || "",
+      procedureDetails: snapshot.collectedData?.procedureDetails || "",
+    };
+    let hasProcedureUpdate = false;
+    if (normalizedText) {
+      if (!procedureData.procedureName) {
+        if (isMeaningfulProcedureName(normalizedText)) {
+          procedureData.procedureName = normalizeProcedureText(normalizedText, 160);
+          hasProcedureUpdate = true;
+        }
+      } else if (!procedureData.procedureDetails) {
+        procedureData.procedureDetails = normalizeProcedureText(normalizedText, 320);
+        hasProcedureUpdate = true;
+      } else if (effectiveCommand === "edit_field" && effectiveCommandField === "description") {
+        procedureData.procedureDetails = normalizeProcedureText(normalizedText, 320);
+        hasProcedureUpdate = true;
+      } else if (effectiveCommand === "edit_field" && effectiveCommandField === "location") {
+        procedureData.procedureName = normalizeProcedureText(normalizedText, 160);
+        hasProcedureUpdate = true;
+      }
+    }
+
+    const procedureMissing = getProcedureMissingFields(procedureData);
+    const procedureStep =
+      procedureMissing[0] === "procedureDetails"
+        ? CHATBOT_CURRENT_STEPS.DESCRIPTION
+        : procedureMissing[0] === "procedureName"
+          ? CHATBOT_CURRENT_STEPS.LOCATION
+          : CHATBOT_CURRENT_STEPS.CONFIRMATION;
+    const updatedProcedureSnapshot = await setConversationState(
+      sessionId,
+      createProcedureFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: procedureData,
+        currentStep: procedureStep,
+        confirmationState: procedureMissing.length > 0 ? "none" : "ready",
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: effectiveCommand === "none" ? "message" : effectiveCommand,
+        lastConfidence: interpretation?.intent?.confidence || null,
+      })
+    );
+
+    if (procedureMissing.length === 0) {
+      const replyText = hasProcedureUpdate
+        ? buildProcedureSummaryReply({
+            procedureName: procedureData.procedureName,
+            procedureDetails: procedureData.procedureDetails,
+          })
+        : "Ya tengo la información inicial del trámite. Siguiente acción: te indicaré cómo continuar con la clasificación específica, o puedes decirme si prefieres reportar una incidencia.";
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText,
+        snapshot: updatedProcedureSnapshot,
+        actionOptions: buildProcedureActionOptions(),
+        nextStepType: "procedure_guided",
+        nextStepField: null,
+      });
+    }
+
+    const procedureReply =
+      procedureMissing[0] === "procedureName"
+        ? buildProcedureStartReply()
+        : buildProcedureDetailsReply(procedureData.procedureName);
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: procedureReply,
+      snapshot: updatedProcedureSnapshot,
+      actionOptions: buildProcedureActionOptions(),
+      nextStepType: "ask_field",
+      nextStepField: procedureMissing[0],
+    });
+  }
+
+  if (
+    isTreeFlowActive(snapshot) &&
+    interpretation?.intent?.kind === "start_procedure" &&
+    (interpretation?.intent?.confidence || 0) >= 0.6
+  ) {
+    const procedureSnapshot = await setConversationState(
+      sessionId,
+      createProcedureFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: {
+          ...EMPTY_COLLECTED_DATA,
+          procedureName: "",
+          procedureDetails: "",
+        },
+        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+        confirmationState: "none",
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "switch_incident_to_procedure",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      })
+    );
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.FLOW_ACTIVATED,
+      mode: "procedure",
+      outcome: "switch_incident_to_procedure_by_llm",
+    });
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildProcedureStartReply(),
+      snapshot: procedureSnapshot,
+      actionOptions: buildProcedureActionOptions(),
+      nextStepType: "ask_field",
+      nextStepField: "procedureName",
+    });
+  }
+
   if (!isTreeFlowActive(snapshot)) {
     const shouldActivate = shouldActivateTreeFlow({
       interpretation,
@@ -655,7 +972,7 @@ export async function POST(request) {
         sessionId,
         locale: effectiveLocale,
         replyText:
-          "Puedo ayudarte con reportes de Árbol caído / ramas peligrosas. Si quieres, cuéntame directamente la ubicación para empezar.",
+          "Puedo ayudarte a reportar una incidencia o a iniciar un trámite. Dime qué quieres hacer y te guío con el siguiente paso.",
         snapshot: {
           ...snapshot,
           locale: effectiveLocale,
