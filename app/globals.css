@@ -1681,6 +1681,121 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
+.admin-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-tabs__button {
+  background: #eef2ff;
+  color: #1e3a8a;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-tabs__button:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.admin-tabs__button--active {
+  background: #1e40af;
+  color: #ffffff;
+  border-color: #1e40af;
+}
+
+.admin-procedures-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.15fr);
+  gap: 1rem;
+}
+
+.admin-procedure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-procedure-item {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #ffffff;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-procedure-item__title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.admin-procedure-item__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-procedure-item__meta {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.86rem;
+}
+
+.admin-procedure-item__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-procedure-item__tag {
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+}
+
+.admin-procedure-item__actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.admin-procedure-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-procedure-form__row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-procedure-form__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-procedure-form__textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .admin-procedures-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .recent-incidents-card {
   margin-bottom: 1rem;
 }
