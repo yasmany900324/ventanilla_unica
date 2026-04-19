@@ -26,14 +26,32 @@ function resolveCardType(item) {
   return "tramite";
 }
 
+function resolveIncidentCategory(item) {
+  const icon = typeof item?.icon === "string" ? item.icon.toUpperCase().trim() : "";
+  if (icon === "AP") {
+    return "alumbrado";
+  }
+  if (icon === "CD") {
+    return "limpieza";
+  }
+  if (icon === "AR") {
+    return "infraestructura";
+  }
+  return "otro";
+}
+
 function buildAssistantCardHref(item) {
+  const cardType = resolveCardType(item);
   const params = new URLSearchParams();
-  params.set("type", resolveCardType(item));
+  params.set("type", cardType);
   params.set("id", normalizeCardId(item?.title || "") || "item");
   params.set("title", item?.title || "");
 
   if (item?.description) {
     params.set("description", item.description);
+  }
+  if (cardType === "incidencia") {
+    params.set("category", resolveIncidentCategory(item));
   }
 
   return `/asistente?${params.toString()}`;

@@ -32,6 +32,7 @@ import {
 } from "../../../../lib/chatbotIntentRoutes";
 import {
   computeMissingIncidentFields,
+  inferIncidentCategoryFromText,
   normalizeIncidentDraft,
 } from "../../../../lib/chatbotIncidentMapper";
 import {
@@ -48,8 +49,46 @@ const EMPTY_INCIDENT_DRAFT = {
   description: "",
   location: "",
 };
-
 export const runtime = "nodejs";
+
+function getContextualReply({ contextEntry, locale }) {
+  const kindLabel = contextEntry.kind === "tramite" ? "tramite" : "incidencia";
+  if (locale === "en") {
+    if (kindLabel === "tramite") {
+      return `I understand you want to start the ${contextEntry.title} procedure. I will guide you step by step to begin.`;
+    }
+    return `I understand you want to report an incident of type ${contextEntry.title}. I will help you provide the required information.`;
+  }
+  if (locale === "pt") {
+    if (kindLabel === "tramite") {
+      return `Entendo que você deseja iniciar o trâmite de ${contextEntry.title}. Vou guiar você passo a passo para começar.`;
+    }
+    return `Entendo que você deseja reportar uma ocorrência do tipo ${contextEntry.title}. Vou ajudar você a registrar as informações necessárias.`;
+  }
+  if (kindLabel === "tramite") {
+    return `Entiendo que deseas iniciar el trámite de ${contextEntry.title}. Te voy a guiar paso a paso para comenzar.`;
+  }
+  return `Entiendo que deseas reportar una incidencia de tipo ${contextEntry.title}. Voy a ayudarte a registrar la información necesaria.`;
+}
+
+function getContextualNextPrompt({ contextEntry, locale }) {
+  if (locale === "en") {
+    if (contextEntry.kind === "tramite") {
+      return "To guide you better, tell me briefly what you need this procedure for.";
+    }
+    return "Please share the exact location where this is happening.";
+  }
+  if (locale === "pt") {
+    if (contextEntry.kind === "tramite") {
+      return "Para orientar melhor, conte em uma frase para que você precisa deste trâmite.";
+    }
+    return "Por favor, informe a localização exata onde isso está acontecendo.";
+  }
+  if (contextEntry.kind === "tramite") {
+    return "Para orientarte mejor, cuéntame en una frase para qué necesitas este trámite.";
+  }
+  return "Por favor, indícame la ubicación exacta donde está ocurriendo.";
+}
 
 export async function GET() {
   return NextResponse.json(
@@ -75,7 +114,7 @@ export async function POST(request) {
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
   }
 
-  const { text, sessionId, preferredLocale, command } = validationResult.value;
+  const { text, sessionId, preferredLocale, command, contextEntry } = validationResult.value;
 
   const headerLocale = normalizeLocale(request.headers.get("accept-language"));
   const persistedSessionSnapshot =
@@ -112,6 +151,87 @@ export async function POST(request) {
     mode: "unknown",
     details: text ? "user_turn_with_text" : "user_turn_command_only",
   });
+
+  if ((command === "start_contextual_flow" || command === "start_contextual_entry") && contextEntry) {
+    const effectiveContextLocale = "es";
+    const nextPrompt = getContextualNextPrompt({
+      contextEntry,
+      locale: effectiveContextLocale,
+    });
+    const seededCategory =
+      contextEntry.kind === "incidencia"
+        ? contextEntry.category ||
+          inferIncidentCategoryFromText(`${contextEntry.title} ${contextEntry.description}`) ||
+          "infraestructura"
+        : "";
+    const seededDescription =
+      contextEntry.kind === "incidencia" && contextEntry.description
+        ? contextEntry.description
+        : "";
+    const seededDraft =
+      contextEntry.kind === "incidencia"
+        ? normalizeIncidentDraft({
+            category: seededCategory,
+            description: seededDescription,
+            location: "",
+          })
+        : EMPTY_INCIDENT_DRAFT;
+    const nextField =
+      contextEntry.kind === "incidencia"
+        ? computeMissingIncidentFields(seededDraft)[0] || "location"
+        : null;
+    const mode = contextEntry.kind === "incidencia" ? "incident" : "procedure";
+
+    await setConversationState(sessionId, {
+      locale: effectiveContextLocale,
+      state:
+        contextEntry.kind === "incidencia"
+          ? CHATBOT_CONVERSATION_STATES.COLLECTING_INCIDENT
+          : CHATBOT_CONVERSATION_STATES.GUIDING_PROCEDURE,
+      draft: seededDraft,
+      pendingField: nextField,
+      lastIntent: contextEntry.kind === "incidencia" ? "crear_incidencia" : "iniciar_tramite",
+      lastAction: "start_contextual_entry",
+      lastConfidence: null,
+    });
+    await trackEvent({
+      eventName: CHATBOT_TELEMETRY_EVENTS.MODE_RESOLVED,
+      mode,
+      action: "start_contextual_entry",
+      outcome: "context_initialized",
+      details: contextEntry.kind,
+    });
+
+    return NextResponse.json({
+      sessionId,
+      locale: effectiveContextLocale,
+      replyText: nextPrompt,
+      intent: contextEntry.kind === "incidencia" ? "crear_incidencia" : "iniciar_tramite",
+      confidence: null,
+      fulfillmentMessages: [],
+      action: "start_contextual_entry",
+      parameters: {},
+      mode,
+      draft: {
+        ...seededDraft,
+        missingFields: computeMissingIncidentFields(seededDraft),
+      },
+      nextStep:
+        contextEntry.kind === "incidencia"
+          ? {
+              type: "ask_field",
+              field: nextField || "location",
+            }
+          : {
+              type: "redirect",
+              field: null,
+            },
+      actionOptions: [],
+      redirectTo: null,
+      redirectLabel: null,
+      needsClarification: false,
+    });
+  }
 
   if (command === "cancel_incident") {
     await clearIncidentDraft(sessionId);
