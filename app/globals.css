@@ -1086,7 +1086,7 @@ h3 {
   font-size: clamp(1.88rem, 3.3vw, 2.62rem);
   line-height: 1.13;
   letter-spacing: -0.01em;
-  max-width: 20ch;
+  max-width: 36ch;
 }
 
 .home-hero > .home-hero__content > p {
