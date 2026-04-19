@@ -1098,7 +1098,7 @@ h3 {
 
 .home-hero__actions {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.62rem;
   margin-top: 0.5rem;
 }
