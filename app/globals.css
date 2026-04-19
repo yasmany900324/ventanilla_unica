@@ -1062,7 +1062,8 @@ h3 {
   display: grid;
   gap: 0.95rem;
   align-content: flex-start;
-  max-width: min(100%, 740px);
+  width: 100%;
+  max-width: none;
 }
 
 .home-hero__kicker {
