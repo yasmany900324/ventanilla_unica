@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "eslint": "latest",
-    "eslint-config-next": "latest"
+    "eslint-config-next": "latest",
+    "vitest": "^4.1.4"
   }
 }
