@@ -310,27 +310,37 @@ export default function PortalShell({ children }) {
             <div className="portal-header__actions">
               {hasActiveSession ? (
                 <>
-                  <span className="portal-user-chip">
-                    {copy.portal.greeting}, {shortName}
-                  </span>
-                  <Link href="/ciudadano/dashboard" className="portal-action-link">
+                  <Link href="/ciudadano/dashboard" className="portal-action-link portal-action-link--primary">
                     {copy.portal.mySpace}
                   </Link>
-                  {isAdministrator ? (
-                    <Link href="/admin/dashboard" className="portal-action-link">
-                      {copy.portal.adminDashboard}
-                    </Link>
-                  ) : null}
-                  <div className="portal-action-form">
-                    <button
-                      type="button"
-                      className="portal-action-button"
-                      onClick={handleLogout}
-                      disabled={isLoadingAuth}
-                    >
-                      {isLoadingAuth ? copy.portal.loggingOut : copy.portal.logout}
-                    </button>
-                  </div>
+                  <details className="portal-user-menu">
+                    <summary className="portal-user-menu__trigger">
+                      <span className="portal-user-menu__name">
+                        {copy.portal.greeting}, {shortName}
+                      </span>
+                      <span className="portal-user-menu__chevron" aria-hidden="true">
+                        ▾
+                      </span>
+                    </summary>
+                    <div className="portal-user-menu__panel">
+                      <Link href="/mis-incidencias" className="portal-user-menu__link">
+                        {copy.nav.myCases}
+                      </Link>
+                      {isAdministrator ? (
+                        <Link href="/admin/dashboard" className="portal-user-menu__link">
+                          {copy.portal.adminDashboard}
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="portal-user-menu__logout"
+                        onClick={handleLogout}
+                        disabled={isLoadingAuth}
+                      >
+                        {isLoadingAuth ? copy.portal.loggingOut : copy.portal.logout}
+                      </button>
+                    </div>
+                  </details>
                 </>
               ) : (
                 <>
