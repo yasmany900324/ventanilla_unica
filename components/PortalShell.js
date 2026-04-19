@@ -15,24 +15,6 @@ const TOPBAR_LINKS = [
 
 const LANGUAGE_LINKS = ["es", "pt", "en"];
 
-const PUBLIC_MOBILE_NAV = [
-  { href: "/", labelKey: "home", icon: "home" },
-  { href: "/login", labelKey: "login", icon: "login" },
-  { href: "/registro", labelKey: "account", icon: "register" },
-  { href: "/#ayuda-soporte", labelKey: "help", icon: "help" },
-];
-
-const AUTH_MOBILE_NAV = [
-  { href: "/", labelKey: "home", icon: "home" },
-  {
-    href: "/mis-incidencias",
-    labelKey: "myCases",
-    icon: "cases",
-  },
-  { href: "/asistente", labelKey: "newCase", icon: "plus" },
-  { href: "/ciudadano/dashboard#detalle-caso", labelKey: "profile", icon: "profile" },
-];
-
 const FOOTER_LINK_GROUPS = [
   {
     titleKey: "onlineServices",
@@ -137,6 +119,16 @@ function Icon({ name }) {
   );
 }
 
+function getIsMobileItemActive(pathname, href) {
+  if (!href || href.startsWith("/#")) {
+    return false;
+  }
+  if (href === "/") {
+    return pathname === "/";
+  }
+  return pathname === href || pathname?.startsWith(`${href}/`);
+}
+
 export default function PortalShell({ children }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const { locale, setLocale } = useLocale();
@@ -170,30 +162,96 @@ export default function PortalShell({ children }) {
     ],
     [copy.nav.help, copy.nav.home, copy.nav.myCases, copy.nav.newRequest, hasActiveSession]
   );
-  const mobileNav = useMemo(() => {
+  const mobilePrimaryNav = useMemo(
+    () => [
+      {
+        key: "home",
+        href: "/",
+        label: copy.portal.mobile.home,
+        icon: "home",
+        isActive: pathname === "/",
+      },
+      {
+        key: "cases",
+        href: hasActiveSession ? "/mis-incidencias" : "/login",
+        label: copy.portal.mobile.myCases,
+        icon: "cases",
+        isActive: pathname === "/mis-incidencias",
+      },
+      {
+        key: "new",
+        href: hasActiveSession ? assistantHref : "/login",
+        label: copy.portal.mobile.newCase,
+        icon: "plus",
+        isActive: pathname === "/asistente",
+      },
+      {
+        key: "help",
+        href: "/#ayuda-soporte",
+        label: copy.portal.mobile.help,
+        icon: "help",
+        isActive: false,
+      },
+    ],
+    [assistantHref, copy.portal.mobile.help, copy.portal.mobile.home, copy.portal.mobile.myCases, copy.portal.mobile.newCase, hasActiveSession, pathname]
+  );
+  const mobileOverflowItems = useMemo(() => {
     if (!hasActiveSession) {
-      return PUBLIC_MOBILE_NAV.map((item) => ({
-        ...item,
-        label: copy.portal.mobile[item.labelKey],
-      }));
+      return [
+        {
+          key: "login",
+          type: "link",
+          href: "/login",
+          label: copy.portal.mobile.login,
+          icon: "login",
+        },
+        {
+          key: "account",
+          type: "link",
+          href: "/registro",
+          label: copy.portal.mobile.account,
+          icon: "register",
+        },
+      ];
     }
 
-    const authenticatedNav = AUTH_MOBILE_NAV.map((item) => ({
-      ...item,
-      label: copy.portal.mobile[item.labelKey],
-    }));
-
+    const authenticatedItems = [
+      {
+        key: "space",
+        type: "link",
+        href: "/ciudadano/dashboard",
+        label: copy.portal.mobile.mySpace,
+        icon: "profile",
+      },
+    ];
     if (isAdministrator) {
-      authenticatedNav.push({
+      authenticatedItems.push({
+        key: "admin",
+        type: "link",
         href: "/admin/dashboard",
-        labelKey: "profile",
         label: copy.portal.adminDashboard,
         icon: "cases",
       });
     }
-
-    return authenticatedNav;
-  }, [copy.portal.adminDashboard, copy.portal.mobile, hasActiveSession, isAdministrator]);
+    authenticatedItems.push({
+      key: "logout",
+      type: "button",
+      label: isLoadingAuth ? copy.portal.mobile.exiting : copy.portal.logout,
+      icon: "login",
+      disabled: isLoadingAuth,
+    });
+    return authenticatedItems;
+  }, [
+    copy.portal.adminDashboard,
+    copy.portal.logout,
+    copy.portal.mobile.account,
+    copy.portal.mobile.exiting,
+    copy.portal.mobile.login,
+    copy.portal.mobile.mySpace,
+    hasActiveSession,
+    isAdministrator,
+    isLoadingAuth,
+  ]);
   const topbarLinks = useMemo(
     () =>
       TOPBAR_LINKS.map((item) => ({
@@ -227,6 +285,7 @@ export default function PortalShell({ children }) {
     helpSupport: false,
     institutionalInfo: false,
   });
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const footerRef = useRef(null);
   const [isFooterVisible, setIsFooterVisible] = useState(false);
   const toggleMobileFooterGroup = useCallback((groupKey) => {
@@ -264,6 +323,19 @@ export default function PortalShell({ children }) {
       router.replace("/asistente?restart=1");
     },
     [pathname, router]
+  );
+  const handleMobileMoreToggle = useCallback(() => {
+    setIsMobileMoreOpen((previousState) => !previousState);
+  }, []);
+  const handleMobileOverflowItemClick = useCallback(
+    async (item) => {
+      setIsMobileMoreOpen(false);
+      if (item.type !== "button") {
+        return;
+      }
+      await handleLogout();
+    },
+    [handleLogout]
   );
 
   return (
@@ -485,9 +557,15 @@ export default function PortalShell({ children }) {
 
       <nav className="mobile-bottom-nav" aria-label={copy.portal.mobileNavAriaLabel}>
         <ul className="mobile-bottom-nav__list">
-          {mobileNav.map((item) => (
-            <li key={item.label}>
-              <Link href={item.href} className="mobile-bottom-nav__link">
+          {mobilePrimaryNav.map((item) => (
+            <li key={item.key}>
+              <Link
+                href={item.href}
+                className={`mobile-bottom-nav__link${
+                  item.isActive ? " mobile-bottom-nav__link--active" : ""
+                }`}
+                onClick={() => setIsMobileMoreOpen(false)}
+              >
                 <span className="mobile-bottom-nav__icon">
                   <Icon name={item.icon} />
                 </span>
@@ -495,25 +573,76 @@ export default function PortalShell({ children }) {
               </Link>
             </li>
           ))}
-          {hasActiveSession ? (
-            <li>
-              <div className="mobile-bottom-nav__form">
-                <button
-                  type="button"
-                  className="mobile-bottom-nav__link mobile-bottom-nav__button"
-                  onClick={handleLogout}
-                  disabled={isLoadingAuth}
-                >
-                  <span className="mobile-bottom-nav__icon">
-                    <Icon name="login" />
-                  </span>
-                  <span className="mobile-bottom-nav__label">
-                    {isLoadingAuth ? copy.portal.mobile.exiting : copy.portal.mobile.exit}
-                  </span>
-                </button>
-              </div>
-            </li>
-          ) : null}
+          <li className="mobile-bottom-nav__item--more">
+            <div className="mobile-bottom-nav__more-wrap">
+              <button
+                type="button"
+                className={`mobile-bottom-nav__link mobile-bottom-nav__button${
+                  isMobileMoreOpen ? " mobile-bottom-nav__link--active" : ""
+                }`}
+                onClick={handleMobileMoreToggle}
+                aria-expanded={isMobileMoreOpen}
+                aria-haspopup="menu"
+                aria-label={
+                  isMobileMoreOpen
+                    ? copy.portal.mobile.closeMoreMenu
+                    : copy.portal.mobile.openMoreMenu
+                }
+              >
+                <span className="mobile-bottom-nav__icon">
+                  <Icon name="profile" />
+                </span>
+                <span className="mobile-bottom-nav__label">{copy.portal.mobile.more}</span>
+              </button>
+              {isMobileMoreOpen ? (
+                <>
+                  <button
+                    type="button"
+                    className="mobile-bottom-nav__overlay"
+                    aria-label={copy.portal.mobile.closeMoreMenu}
+                    onClick={() => setIsMobileMoreOpen(false)}
+                  />
+                  <div className="mobile-bottom-nav__more-panel" role="menu">
+                    <p className="mobile-bottom-nav__more-title">{copy.portal.mobile.moreMenuTitle}</p>
+                    {mobileOverflowItems.map((item) =>
+                      item.type === "link" ? (
+                        <Link
+                          key={item.key}
+                          href={item.href}
+                          role="menuitem"
+                          className={`mobile-bottom-nav__more-link${
+                            getIsMobileItemActive(pathname, item.href)
+                              ? " mobile-bottom-nav__more-link--active"
+                              : ""
+                          }`}
+                          onClick={() => setIsMobileMoreOpen(false)}
+                        >
+                          <span className="mobile-bottom-nav__more-icon">
+                            <Icon name={item.icon} />
+                          </span>
+                          <span>{item.label}</span>
+                        </Link>
+                      ) : (
+                        <button
+                          key={item.key}
+                          type="button"
+                          role="menuitem"
+                          className="mobile-bottom-nav__more-button"
+                          onClick={() => handleMobileOverflowItemClick(item)}
+                          disabled={item.disabled}
+                        >
+                          <span className="mobile-bottom-nav__more-icon">
+                            <Icon name={item.icon} />
+                          </span>
+                          <span>{item.label}</span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </li>
         </ul>
       </nav>
     </div>
