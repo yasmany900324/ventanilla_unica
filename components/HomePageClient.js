@@ -78,6 +78,185 @@ function buildAssistantCardHref(item) {
   return `/asistente?${params.toString()}`;
 }
 
+function HeroAssistantArtwork() {
+  return (
+    <svg
+      width="720"
+      height="420"
+      viewBox="0 0 720 420"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Ilustración de asistente virtual para atención ciudadana"
+      className="home-hero-illustration"
+    >
+      <defs>
+        <linearGradient id="bgGlow" x1="0" y1="0" x2="720" y2="420" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3E67C7" stopOpacity="0.06" />
+          <stop offset="100%" stopColor="#8ED8F8" stopOpacity="0.12" />
+        </linearGradient>
+
+        <linearGradient
+          id="botStroke"
+          x1="430"
+          y1="40"
+          x2="640"
+          y2="240"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#8A97E8" />
+          <stop offset="100%" stopColor="#1E4BA8" />
+        </linearGradient>
+
+        <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7FD6F4" />
+          <stop offset="100%" stopColor="#4BBDEB" />
+        </linearGradient>
+
+        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#163F8C" floodOpacity="0.10" />
+        </filter>
+      </defs>
+
+      <rect x="0" y="0" width="720" height="420" fill="url(#bgGlow)" />
+
+      <g
+        opacity="0.16"
+        stroke="#DCE7FF"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M18 88H244" />
+        <path d="M18 184H312" />
+        <path d="M30 286H242" />
+        <path d="M258 286H386" />
+        <path d="M102 24V354" />
+        <path d="M234 24V354" />
+        <path d="M356 44V336" />
+        <path d="M506 66V320" />
+
+        <rect x="230" y="120" rx="16" ry="16" width="120" height="138" />
+        <path d="M256 152L263 159L276 144" />
+        <rect x="286" y="145" width="34" height="4" rx="2" />
+        <path d="M256 187L263 194L276 179" />
+        <rect x="286" y="180" width="34" height="4" rx="2" />
+        <path d="M256 222L263 229L276 214" />
+        <rect x="286" y="215" width="34" height="4" rx="2" />
+
+        <path d="M126 214V144C126 137.373 131.373 132 138 132H192L224 164V214C224 220.627 218.627 226 212 226H138C131.373 226 126 220.627 126 214Z" />
+        <path d="M192 132V157C192 160.866 195.134 164 199 164H224" />
+        <path d="M148 182H198" />
+        <path d="M148 197H184" />
+
+        <path d="M58 257C58 236.565 74.5655 220 95 220C115.435 220 132 236.565 132 257C132 282 95 314 95 314C95 314 58 282 58 257Z" />
+        <circle cx="95" cy="257" r="11" />
+
+        <path d="M406 260V180L454 150L502 180V260" />
+        <path d="M418 260V210H442V260" />
+        <path d="M466 260V210H490V260" />
+        <path d="M396 260H512" />
+
+        <path d="M540 248V204L572 180L604 204V248" />
+        <path d="M552 248V222H566V248" />
+        <path d="M530 248H614" />
+
+        <path d="M40 112C40 100.954 48.9543 92 60 92H116C127.046 92 136 100.954 136 112V132C136 143.046 127.046 152 116 152H78L58 168V152C48.9543 152 40 143.046 40 132V112Z" />
+        <path d="M64 122H112" />
+        <path d="M64 136H98" />
+
+        <circle cx="52" cy="54" r="10" />
+        <circle cx="84" cy="54" r="10" />
+        <circle cx="116" cy="54" r="10" />
+      </g>
+
+      <g
+        opacity="0.14"
+        stroke="#DCE7FF"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="640" cy="100" r="26" />
+        <path d="M640 82V100L652 112" />
+        <circle cx="612" cy="292" r="20" />
+        <path d="M612 278V292L621 300" />
+        <path d="M565 86H588" />
+        <path d="M576 74V98" />
+      </g>
+
+      <g filter="url(#softShadow)">
+        <circle cx="514" cy="165" r="72" fill="#7ED6F4" fillOpacity="0.22" />
+        <path
+          d="M472 134C472 97 502 67 539 67H552C583 67 609 93 609 124V144"
+          stroke="#7ED6F4"
+          strokeWidth="14"
+          strokeLinecap="round"
+          opacity="0.55"
+        />
+
+        <path
+          d="M451 140C451 81.458 498.458 34 557 34C615.542 34 663 81.458 663 140V182C663 240.542 615.542 288 557 288C498.458 288 451 240.542 451 182V140Z"
+          fill="#F9FBFF"
+          stroke="url(#botStroke)"
+          strokeWidth="12"
+        />
+
+        <path
+          d="M495 82C521 48 572 38 617 56C600 76 589 97 576 111C556 132 526 135 495 118C485 112 486 95 495 82Z"
+          fill="#EAF1FF"
+          stroke="#7D8FE0"
+          strokeWidth="8"
+          strokeLinejoin="round"
+        />
+
+        <path
+          d="M456 150C456 92 503 45 561 45C619 45 666 92 666 150"
+          stroke="#304FAF"
+          strokeWidth="14"
+          strokeLinecap="round"
+        />
+
+        <rect x="437" y="142" width="22" height="56" rx="11" fill="#2747A5" />
+        <rect x="662" y="142" width="22" height="56" rx="11" fill="#2747A5" />
+
+        <ellipse cx="523" cy="168" rx="7" ry="12" fill="#6EBDEA" />
+        <ellipse cx="593" cy="168" rx="7" ry="12" fill="#6EBDEA" />
+
+        <path
+          d="M523 216C534 228 552 235 570 235C587 235 602 229 613 218"
+          stroke="#465CB6"
+          strokeWidth="8"
+          strokeLinecap="round"
+        />
+
+        <path d="M470 206C470 206 483 223 501 232" stroke="url(#accent)" strokeWidth="8" strokeLinecap="round" />
+        <circle cx="506" cy="234" r="6" fill="url(#accent)" />
+
+        <rect x="500" y="286" width="12" height="52" rx="6" fill="#2747A5" />
+        <rect x="602" y="286" width="12" height="52" rx="6" fill="#2747A5" />
+      </g>
+
+      <g
+        opacity="0.22"
+        stroke="#D8E6FF"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="560" y="236" width="58" height="72" rx="12" />
+        <path d="M575 258L580 263L589 252" />
+        <rect x="595" y="253" width="12" height="3" rx="1.5" />
+        <path d="M575 279L580 284L589 273" />
+        <rect x="595" y="274" width="12" height="3" rx="1.5" />
+
+        <path d="M648 236C648 224.402 657.402 215 669 215C680.598 215 690 224.402 690 236C690 250 669 268 669 268C669 268 648 250 648 236Z" />
+        <circle cx="669" cy="236" r="6" />
+      </g>
+    </svg>
+  );
+}
+
 export default function HomePageClient() {
   const { isAuthenticated } = useAuth();
   const { locale } = useLocale();
@@ -124,62 +303,7 @@ export default function HomePageClient() {
 
       <section className="home-hero" aria-labelledby="titulo-home">
         <div className="home-hero__illustration" aria-hidden="true">
-          <svg viewBox="0 0 440 360" className="home-hero-illustration" role="presentation">
-            <g opacity="0.28" stroke="#cfe2ff" strokeWidth="2.2" fill="none" strokeLinecap="round">
-              <path d="M24 314h392" />
-              <path d="M34 274h54v40H34z" />
-              <path d="M96 246h66v68H96z" />
-              <path d="M170 222h54v92h-54z" />
-              <path d="M232 248h38v66h-38z" />
-              <path d="M278 230h52v84h-52z" />
-              <path d="M338 254h44v60h-44z" />
-              <rect x="52" y="160" width="92" height="52" rx="10" />
-              <path d="M72 184h48" />
-              <path d="M72 198h34" />
-              <path d="M328 172l20 20 36-34" />
-              <rect x="306" y="148" width="92" height="68" rx="14" />
-              <path d="M292 126c8-16 24-26 42-26 10 0 19 3 27 9" />
-              <path d="M232 140h22" />
-              <path d="M220 174h34" />
-            </g>
-            <g transform="translate(214 50)">
-              <ellipse cx="72" cy="250" rx="84" ry="22" fill="#b7d1ff" opacity="0.28" />
-              <path
-                d="M26 112c0-32 21-57 46-57s46 25 46 57v24H26z"
-                fill="#f3f8ff"
-                stroke="#9fc0f4"
-                strokeWidth="3"
-              />
-              <rect
-                x="37"
-                y="114"
-                width="70"
-                height="62"
-                rx="20"
-                fill="#ffffff"
-                stroke="#8fb3ee"
-                strokeWidth="3"
-              />
-              <circle cx="58" cy="142" r="6.8" fill="#2f66bf" />
-              <circle cx="86" cy="142" r="6.8" fill="#2f66bf" />
-              <path d="M57 162c7 7 23 7 30 0" stroke="#2f66bf" strokeWidth="4.5" strokeLinecap="round" />
-              <path
-                d="M8 132c0-27 16-48 38-56m108 56c0-27-16-48-38-56"
-                stroke="#8db2f1"
-                strokeWidth="7"
-                fill="none"
-                strokeLinecap="round"
-              />
-              <rect x="-4" y="130" width="18" height="32" rx="9" fill="#d9e8ff" />
-              <rect x="142" y="130" width="18" height="32" rx="9" fill="#d9e8ff" />
-              <path
-                d="M52 176h40v38c0 10-8 18-18 18h-4c-10 0-18-8-18-18z"
-                fill="#dbe9ff"
-                stroke="#8fb3ee"
-                strokeWidth="3"
-              />
-            </g>
-          </svg>
+          <HeroAssistantArtwork />
         </div>
         <div className="home-hero__content">
           <span className="home-hero__kicker">{copy.home.kicker}</span>
