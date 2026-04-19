@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { requireAdministrator } from "../../../../lib/auth";
 import {
   ensureProcedureCatalogSchema,
-  listActiveProcedureCatalog,
+  getProcedureCatalogEntryByCode,
+  listProcedureCatalog,
 } from "../../../../lib/procedureCatalog";
 import { ensureDatabase, hasDatabase } from "../../../../lib/db";
 import {
@@ -25,6 +26,7 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingFields: "Debes configurar al menos un campo requerido para el trámite.",
     duplicateCode: "Ya existe un trámite con ese código.",
     notFound: "No se encontró el trámite solicitado.",
+    deleteError: "No se pudo eliminar el trámite.",
   },
   en: {
     forbidden: "Unauthorized.",
@@ -38,6 +40,7 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingFields: "At least one required field must be configured.",
     duplicateCode: "A procedure with that code already exists.",
     notFound: "Requested procedure was not found.",
+    deleteError: "Could not delete procedure.",
   },
   pt: {
     forbidden: "Não autorizado.",
@@ -51,6 +54,7 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingFields: "Configure ao menos um campo obrigatório para o trâmite.",
     duplicateCode: "Já existe um trâmite com esse código.",
     notFound: "Não foi encontrado o trâmite solicitado.",
+    deleteError: "Não foi possível eliminar o trâmite.",
   },
 };
 
@@ -223,7 +227,8 @@ export async function GET(request) {
     }
 
     await ensureProcedureCatalogSchema();
-    const procedures = await listActiveProcedureCatalog();
+    const includeInactive = normalizeLookup(searchParams.get("includeInactive")) === "true";
+    const procedures = await listProcedureCatalog({ includeInactive });
     return NextResponse.json({ procedures });
   } catch (_error) {
     return NextResponse.json({ error: messages.listError }, { status: 500 });
@@ -297,8 +302,11 @@ export async function POST(request) {
       RETURNING code;
     `;
 
+    const procedure = await getProcedureCatalogEntryByCode(created?.code || normalized.value.code, {
+      includeInactive: true,
+    });
     return NextResponse.json(
-      { ok: true, code: created?.code || normalized.value.code },
+      { ok: true, code: created?.code || normalized.value.code, procedure },
       { status: 201 }
     );
   } catch (_error) {
@@ -327,12 +335,64 @@ export async function PATCH(request) {
       return NextResponse.json({ error: messages.invalidBody }, { status: 400 });
     }
 
-    const normalized = normalizeProcedurePayload(body, messages);
+    await ensureProcedureCatalogSchema();
+    const code = normalizeCode(body?.code);
+    if (!code) {
+      return NextResponse.json({ error: messages.missingCode }, { status: 400 });
+    }
+
+    const existingProcedure = await getProcedureCatalogEntryByCode(code, {
+      includeInactive: true,
+    });
+    if (!existingProcedure) {
+      return NextResponse.json({ error: messages.notFound }, { status: 404 });
+    }
+
+    const isStatusOnlyPatch =
+      typeof body?.isActive === "boolean" &&
+      typeof body?.name !== "string" &&
+      typeof body?.description !== "string" &&
+      typeof body?.category !== "string" &&
+      !Array.isArray(body?.requiredFields) &&
+      !Array.isArray(body?.aliases) &&
+      !Array.isArray(body?.keywords);
+
+    if (isStatusOnlyPatch) {
+      const sql = ensureDatabase();
+      const [updated] = await sql`
+        UPDATE chatbot_procedure_catalog
+        SET
+          is_active = ${body.isActive},
+          updated_at = NOW()
+        WHERE code = ${code}
+        RETURNING code;
+      `;
+      if (!updated) {
+        return NextResponse.json({ error: messages.notFound }, { status: 404 });
+      }
+
+      const procedure = await getProcedureCatalogEntryByCode(updated.code, {
+        includeInactive: true,
+      });
+      return NextResponse.json({ ok: true, code: updated.code, procedure });
+    }
+
+    const normalized = normalizeProcedurePayload(
+      {
+        ...existingProcedure,
+        ...body,
+        code,
+        isActive:
+          typeof body?.isActive === "boolean"
+            ? body.isActive
+            : Boolean(existingProcedure.isActive),
+      },
+      messages
+    );
     if (!normalized.ok) {
       return NextResponse.json({ error: normalized.error }, { status: 400 });
     }
 
-    await ensureProcedureCatalogSchema();
     const sql = ensureDatabase();
     const [updated] = await sql`
       UPDATE chatbot_procedure_catalog
@@ -353,8 +413,54 @@ export async function PATCH(request) {
       return NextResponse.json({ error: messages.notFound }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, code: updated.code });
+    const procedure = await getProcedureCatalogEntryByCode(updated.code, {
+      includeInactive: true,
+    });
+    return NextResponse.json({ ok: true, code: updated.code, procedure });
   } catch (_error) {
     return NextResponse.json({ error: messages.updateError }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  const { searchParams } = new URL(request.url);
+  const locale = resolveRequestLocale(request, searchParams);
+  const messages = PROCEDURE_ADMIN_MESSAGES[locale] || PROCEDURE_ADMIN_MESSAGES.es;
+
+  try {
+    const administrator = await requireAdministrator(request);
+    if (!administrator) {
+      return NextResponse.json({ error: messages.forbidden }, { status: 403 });
+    }
+    if (!hasDatabase()) {
+      return NextResponse.json({ error: messages.dbRequired }, { status: 503 });
+    }
+
+    let body = null;
+    try {
+      body = await request.json();
+    } catch (_error) {
+      return NextResponse.json({ error: messages.invalidBody }, { status: 400 });
+    }
+
+    const code = normalizeCode(body?.code);
+    if (!code) {
+      return NextResponse.json({ error: messages.missingCode }, { status: 400 });
+    }
+
+    await ensureProcedureCatalogSchema();
+    const sql = ensureDatabase();
+    const [deleted] = await sql`
+      DELETE FROM chatbot_procedure_catalog
+      WHERE code = ${code}
+      RETURNING code;
+    `;
+    if (!deleted) {
+      return NextResponse.json({ error: messages.notFound }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, code: deleted.code });
+  } catch (_error) {
+    return NextResponse.json({ error: messages.deleteError }, { status: 500 });
   }
 }

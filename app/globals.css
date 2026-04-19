@@ -287,7 +287,7 @@ body {
 }
 
 .page--dashboard {
-  max-width: 1140px;
+  max-width: 1280px;
 }
 
 .page--home {
@@ -1682,7 +1682,12 @@ button:disabled {
 }
 
 .admin-tabs {
-  display: inline-flex;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.admin-tabs__list {
+  display: flex;
   gap: 0.5rem;
   flex-wrap: nowrap;
   max-width: 100%;
@@ -1692,90 +1697,59 @@ button:disabled {
   scrollbar-width: thin;
 }
 
-.admin-tabs__button {
+.admin-tabs__tab {
+  width: auto;
   flex: 0 0 auto;
-  background: #eef2ff;
-  color: #1e3a8a;
-  border: 1px solid #c7d2fe;
+  background: #f8fafc;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
   border-radius: 999px;
   padding: 0.45rem 0.9rem;
   font-size: 0.9rem;
   font-weight: 700;
 }
 
-.admin-tabs__button:hover:not(:disabled) {
-  background: #dbeafe;
+.admin-tabs__tab:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
-.admin-tabs__button--active {
-  background: #1e40af;
+.admin-tabs__tab--active {
+  background: #1d4ed8;
   color: #ffffff;
-  border-color: #1e40af;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-.admin-tabs::-webkit-scrollbar {
+.admin-tabs__list::-webkit-scrollbar {
   height: 6px;
 }
 
-.admin-tabs::-webkit-scrollbar-thumb {
-  background: #c7d2fe;
+.admin-tabs__list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
   border-radius: 999px;
 }
 
-.admin-procedures-layout {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.15fr);
-  gap: 1rem;
-}
-
-.admin-procedure-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.admin-procedure-item {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 0.75rem;
-  background: #ffffff;
-  display: grid;
-  gap: 0.4rem;
-}
-
-.admin-procedure-item__title-row {
+.admin-procedure-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
-.admin-procedure-item__title {
+.admin-procedure-toolbar__content h3 {
+  margin: 0 0 0.35rem;
+}
+
+.admin-procedure-toolbar__content p {
   margin: 0;
-  font-size: 1rem;
 }
 
-.admin-procedure-item__meta {
-  margin: 0;
-  color: #4b5563;
-  font-size: 0.86rem;
-}
-
-.admin-procedure-item__tags {
+.admin-procedure-toolbar__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.admin-procedure-item__tag {
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.55rem;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .admin-procedure-item__actions {
@@ -1784,14 +1758,63 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.button-inline--danger {
+  background: #dc2626;
+}
+
+.button-inline--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.admin-procedure-table__container {
+  overflow-x: auto;
+}
+
+.admin-procedure-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 940px;
+}
+
+.admin-procedure-table th,
+.admin-procedure-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.6rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-procedure-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+
+.admin-procedure-table__primary {
+  margin: 0;
+  font-weight: 700;
+  color: #111827;
+}
+
+.admin-procedure-table__secondary {
+  margin: 0.25rem 0 0;
+  color: #4b5563;
+  font-size: 0.86rem;
+}
+
+.admin-procedure-table__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 0.84rem;
+}
+
 .admin-procedure-form {
   display: grid;
   gap: 0.75rem;
-}
-
-.admin-procedure-form__row {
-  display: grid;
-  gap: 0.35rem;
 }
 
 .admin-procedure-form__actions {
@@ -1800,14 +1823,10 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.admin-procedure-form__textarea {
-  min-height: 96px;
-  resize: vertical;
-}
-
 @media (max-width: 900px) {
-  .admin-procedures-layout {
-    grid-template-columns: 1fr;
+  .admin-procedure-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
