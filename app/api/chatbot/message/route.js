@@ -49,6 +49,7 @@ import {
   findMatchingProcedure,
   getProcedureByCode,
   ensureProcedureCatalogSchema,
+  listActiveProcedureCatalog,
   normalizeProcedureCollectedData,
   getProcedureMissingFieldsFromDefinition,
   getProcedureFieldDefinition,
@@ -271,6 +272,61 @@ function buildStatusReply() {
 
 function buildUnsupportedProcedureReply() {
   return "Lo siento, de momento no puedo ayudarte con este trámite.";
+}
+
+function hasProcedureSpecificSignals(text) {
+  const normalized = normalizeIntentLookup(text);
+  if (!normalized) {
+    return false;
+  }
+
+  const genericProcedureSignals = new Set([
+    "quiero iniciar un tramite",
+    "necesito hacer un tramite",
+    "necesito realizar una gestion",
+    "quiero realizar una gestion",
+    "iniciar tramite",
+    "iniciar un tramite",
+    "hacer un tramite",
+    "tramite",
+    "trámite",
+    "quiero gestionar un tramite",
+    "quiero hacer un tramite",
+  ]);
+  if (genericProcedureSignals.has(normalized)) {
+    return false;
+  }
+
+  return normalized.length >= 18 || normalized.split(" ").length >= 4;
+}
+
+function buildProcedureCatalogIntroReply(procedures) {
+  const supported = Array.isArray(procedures) ? procedures : [];
+  if (supported.length === 0) {
+    return "Lo siento, de momento no puedo ayudarte con este trámite.";
+  }
+
+  const names = supported
+    .slice(0, 6)
+    .map((procedure) => procedure?.name)
+    .filter((name) => typeof name === "string" && name.trim());
+  if (names.length === 0) {
+    return "Lo siento, de momento no puedo ayudarte con este trámite.";
+  }
+
+  const listedNames = names.map((name) => `"${name}"`).join(", ");
+  const totalSupported = supported.length;
+  return `Actualmente puedo ayudarte con ${totalSupported} tipos de trámites: ${listedNames}. Indícame cuál deseas iniciar.`;
+}
+
+function buildProcedureCatalogActionOptions(procedures) {
+  const supported = Array.isArray(procedures) ? procedures : [];
+  return supported.slice(0, 6).map((procedure) => ({
+    label: procedure.name,
+    command: "none",
+    value: `Quiero iniciar el trámite ${procedure.name}.`,
+    commandField: null,
+  }));
 }
 
 function buildProcedureCompletedReply(activeProcedure) {
@@ -985,6 +1041,37 @@ export async function POST(request) {
   }
 
   if (switchToProcedure && !isProcedureFlowActive(snapshot)) {
+    const activeProcedures = await listActiveProcedureCatalog();
+    const canListSupportedProcedures = activeProcedures.length > 0;
+    const hasSpecificProcedureRequest = hasProcedureSpecificSignals(text);
+
+    if (!hasSpecificProcedureRequest && canListSupportedProcedures) {
+      const idleSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.IDLE,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+        confirmationState: "none",
+        collectedData: snapshot.collectedData || EMPTY_COLLECTED_DATA,
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "list_supported_procedures",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildProcedureCatalogIntroReply(activeProcedures),
+        snapshot: idleSnapshot,
+        actionOptions: buildProcedureCatalogActionOptions(activeProcedures),
+        nextStepType: "clarify_procedure",
+        nextStepField: "procedureName",
+        needsClarification: false,
+      });
+    }
+
     const procedureMatch = await findMatchingProcedure({
       text,
       interpretation,
