@@ -262,8 +262,7 @@ export default function HomePageClient() {
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
-  const startProcedureHref =
-    "/asistente?type=tramite&id=iniciar-tramite&title=Iniciar+un+tramite";
+  const startProcedureHref = "/asistente";
   const primaryHelpItem = copy.home.helpItems[0] || null;
   const secondaryHelpItems = copy.home.helpItems.slice(1);
 
