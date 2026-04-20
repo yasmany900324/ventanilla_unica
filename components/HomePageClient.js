@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
@@ -76,6 +77,174 @@ function buildAssistantCardHref(item) {
   }
 
   return `/asistente?${params.toString()}`;
+}
+
+function resolveFrequentServiceCta(item, copy) {
+  const kind = resolveServiceKind(item);
+  const frequentCtas = copy?.home?.frequentCtas || {};
+  if (kind === "incidencia") {
+    return frequentCtas.incidencia || "Reportar";
+  }
+  if (kind === "estado") {
+    return frequentCtas.estado || "Ver más";
+  }
+  return frequentCtas.tramite || "Iniciar trámite";
+}
+
+function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
+  const viewportRef = useRef(null);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+  const hasMeasuredScrollRef = useRef(false);
+
+  const updateScrollState = useCallback(() => {
+    const viewportNode = viewportRef.current;
+    if (!viewportNode) {
+      setCanScrollPrev(false);
+      setCanScrollNext(false);
+      return;
+    }
+
+    const tolerance = 4;
+    const maxScrollLeft = viewportNode.scrollWidth - viewportNode.clientWidth;
+    setCanScrollPrev(viewportNode.scrollLeft > tolerance);
+    setCanScrollNext(viewportNode.scrollLeft < maxScrollLeft - tolerance);
+  }, []);
+
+  useEffect(() => {
+    const viewportNode = viewportRef.current;
+    if (!viewportNode) {
+      return undefined;
+    }
+
+    const handleScroll = () => updateScrollState();
+    const handleResize = () => updateScrollState();
+    viewportNode.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+    return () => {
+      viewportNode.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [updateScrollState]);
+
+  useEffect(() => {
+    if (hasMeasuredScrollRef.current) {
+      return;
+    }
+    hasMeasuredScrollRef.current = true;
+    const viewportNode = viewportRef.current;
+    if (!viewportNode) {
+      return;
+    }
+    const tolerance = 4;
+    const maxScrollLeft = viewportNode.scrollWidth - viewportNode.clientWidth;
+    setCanScrollPrev(viewportNode.scrollLeft > tolerance);
+    setCanScrollNext(viewportNode.scrollLeft < maxScrollLeft - tolerance);
+  }, [services.length]);
+
+  const scrollByStep = useCallback((direction) => {
+    const viewportNode = viewportRef.current;
+    if (!viewportNode) {
+      return;
+    }
+
+    const firstCard = viewportNode.querySelector(".home-frequent-card");
+    if (!firstCard) {
+      return;
+    }
+
+    const computedStyles = window.getComputedStyle(viewportNode);
+    const gapValue = Number.parseFloat(computedStyles.getPropertyValue("--frequent-carousel-gap")) || 0;
+    const step = firstCard.getBoundingClientRect().width + gapValue;
+    viewportNode.scrollBy({
+      left: direction * step,
+      behavior: "smooth",
+    });
+  }, []);
+
+  const handleViewportKeyDown = useCallback(
+    (event) => {
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        scrollByStep(1);
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        scrollByStep(-1);
+      }
+    },
+    [scrollByStep]
+  );
+
+  return (
+    <div className="home-frequent-carousel">
+      <button
+        type="button"
+        className="home-frequent-carousel__nav home-frequent-carousel__nav--prev"
+        aria-label={copy.home.frequentCarouselPrev}
+        onClick={() => scrollByStep(-1)}
+        disabled={!canScrollPrev}
+      >
+        <span aria-hidden="true">←</span>
+      </button>
+
+      <div
+        ref={viewportRef}
+        className="home-frequent-carousel__viewport"
+        role="region"
+        tabIndex={0}
+        aria-label={copy.home.frequentCarouselAria}
+        onKeyDown={handleViewportKeyDown}
+      >
+        <ul className="home-frequent-carousel__track">
+          {services.map((item) => {
+            const href =
+              item.badgeType === "identity" && !hasActiveSession
+                ? "/login"
+                : buildAssistantCardHref(item);
+            const serviceKind = resolveServiceKind(item);
+            const ctaLabel = resolveFrequentServiceCta(item, copy);
+
+            return (
+              <li key={item.title} className="home-frequent-carousel__slide">
+                <Link
+                  href={href}
+                  className={`home-frequent-card home-frequent-card--${serviceKind}`}
+                  aria-label={`${copy.home.openItemAriaPrefix} ${item.title}`}
+                >
+                  <div className="home-frequent-card__icon-wrap">
+                    <span className="home-frequent-card__icon" aria-hidden="true">
+                      {resolveServiceIcon(item)}
+                    </span>
+                    {item.badge ? (
+                      <span className={`home-frequent-card__badge home-frequent-card__badge--${item.badgeType}`}>
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="home-frequent-card__body">
+                    <p className="home-frequent-card__type">{copy.home.frequentTypeLabels[serviceKind]}</p>
+                    <h3>{item.title}</h3>
+                    <p className="home-frequent-card__description">{item.description}</p>
+                  </div>
+                  <span className="home-frequent-card__cta">{ctaLabel}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <button
+        type="button"
+        className="home-frequent-carousel__nav home-frequent-carousel__nav--next"
+        aria-label={copy.home.frequentCarouselNext}
+        onClick={() => scrollByStep(1)}
+        disabled={!canScrollNext}
+      >
+        <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  );
 }
 
 function HeroAssistantArtwork() {
@@ -303,40 +472,11 @@ export default function HomePageClient() {
             {copy.home.viewAllProcedures}
           </Link>
         </header>
-
-        <div className="home-frequent__grid">
-          {copy.home.frequentServices.map((item) => {
-            const href =
-              item.badgeType === "identity" && !hasActiveSession
-                ? "/login"
-                : buildAssistantCardHref(item);
-            const serviceKind = resolveServiceKind(item);
-
-            return (
-              <Link
-                key={item.title}
-                href={href}
-                className={`frequent-card frequent-card--${serviceKind}`}
-                aria-label={`${copy.home.openItemAriaPrefix} ${item.title}`}
-              >
-                <div className="frequent-card__icon" aria-hidden="true">
-                  {resolveServiceIcon(item)}
-                </div>
-                <div className="frequent-card__content">
-                  <p className="frequent-card__type">{copy.home.frequentTypeLabels[serviceKind]}</p>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <span className={`frequent-card__badge frequent-card__badge--${item.badgeType}`}>
-                    {item.badge}
-                  </span>
-                </div>
-                <span className="frequent-card__arrow" aria-hidden="true">
-                  →
-                </span>
-              </Link>
-            );
-          })}
-        </div>
+        <FrequentServicesCarousel
+          services={copy.home.frequentServices}
+          copy={copy}
+          hasActiveSession={hasActiveSession}
+        />
       </section>
 
       <section className="home-bottom-grid">
