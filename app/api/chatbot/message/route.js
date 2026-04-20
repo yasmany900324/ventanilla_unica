@@ -221,25 +221,6 @@ function isGenericProcedureStartRequest(text) {
   return genericProcedureSignals.includes(normalized);
 }
 
-function isGreetingMessage(text) {
-  const normalized = normalizeIntentLookup(text);
-  if (!normalized) {
-    return false;
-  }
-
-  return [
-    "hola",
-    "buenas",
-    "buen dia",
-    "buenos dias",
-    "buenas tardes",
-    "buenas noches",
-    "hello",
-    "hi",
-    "ola",
-  ].includes(normalized);
-}
-
 function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
   if (isCompleted) {
     return [
@@ -1153,7 +1134,7 @@ export async function POST(request) {
   const switchToProcedure = shouldSwitchToProcedureFlow({ text, interpretation });
   const switchToIncident = shouldSwitchToIncidentFlow({ text, interpretation });
   const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
-  const isGreeting = isGreetingMessage(text);
+  const isGreeting = Boolean(interpretation?.userSignals?.greetingOpen);
   if (chatDebugEnabled) {
     logChatDebug(
       "intent_switch_evaluation",
