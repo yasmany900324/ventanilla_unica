@@ -302,6 +302,34 @@ function mapProcedureRequestToStatusSummaryEntry(procedureRequest) {
   };
 }
 
+async function resolveStatusSummaryEntry({ userId, identifier }) {
+  if (!userId || !identifier) {
+    return null;
+  }
+
+  const normalizedIdentifier = normalizeStatusIdentifier(identifier);
+  if (!normalizedIdentifier) {
+    return null;
+  }
+
+  const [incidentMatch, procedureMatch] = await Promise.all([
+    findIncidentByIdentifier({ userId, identifier: normalizedIdentifier }),
+    findProcedureRequestByIdentifier({ userId, identifier: normalizedIdentifier }),
+  ]);
+
+  const candidates = [
+    mapIncidentToStatusSummaryEntry(incidentMatch),
+    mapProcedureRequestToStatusSummaryEntry(procedureMatch),
+  ].filter(Boolean);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((a, b) => b.updatedTimestamp - a.updatedTimestamp);
+  return candidates[0];
+}
+
 function shouldSwitchToStatusIntent({ text, interpretation }) {
   const normalized = normalizeIntentLookup(text);
   if (normalized) {
