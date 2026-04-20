@@ -2325,6 +2325,10 @@ button:disabled {
   gap: 0.32rem;
 }
 
+.portal-footer__social--mobile {
+  display: none;
+}
+
 .portal-footer__social a {
   width: 1.65rem;
   height: 1.65rem;
@@ -3421,6 +3425,14 @@ textarea:focus-visible {
     gap: 0.32rem;
     opacity: 0.82;
     order: 3;
+  }
+
+  .portal-footer__social--desktop {
+    display: none;
+  }
+
+  .portal-footer__social--mobile {
+    display: flex;
   }
 
   .portal-footer__social a {
