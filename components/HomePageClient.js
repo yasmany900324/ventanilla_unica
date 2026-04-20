@@ -91,6 +91,30 @@ function resolveFrequentServiceCta(item, copy) {
   return frequentCtas.tramite || "Iniciar trámite";
 }
 
+function CarouselChevronIcon({ direction = "next" }) {
+  const rotation = direction === "prev" ? "180" : "0";
+  return (
+    <svg
+      className="home-frequent-carousel__nav-icon"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <g transform={`rotate(${rotation} 10 10)`}>
+        <path
+          d="M7.25 4.75 12.5 10l-5.25 5.25"
+          stroke="currentColor"
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
 function FrequentItemCard({ item, href, serviceKind, ctaLabel, typeLabel, openItemAriaPrefix }) {
   return (
     <li className="home-frequent-carousel__slide">
@@ -221,7 +245,7 @@ function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
         onClick={() => scrollByStep(-1)}
         disabled={!canScrollPrev}
       >
-        <span aria-hidden="true">←</span>
+        <CarouselChevronIcon direction="prev" />
       </button>
 
       <div
@@ -264,7 +288,7 @@ function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
         onClick={() => scrollByStep(1)}
         disabled={!canScrollNext}
       >
-        <span aria-hidden="true">→</span>
+        <CarouselChevronIcon direction="next" />
       </button>
     </div>
   );
