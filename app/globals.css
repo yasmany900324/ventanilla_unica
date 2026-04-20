@@ -2756,6 +2756,131 @@ button:disabled {
   color: rgba(255, 255, 255, 0.86);
 }
 
+.assistant-status-card {
+  border: 1px solid #d8e3f3;
+  background: #f9fbff;
+  border-radius: 12px;
+  padding: 0.68rem;
+  display: grid;
+  gap: 0.52rem;
+}
+
+.assistant-status-card__header h3 {
+  margin: 0;
+  color: #1f3f77;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.assistant-status-card__status-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.46rem;
+}
+
+.assistant-status-card__status-label {
+  margin: 0;
+  color: #5a6b84;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.assistant-status-card__pill {
+  border-radius: 999px;
+  border: 1px solid #c9d9f1;
+  background: #ecf3ff;
+  color: #1f4a92;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.18rem 0.56rem;
+}
+
+.assistant-status-card__pill--recibido {
+  border-color: #cde4d5;
+  background: #edf8f1;
+  color: #2b6d3b;
+}
+
+.assistant-status-card__pill--en-revision,
+.assistant-status-card__pill--en_revision {
+  border-color: #e6d7b8;
+  background: #fff8e9;
+  color: #8b6616;
+}
+
+.assistant-status-card__pill--en-proceso,
+.assistant-status-card__pill--en_proceso {
+  border-color: #bcd6ec;
+  background: #eaf4ff;
+  color: #1f5a90;
+}
+
+.assistant-status-card__pill--resuelto {
+  border-color: #b9decb;
+  background: #e8f8ef;
+  color: #216746;
+}
+
+.assistant-status-card__explanation {
+  margin: 0;
+  color: #304762;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.assistant-status-card__divider {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #dbe7f7;
+}
+
+.assistant-status-card__details {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.assistant-status-card__details-title {
+  margin: 0;
+  color: #4f5f79;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.assistant-status-card__details-list {
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.assistant-status-card__detail-row {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.assistant-status-card__detail-row dt {
+  margin: 0;
+  color: #4f5f79;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.assistant-status-card__detail-row dd {
+  margin: 0;
+  color: #253754;
+  font-size: 0.83rem;
+  line-height: 1.38;
+}
+
+.assistant-message--user .assistant-status-card {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.36);
+}
+
 .assistant-message__typing-copy {
   color: #5d6f8a;
   font-size: 0.84rem;
@@ -3186,6 +3311,44 @@ textarea:focus-visible {
     max-width: 100%;
     border-radius: 10px;
     padding: 0.5rem 0.56rem;
+  }
+
+  .assistant-status-card {
+    padding: 0.58rem;
+    gap: 0.42rem;
+  }
+
+  .assistant-status-card__header h3 {
+    font-size: 0.84rem;
+  }
+
+  .assistant-status-card__status-wrap {
+    gap: 0.36rem;
+  }
+
+  .assistant-status-card__status-label {
+    font-size: 0.68rem;
+  }
+
+  .assistant-status-card__pill {
+    font-size: 0.7rem;
+    padding: 0.14rem 0.48rem;
+  }
+
+  .assistant-status-card__explanation {
+    font-size: 0.8rem;
+  }
+
+  .assistant-status-card__details-title {
+    font-size: 0.69rem;
+  }
+
+  .assistant-status-card__detail-row dt {
+    font-size: 0.67rem;
+  }
+
+  .assistant-status-card__detail-row dd {
+    font-size: 0.78rem;
   }
 
   .assistant-message p {
