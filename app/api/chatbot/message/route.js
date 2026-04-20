@@ -221,6 +221,25 @@ function isGenericProcedureStartRequest(text) {
   return genericProcedureSignals.includes(normalized);
 }
 
+function isGreetingMessage(text) {
+  const normalized = normalizeIntentLookup(text);
+  if (!normalized) {
+    return false;
+  }
+
+  return [
+    "hola",
+    "buenas",
+    "buen dia",
+    "buenos dias",
+    "buenas tardes",
+    "buenas noches",
+    "hello",
+    "hi",
+    "ola",
+  ].includes(normalized);
+}
+
 function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
   if (isCompleted) {
     return [
@@ -313,6 +332,10 @@ function buildStatusActionOptions() {
 
 function buildStatusReply() {
   return "Entiendo. Te ayudo a consultar el estado de tu solicitud. Puedes revisar tus casos en 'Mis incidencias' o indicarme el número de ticket para orientarte.";
+}
+
+function buildGreetingReply() {
+  return "Hola, ¿en qué te ayudo hoy? Puedo ayudarte a iniciar un trámite, reportar una incidencia o consultar el estado de tu solicitud.";
 }
 
 function buildIncidentStartReply() {
@@ -1130,6 +1153,7 @@ export async function POST(request) {
   const switchToProcedure = shouldSwitchToProcedureFlow({ text, interpretation });
   const switchToIncident = shouldSwitchToIncidentFlow({ text, interpretation });
   const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
+  const isGreeting = isGreetingMessage(text);
   if (chatDebugEnabled) {
     logChatDebug(
       "intent_switch_evaluation",
@@ -1143,12 +1167,45 @@ export async function POST(request) {
         interpretation,
         llmMeta,
         decision: {
+          isGreeting,
           switchToProcedure,
           switchToIncident,
           switchToStatus,
         },
       })
     );
+  }
+
+  if (
+    isGreeting &&
+    !switchToProcedure &&
+    !switchToIncident &&
+    !switchToStatus &&
+    effectiveCommand === "none"
+  ) {
+    const greetingSnapshot = await setConversationState(sessionId, {
+      locale: effectiveLocale,
+      userId: authenticatedUser?.id || snapshot.userId || null,
+      state: CHATBOT_CONVERSATION_STATES.IDLE,
+      flowKey: null,
+      currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+      confirmationState: "none",
+      collectedData: { ...EMPTY_COLLECTED_DATA },
+      lastInterpretation: interpretation,
+      lastIntent: interpretation?.intent?.kind || "small_talk",
+      lastAction: "greeting",
+      lastConfidence: interpretation?.intent?.confidence || null,
+    });
+    return buildChatResponse({
+      sessionId,
+      locale: effectiveLocale,
+      replyText: buildGreetingReply(),
+      snapshot: greetingSnapshot,
+      actionOptions: buildClarificationActionOptions(),
+      nextStepType: "clarify",
+      nextStepField: null,
+      needsClarification: false,
+    });
   }
 
   if (switchToStatus) {
