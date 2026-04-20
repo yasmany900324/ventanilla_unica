@@ -302,7 +302,7 @@ function mapProcedureRequestToStatusSummaryEntry(procedureRequest) {
   };
 }
 
-async function resolveStatusSummaryEntry({ userId, identifier }) {
+async function resolveStatusSummaryByIdentifier({ userId, identifier }) {
   if (!userId || !identifier) {
     return null;
   }
@@ -1525,31 +1525,6 @@ export async function POST(request) {
     });
   }
 
-  const statusSummaryResolver =
-    typeof resolveStatusSummaryEntry === "function"
-      ? resolveStatusSummaryEntry
-      : async ({ userId, identifier }) => {
-          if (!userId || !identifier) {
-            return null;
-          }
-          const normalizedIdentifier = normalizeStatusIdentifier(identifier);
-          if (!normalizedIdentifier) {
-            return null;
-          }
-          const [incidentMatch, procedureMatch] = await Promise.all([
-            findIncidentByIdentifier({ userId, identifier: normalizedIdentifier }),
-            findProcedureRequestByIdentifier({ userId, identifier: normalizedIdentifier }),
-          ]);
-          const candidates = [
-            mapIncidentToStatusSummaryEntry(incidentMatch),
-            mapProcedureRequestToStatusSummaryEntry(procedureMatch),
-          ].filter(Boolean);
-          if (candidates.length === 0) {
-            return null;
-          }
-          candidates.sort((a, b) => b.updatedTimestamp - a.updatedTimestamp);
-          return candidates[0];
-        };
   const statusIdentifierFromText = extractStatusIdentifierFromText(text);
   const statusFlowActive = snapshot?.lastIntent === "check_status" && !switchToIncident && !switchToProcedure;
   const isStatusFollowUp =
@@ -1563,7 +1538,7 @@ export async function POST(request) {
   if (switchToStatus || isStatusFollowUp) {
     const statusIdentifier = statusIdentifierFromText;
     if (statusIdentifier && authenticatedUser?.id) {
-      const statusSummaryEntry = await statusSummaryResolver({
+      const statusSummaryEntry = await resolveStatusSummaryByIdentifier({
         userId: authenticatedUser.id,
         identifier: statusIdentifier,
       });
