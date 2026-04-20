@@ -1246,15 +1246,15 @@ h3 {
 
 .home-frequent-card {
   height: 100%;
-  min-height: 246px;
+  min-height: 268px;
   text-decoration: none;
   border: 1px solid #d7e2f1;
-  border-radius: 20px;
+  border-radius: 22px;
   background: #ffffff;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 0.74rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.08rem;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease,
     background-color 180ms ease;
@@ -1267,54 +1267,60 @@ h3 {
   background: #fbfdff;
 }
 
-.home-frequent-card__icon-wrap {
+.home-frequent-card__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
-.home-frequent-card__icon {
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 12px;
-  border: 1px solid #d4e0f3;
-  background: #f3f7ff;
-  color: #15418f;
+.home-frequent-card__icon-shell {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 14px;
+  border: 1px solid #d5e3f7;
+  background: linear-gradient(180deg, #f3f8ff 0%, #e9f1ff 100%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.88rem;
+  flex-shrink: 0;
+}
+
+.home-frequent-card__icon {
+  color: #1a4c99;
+  font-size: 1.06rem;
   font-weight: 700;
 }
 
 .home-frequent-card__body {
-  display: grid;
-  align-content: start;
-  gap: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
 }
 
 .home-frequent-card__type {
   margin: 0;
-  color: #47659a;
-  font-size: 0.68rem;
+  color: #4a6699;
+  font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  opacity: 0.92;
 }
 
 .home-frequent-card h3 {
   margin: 0;
-  color: #173967;
-  font-size: 1.03rem;
-  line-height: 1.26;
+  color: #16355f;
+  font-size: 1.11rem;
+  line-height: 1.24;
 }
 
 .home-frequent-card__description {
   margin: 0;
-  color: #57667f;
+  color: #5f6f85;
   font-size: 0.84rem;
-  line-height: 1.38;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1324,11 +1330,13 @@ h3 {
 .home-frequent-card__badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   width: fit-content;
   border-radius: 999px;
-  padding: 0.22rem 0.56rem;
-  font-size: 0.7rem;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.67rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .home-frequent-card__badge--anonymous {
@@ -1348,26 +1356,43 @@ h3 {
 
 .home-frequent-card__cta {
   justify-self: start;
-  align-self: end;
-  border-radius: 10px;
-  border: 1px solid #114189;
-  background: linear-gradient(180deg, #1f56ae 0%, #174896 100%);
+  align-self: flex-start;
+  margin-top: auto;
+  border-radius: 11px;
+  border: 1px solid #1a4e9a;
+  background: #1d57ac;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  padding: 0.42rem 0.72rem;
+  padding: 0.46rem 0.76rem;
 }
 
-.home-frequent-card--incidencia {
-  border-left: 4px solid #2f9a52;
+.home-frequent-card__cta:hover {
+  background: #174997;
+  border-color: #174997;
 }
 
-.home-frequent-card--tramite {
-  border-left: 4px solid #2b66bf;
+.home-frequent-card:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 3px;
 }
 
-.home-frequent-card--estado {
-  border-left: 4px solid #8561ca;
+.home-frequent-card--incidencia .home-frequent-card__icon-shell {
+  border-color: #cde6d5;
+  background: linear-gradient(180deg, #edf9f1 0%, #e5f4ea 100%);
+}
+
+.home-frequent-card--incidencia .home-frequent-card__icon {
+  color: #2a7a42;
+}
+
+.home-frequent-card--estado .home-frequent-card__icon-shell {
+  border-color: #d6d7f4;
+  background: linear-gradient(180deg, #f1f2ff 0%, #eceeff 100%);
+}
+
+.home-frequent-card--estado .home-frequent-card__icon {
+  color: #5640a2;
 }
 
 .frequent-card {
