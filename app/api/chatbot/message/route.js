@@ -154,9 +154,48 @@ function normalizeStringField(value, maxLength = 320) {
 function shouldSwitchToStatusIntent({ text, interpretation }) {
   const normalized = normalizeIntentLookup(text);
   if (normalized) {
+    const statusWordSignals = [
+      "estado",
+      "seguimiento",
+      "status",
+      "consultar",
+      "consulta",
+      "ver",
+      "saber",
+      "conocer",
+      "conozco",
+      "conosco",
+      "avance",
+      "avanza",
+      "progreso",
+    ];
+    const statusPhraseSignals = ["como va", "en que va"];
+    const statusObjectSignals = [
+      "tramite",
+      "solicitud",
+      "ticket",
+      "expediente",
+      "caso",
+      "gestion",
+      "reporte",
+      "incidencia",
+    ];
+    const tokens = new Set(normalized.split(" "));
+    const hasStatusSignal =
+      statusWordSignals.some((signal) => tokens.has(signal)) ||
+      statusPhraseSignals.some((signal) => normalized.includes(signal));
+    const hasStatusObjectSignal = statusObjectSignals.some((signal) => tokens.has(signal));
+    const hasStatusByPattern = /(?:estado|seguimiento|status)\s+de(?:l| la| mi| un| una)?\s*(?:tramite|solicitud|ticket|expediente|caso|gestion|reporte|incidencia)\b/u.test(
+      normalized
+    );
+    if (hasStatusByPattern || (hasStatusSignal && hasStatusObjectSignal)) {
+      return true;
+    }
+
     const statusKeywords = [
       "consultar estado",
       "estado de tramite",
+      "estado de mi tramite",
       "estado del tramite",
       "estado de solicitud",
       "estado de mi solicitud",
