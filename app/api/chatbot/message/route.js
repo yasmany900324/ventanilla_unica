@@ -323,6 +323,31 @@ function buildIncidentStartReply() {
   return "Bien, cuéntame qué sucede para ayudarte a registrar la incidencia.";
 }
 
+function buildIncidentSeedData({ isTreeSpecific = false, contextEntry = null } = {}) {
+  if (isTreeSpecific) {
+    const treeSeed = contextEntry
+      ? buildTreeFlowSeedFromContext(contextEntry)
+      : {
+          category: "infraestructura",
+          subcategory: "arbol_caido_ramas_peligrosas",
+          location: "",
+          description: "",
+          risk: "",
+          photoStatus: "not_requested",
+        };
+    return {
+      ...EMPTY_COLLECTED_DATA,
+      ...treeSeed,
+    };
+  }
+
+  return {
+    ...EMPTY_COLLECTED_DATA,
+    category: "incidencia_general",
+    subcategory: "reporte_general",
+  };
+}
+
 function buildUnsupportedProcedureReply() {
   return "Lo siento, de momento no puedo ayudarte con este trámite.";
 }
@@ -1220,11 +1245,15 @@ export async function POST(request) {
 
   if (switchToIncident && !isTreeFlowActive(snapshot) && !isProcedureFlowActive(snapshot)) {
     const isGenericIncidentStart = isGenericIncidentStartRequest(text);
-    const seedData = {
-      ...EMPTY_COLLECTED_DATA,
-      category: "infraestructura",
-      subcategory: "arbol_caido_ramas_peligrosas",
-    };
+    const isTreeSpecificIncident = shouldActivateTreeFlow({
+      interpretation,
+      text,
+      contextEntry,
+    });
+    const seedData = buildIncidentSeedData({
+      isTreeSpecific: isTreeSpecificIncident,
+      contextEntry,
+    });
     const mergedFromIntent = mergeCollectedDataFromInterpretation({
       collectedData: seedData,
       interpretation,
@@ -1287,7 +1316,7 @@ export async function POST(request) {
           ? buildIncidentStartReply()
           : buildQuestionForStep({
               step: nextStep,
-              isTreeSpecific: false,
+              isTreeSpecific: isTreeSpecificIncident,
               suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
             }),
       snapshot: savedSnapshot,
@@ -1512,19 +1541,18 @@ export async function POST(request) {
       });
     }
 
+    const switchToTreeIncident = shouldActivateTreeFlow({
+      interpretation,
+      text,
+      contextEntry,
+    });
     const procedureSwitchToIncident =
-      shouldSwitchToIncidentFlow({ text, interpretation }) ||
-      shouldActivateTreeFlow({
-        interpretation,
-        text,
+      shouldSwitchToIncidentFlow({ text, interpretation }) || switchToTreeIncident;
+    if (procedureSwitchToIncident) {
+      const treeSeed = buildIncidentSeedData({
+        isTreeSpecific: switchToTreeIncident,
         contextEntry,
       });
-    if (procedureSwitchToIncident) {
-      const treeSeed = {
-        ...EMPTY_COLLECTED_DATA,
-        category: "infraestructura",
-        subcategory: "arbol_caido_ramas_peligrosas",
-      };
       const mergedFromSwitch = mergeCollectedDataFromInterpretation({
         collectedData: treeSeed,
         interpretation,
@@ -1570,7 +1598,7 @@ export async function POST(request) {
         locale: effectiveLocale,
         replyText: buildQuestionForStep({
           step: nextTreeStep,
-          isTreeSpecific: false,
+          isTreeSpecific: switchToTreeIncident,
           suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
         }),
         snapshot: switchedSnapshot,
@@ -1876,13 +1904,10 @@ export async function POST(request) {
       });
     }
 
-    const seedData = contextEntry
-      ? buildTreeFlowSeedFromContext(contextEntry)
-      : {
-          ...EMPTY_COLLECTED_DATA,
-          category: "infraestructura",
-          subcategory: "arbol_caido_ramas_peligrosas",
-        };
+    const seedData = buildIncidentSeedData({
+      isTreeSpecific: true,
+      contextEntry,
+    });
     snapshot = await setConversationState(
       sessionId,
       createTreeFlowSnapshotPatch({
