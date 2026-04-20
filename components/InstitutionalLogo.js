@@ -12,11 +12,15 @@ const VARIANT_SIZES = {
 
 export default function InstitutionalLogo({ alt, variant = "header", priority = false }) {
   const safeVariant = variant === "footer" ? "footer" : "header";
+  const imageSrc =
+    safeVariant === "footer"
+      ? "/images/logo-intendencia-maldonado-footer.png"
+      : "/images/logo-intendencia-maldonado.png";
 
   return (
     <span className={`institutional-logo institutional-logo--${safeVariant}`}>
       <Image
-        src="/images/logo-intendencia-maldonado.png"
+        src={imageSrc}
         alt={alt}
         width={LOGO_DIMENSIONS.width}
         height={LOGO_DIMENSIONS.height}
