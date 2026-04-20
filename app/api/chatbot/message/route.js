@@ -584,7 +584,29 @@ function buildClarificationActionOptions() {
   ];
 }
 
-function buildStatusActionOptions() {
+function buildStatusActionOptions({ afterSummary = false } = {}) {
+  if (afterSummary) {
+    return [
+      {
+        label: "Ver mis incidencias",
+        command: "none",
+        value: "Quiero ver mis incidencias.",
+        commandField: null,
+      },
+      {
+        label: "Consultar otro caso",
+        command: "none",
+        value: "Quiero consultar otro caso con identificador.",
+        commandField: null,
+      },
+      {
+        label: "Reportar nueva incidencia",
+        command: "none",
+        value: "Quiero reportar una nueva incidencia.",
+        commandField: null,
+      },
+    ];
+  }
   return [
     {
       label: "Ver mis incidencias",
@@ -611,6 +633,39 @@ function buildStatusActionOptions() {
       commandField: null,
     },
   ];
+}
+
+function buildStatusResultActionOptions({ isIncident = false } = {}) {
+  const options = [
+    {
+      label: "Ver mis incidencias",
+      command: "none",
+      value: "Quiero ver mis incidencias.",
+      commandField: null,
+    },
+    {
+      label: "Consultar otro caso",
+      command: "none",
+      value: "Quiero consultar otro caso con identificador.",
+      commandField: null,
+    },
+  ];
+  if (isIncident) {
+    options.push({
+      label: "Reportar nueva incidencia",
+      command: "none",
+      value: "Quiero reportar una incidencia.",
+      commandField: null,
+    });
+  } else {
+    options.push({
+      label: "Iniciar trámite",
+      command: "none",
+      value: "Quiero iniciar un trámite.",
+      commandField: null,
+    });
+  }
+  return options;
 }
 
 function buildStatusReply({ identifierRequested = false } = {}) {
@@ -678,6 +733,37 @@ function buildProcedureCompletedReply(activeProcedure, requestCode = null) {
   return `Perfecto. Confirmé los datos para ${procedureName} y cerré esta conversación de forma guiada.`;
 }
 
+function humanizeIncidentTypeLabel(value) {
+  const normalized = normalizeIntentLookup(value);
+  if (!normalized) {
+    return "Incidencia ciudadana";
+  }
+  if (normalized === "incidencia_general" || normalized === "reporte_general") {
+    return "Incidencia general";
+  }
+  return value
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+function buildIncidentStatusExplanation(statusLabel) {
+  const normalized = normalizeIntentLookup(statusLabel);
+  if (normalized.includes("recibido")) {
+    return "Tu incidencia fue registrada correctamente y está pendiente de revisión por el equipo correspondiente.";
+  }
+  if (normalized.includes("revision")) {
+    return "Tu incidencia está siendo revisada por el equipo correspondiente.";
+  }
+  if (normalized.includes("proceso")) {
+    return "Tu incidencia está en proceso de atención.";
+  }
+  if (normalized.includes("resuelto")) {
+    return "Tu incidencia figura como resuelta. Si necesitas, puedo ayudarte a revisar otro caso.";
+  }
+  return "Te comparto el estado actualizado de tu incidencia.";
+}
+
 function buildStatusSummaryReply(statusEntry) {
   if (!statusEntry || typeof statusEntry !== "object") {
     return "No pude obtener el estado de ese identificador.";
@@ -689,13 +775,20 @@ function buildStatusSummaryReply(statusEntry) {
 
   if (statusEntry.kind === "incident") {
     const description = shortenStatusText(statusEntry.description, 160);
-    return `Resumen del caso ${identifier}:
-- Tipo: Incidencia
-- Estado: ${statusLabel}
-- Categoría: ${statusEntry.category || "Sin categoría"}
-- Ubicación: ${statusEntry.location || "Sin ubicación"}
+    const typeLabel = humanizeIncidentTypeLabel(statusEntry.category || statusEntry.subcategory || "");
+    const friendlyExplanation = buildIncidentStatusExplanation(statusLabel);
+    return `Incidencia ${identifier}
+
+Estado actual: ${statusLabel}
+${friendlyExplanation}
+
+Detalles del caso:
 - Última actualización: ${updatedAt}
-- Descripción: ${description || "Sin descripción"}`;
+- Ubicación: ${statusEntry.location || "Sin ubicación informada"}
+- Tipo: ${typeLabel}
+- Descripción: ${description || "Sin descripción disponible"}
+
+Si quieres, puedo ayudarte con otro identificador o con una nueva incidencia.`;
   }
 
   const details = shortenStatusText(
@@ -1617,7 +1710,9 @@ export async function POST(request) {
           locale: effectiveLocale,
           replyText: buildStatusSummaryReply(statusSummaryEntry),
           snapshot: statusLookupSnapshot,
-          actionOptions: buildStatusActionOptions(),
+          actionOptions: buildStatusResultActionOptions({
+            isIncident: statusSummaryEntry.kind === "incident",
+          }),
           nextStepType: "check_status",
           nextStepField: "identifier",
           redirectTo: "/mis-incidencias",
