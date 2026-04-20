@@ -91,6 +91,43 @@ function resolveFrequentServiceCta(item, copy) {
   return frequentCtas.tramite || "Iniciar trámite";
 }
 
+function FrequentItemCard({ item, href, serviceKind, ctaLabel, typeLabel, openItemAriaPrefix }) {
+  return (
+    <li className="home-frequent-carousel__slide">
+      <Link
+        href={href}
+        className={`home-frequent-card home-frequent-card--${serviceKind}`}
+        aria-label={`${openItemAriaPrefix} ${item.title}`}
+      >
+        <div className="home-frequent-card__top">
+          <span
+            className={`home-frequent-card__icon-shell home-frequent-card__icon-shell--${serviceKind}`}
+            aria-hidden="true"
+          >
+            <span className="home-frequent-card__icon" aria-hidden="true">
+              {resolveServiceIcon(item)}
+            </span>
+          </span>
+          {item.badge ? (
+            <span className={`home-frequent-card__badge home-frequent-card__badge--${item.badgeType}`}>
+              {item.badge}
+            </span>
+          ) : null}
+        </div>
+        <div className="home-frequent-card__content">
+          <p className="home-frequent-card__type">{typeLabel}</p>
+          <h3 className="home-frequent-card__title">{item.title}</h3>
+          <p className="home-frequent-card__description">{item.description}</p>
+        </div>
+        <span className="home-frequent-card__cta">
+          {ctaLabel}
+          <span aria-hidden="true">→</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
   const viewportRef = useRef(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
@@ -203,32 +240,18 @@ function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
                 : buildAssistantCardHref(item);
             const serviceKind = resolveServiceKind(item);
             const ctaLabel = resolveFrequentServiceCta(item, copy);
+            const typeLabel = copy.home.frequentTypeLabels[serviceKind] || "";
 
             return (
-              <li key={item.title} className="home-frequent-carousel__slide">
-                <Link
-                  href={href}
-                  className={`home-frequent-card home-frequent-card--${serviceKind}`}
-                  aria-label={`${copy.home.openItemAriaPrefix} ${item.title}`}
-                >
-                  <div className="home-frequent-card__icon-wrap">
-                    <span className="home-frequent-card__icon" aria-hidden="true">
-                      {resolveServiceIcon(item)}
-                    </span>
-                    {item.badge ? (
-                      <span className={`home-frequent-card__badge home-frequent-card__badge--${item.badgeType}`}>
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="home-frequent-card__body">
-                    <p className="home-frequent-card__type">{copy.home.frequentTypeLabels[serviceKind]}</p>
-                    <h3>{item.title}</h3>
-                    <p className="home-frequent-card__description">{item.description}</p>
-                  </div>
-                  <span className="home-frequent-card__cta">{ctaLabel}</span>
-                </Link>
-              </li>
+              <FrequentItemCard
+                key={item.title}
+                item={item}
+                href={href}
+                serviceKind={serviceKind}
+                ctaLabel={ctaLabel}
+                typeLabel={typeLabel}
+                openItemAriaPrefix={copy.home.openItemAriaPrefix}
+              />
             );
           })}
         </ul>
