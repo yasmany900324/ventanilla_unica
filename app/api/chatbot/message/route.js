@@ -30,6 +30,7 @@ import {
   buildTreeFlowSeedFromContext,
   createTreeFlowSnapshotPatch,
   getNextTreeFlowStep,
+  isTreeIncidentCollectedData,
   isProcedureFlowActive,
   isTreeFlowActive,
   mergeCollectedDataFromInterpretation,
@@ -684,7 +685,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: nextStep }),
+      replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
       snapshot: savedSnapshot,
       actionOptions,
       nextStepType: "ask_field",
@@ -747,7 +748,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: targetStep }),
+      replyText: buildQuestionForStep({ step: targetStep, isTreeSpecific: true }),
       snapshot: updatedSnapshot,
       actionOptions:
         targetStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -808,7 +809,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: nextStep }),
+      replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
       snapshot: updatedSnapshot,
       actionOptions:
         nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -840,7 +841,7 @@ export async function POST(request) {
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildQuestionForStep({ step: nextStep }),
+        replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
         snapshot: updatedSnapshot,
         actionOptions:
           nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -899,7 +900,7 @@ export async function POST(request) {
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildQuestionForStep({ step: nextStep }),
+        replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
         snapshot: updatedSnapshot,
         actionOptions:
           nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -1248,6 +1249,7 @@ export async function POST(request) {
           ? buildIncidentStartReply()
           : buildQuestionForStep({
               step: nextStep,
+              isTreeSpecific: false,
               suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
             }),
       snapshot: savedSnapshot,
@@ -1530,6 +1532,7 @@ export async function POST(request) {
         locale: effectiveLocale,
         replyText: buildQuestionForStep({
           step: nextTreeStep,
+          isTreeSpecific: false,
           suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
         }),
         snapshot: switchedSnapshot,
@@ -1951,6 +1954,7 @@ export async function POST(request) {
   const replyText = buildQuestionForStep({
     step: nextStep,
     lowConfidence: currentStepHasLowConfidence,
+    isTreeSpecific: isTreeIncidentCollectedData(savedSnapshot.collectedData),
     suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
   });
   return buildChatResponse({
