@@ -42,12 +42,6 @@ const FOOTER_LINK_GROUPS = [
   },
 ];
 
-const FOOTER_MOBILE_PRIORITY_LINKS = [
-  { href: "/#tramites", labelKey: "proceduresGuide" },
-  { href: "/#ayuda-soporte", labelKey: "helpCenter" },
-  { href: "/#accesibilidad", labelKey: "accessibility" },
-];
-
 const SOCIAL_LINKS = [
   { href: "https://www.facebook.com", label: "Facebook", shortLabel: "Fb" },
   { href: "https://x.com", label: "X", shortLabel: "X" },
@@ -272,14 +266,6 @@ export default function PortalShell({ children }) {
       })),
     [copy.portal.footerGroups, copy.portal.footerLinks]
   );
-  const footerPriorityLinks = useMemo(
-    () =>
-      FOOTER_MOBILE_PRIORITY_LINKS.map((link) => ({
-        href: link.href,
-        label: copy.portal.footerLinks[link.labelKey],
-      })),
-    [copy.portal.footerLinks]
-  );
   const [mobileFooterAccordionState, setMobileFooterAccordionState] = useState({
     onlineServices: false,
     helpSupport: false,
@@ -465,14 +451,7 @@ export default function PortalShell({ children }) {
               <br />
               {copy.portal.footerMail}
             </p>
-            <ul className="portal-footer__quick-links">
-              {footerPriorityLinks.map((link) => (
-                <li key={link.label}>
-                  <Link href={link.href}>{link.label}</Link>
-                </li>
-              ))}
-            </ul>
-            <ul className="portal-footer__social">
+            <ul className="portal-footer__social portal-footer__social--desktop">
               {SOCIAL_LINKS.map((social) => (
                 <li key={social.label}>
                   <a href={social.href} aria-label={social.label}>
@@ -515,7 +494,9 @@ export default function PortalShell({ children }) {
                     >
                       <span>{group.title}</span>
                       <span className="portal-footer__accordion-icon" aria-hidden="true">
-                        {isExpanded ? "−" : "+"}
+                        <svg viewBox="0 0 20 20" focusable="false">
+                          <path d="M5.75 7.5 10 11.75 14.25 7.5" />
+                        </svg>
                       </span>
                     </button>
                   </h3>
@@ -538,6 +519,15 @@ export default function PortalShell({ children }) {
               );
             })}
           </div>
+          <ul className="portal-footer__social portal-footer__social--mobile">
+            {SOCIAL_LINKS.map((social) => (
+              <li key={`${social.label}-mobile`}>
+                <a href={social.href} aria-label={social.label}>
+                  {social.shortLabel}
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
         <div className="portal-footer__legal">
           <p>{copy.portal.footerRights}</p>
