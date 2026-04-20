@@ -3357,6 +3357,8 @@ textarea:focus-visible {
     padding-top: 0.74rem;
     padding-bottom: 0.62rem;
     gap: 0.42rem;
+    padding-left: 0.68rem;
+    padding-right: 0.68rem;
   }
 
   .portal-footer {
@@ -3367,7 +3369,7 @@ textarea:focus-visible {
     display: grid;
     justify-items: center;
     gap: 0.28rem;
-    width: min(100%, 304px);
+    width: min(100%, 356px);
     margin: 0 auto;
   }
 
@@ -3399,7 +3401,7 @@ textarea:focus-visible {
     padding: 0;
     display: grid;
     gap: 0.05rem;
-    width: min(100%, 270px);
+    width: min(100%, 340px);
   }
 
   .portal-footer__quick-links a {
@@ -3438,13 +3440,15 @@ textarea:focus-visible {
   .portal-footer__mobile-accordion {
     display: grid;
     gap: 0.08rem;
-    width: min(100%, 312px);
+    width: min(100%, 100%);
     margin: 0.1rem auto 0;
   }
 
   .portal-footer__accordion-item {
     border-top: 1px solid rgba(206, 221, 250, 0.18);
     padding-top: 0.2rem;
+    margin-left: 0.08rem;
+    margin-right: 0.08rem;
   }
 
   .portal-footer__accordion-heading {
@@ -3462,7 +3466,7 @@ textarea:focus-visible {
     justify-content: space-between;
     gap: 0.55rem;
     min-height: 2.38rem;
-    padding: 0.4rem 0.12rem;
+    padding: 0.4rem 0.2rem;
     font-size: 0.8rem;
     font-weight: 650;
     text-align: left;
@@ -3491,7 +3495,7 @@ textarea:focus-visible {
   .portal-footer__accordion-panel ul {
     list-style: none;
     margin: 0;
-    padding: 0 0 0.1rem;
+    padding: 0 0.2rem 0.1rem;
     gap: 0.08rem;
     display: grid;
   }
@@ -3503,6 +3507,7 @@ textarea:focus-visible {
     font-size: 0.78rem;
     color: #d8e6ff;
     text-decoration: none;
+    width: 100%;
   }
 
   .portal-footer__accordion-panel a:hover,
