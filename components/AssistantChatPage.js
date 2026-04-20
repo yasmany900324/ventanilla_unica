@@ -240,38 +240,36 @@ function buildContextWelcomeMessage({ context, copy }) {
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
-      <div className="assistant-chat-header__identity">
-        <div className="assistant-chat-header__avatar" aria-hidden="true">
-          AV
+      <div className="assistant-chat-header__top">
+        <div className="assistant-chat-header__identity">
+          <div className="assistant-chat-header__avatar" aria-hidden="true">
+            AV
+          </div>
+          <div>
+            <p className="assistant-chat-header__eyebrow">{copy.header.eyebrow}</p>
+            <h1>{copy.header.title}</h1>
+          </div>
         </div>
-        <div>
-          <p className="assistant-chat-header__eyebrow">{copy.header.eyebrow}</p>
-          <h1>{copy.header.title}</h1>
-          <p className="assistant-chat-header__subtitle">
-            {copy.header.subtitle}
-          </p>
-        </div>
-      </div>
-      <div className="assistant-chat-header__meta">
         <p className="assistant-chat-header__status" aria-live="polite">
           <span className="assistant-chat-header__status-dot" aria-hidden="true" />
           {copy.header.online}
         </p>
-        <nav aria-label={copy.header.secondaryNavAria}>
-          <ul className="assistant-chat-header__actions">
-            <li>
-              <Link href="/" className="assistant-chat-header__action-link">
-                {copy.header.backHome}
-              </Link>
-            </li>
-            <li>
-              <Link href="/mis-incidencias" className="assistant-chat-header__action-link">
-                {copy.header.viewIncidents}
-              </Link>
-            </li>
-          </ul>
-        </nav>
       </div>
+      <p className="assistant-chat-header__subtitle">{copy.header.subtitle}</p>
+      <nav className="assistant-chat-header__nav" aria-label={copy.header.secondaryNavAria}>
+        <ul className="assistant-chat-header__actions">
+          <li>
+            <Link href="/" className="assistant-chat-header__action-link">
+              {copy.header.backHome}
+            </Link>
+          </li>
+          <li>
+            <Link href="/mis-incidencias" className="assistant-chat-header__action-link">
+              {copy.header.viewIncidents}
+            </Link>
+          </li>
+        </ul>
+      </nav>
     </header>
   );
 }
@@ -419,6 +417,35 @@ function ChatQuickReplies({ prompts, onPromptClick, disabled, copy }) {
   );
 }
 
+function ChatInitialGuidance({ prompts, onPromptClick, disabled, copy }) {
+  if (!Array.isArray(prompts) || prompts.length === 0) {
+    return null;
+  }
+
+  return (
+    <li className="assistant-thread__item assistant-thread__item--bot">
+      <article className="assistant-message assistant-message--bot assistant-message--intro">
+        <p className="assistant-message__intro-copy">{copy.initialHelp}</p>
+        <div className="assistant-chat-quick-replies" aria-label={copy.quickRepliesTitle}>
+          <div className="assistant-chat-quick-replies__list">
+            {prompts.map((prompt) => (
+              <button
+                key={`starter-${prompt}`}
+                type="button"
+                className="assistant-prompt-chip"
+                onClick={() => onPromptClick(prompt)}
+                disabled={disabled}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      </article>
+    </li>
+  );
+}
+
 function ChatComposer({
   inputValue,
   onInputChange,
@@ -437,26 +464,19 @@ function ChatComposer({
       <label htmlFor="assistant-chat-input" className="assistant-chat-composer__sr-only">
         {copy.composer.label}
       </label>
-      <textarea
-        ref={inputRef}
-        id="assistant-chat-input"
-        name="message"
-        maxLength={MAX_MESSAGE_LENGTH}
-        placeholder={copy.composer.placeholder}
-        value={inputValue}
-        onChange={onInputChange}
-        onKeyDown={onKeyDown}
-        disabled={isSending}
-        rows={1}
-      />
-      <div className="assistant-chat-composer__actions">
-        {shouldShowCounter ? (
-          <p className="assistant-chat-composer__counter">
-            {characterCount}/{MAX_MESSAGE_LENGTH}
-          </p>
-        ) : (
-          <span className="assistant-chat-composer__hint">{copy.composer.counterHint}</span>
-        )}
+      <div className="assistant-chat-composer__input-wrap">
+        <textarea
+          ref={inputRef}
+          id="assistant-chat-input"
+          name="message"
+          maxLength={MAX_MESSAGE_LENGTH}
+          placeholder={copy.composer.placeholder}
+          value={inputValue}
+          onChange={onInputChange}
+          onKeyDown={onKeyDown}
+          disabled={isSending}
+          rows={1}
+        />
         <button
           type="submit"
           className="assistant-chat-composer__send"
@@ -468,6 +488,11 @@ function ChatComposer({
           </svg>
         </button>
       </div>
+      {shouldShowCounter ? (
+        <p className="assistant-chat-composer__counter">
+          {characterCount}/{MAX_MESSAGE_LENGTH}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -479,6 +504,10 @@ export default function AssistantChatPage() {
   const { locale } = useLocale();
   const uiCopy = getLocaleCopy(locale).chat;
   const entryContext = useMemo(() => getChatEntryContext(searchParams), [searchParams]);
+  const quickPrompts = useMemo(
+    () => (Array.isArray(uiCopy.quickPrompts) ? uiCopy.quickPrompts.slice(0, 3) : []),
+    [uiCopy.quickPrompts]
+  );
   const contextualWelcomeMessage = useMemo(
     () => buildContextWelcomeMessage({ context: entryContext, copy: uiCopy }),
     [entryContext, uiCopy]
@@ -496,7 +525,6 @@ export default function AssistantChatPage() {
     return `${entryContext.type}|${entryContext.id}|${entryContext.title}`;
   }, [entryContext]);
   const restartKey = useMemo(() => normalizeContextParam(searchParams.get("restart"), 8), [searchParams]);
-  const quickPrompts = uiCopy.quickPrompts;
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
   const initializedSessionRef = useRef(false);
@@ -855,11 +883,21 @@ export default function AssistantChatPage() {
   };
 
   const characterCount = inputValue.length;
-  const showQuickReplies = messages.some((message) => message.sender === "bot") && !isSending && !entryContext;
+  const showInitialGuidance =
+    !entryContext &&
+    !serviceError &&
+    !isSending &&
+    messages.length === 1 &&
+    messages[0]?.sender === "bot";
+  const showQuickReplies =
+    messages.some((message) => message.sender === "bot") &&
+    !isSending &&
+    !entryContext &&
+    !showInitialGuidance;
 
   return (
     <main className="page page--assistant" lang={locale}>
-      <section className="card assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
+      <section className="assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
         <ChatHeader copy={uiCopy} />
 
         <div
@@ -894,6 +932,14 @@ export default function AssistantChatPage() {
                 copy={uiCopy}
               />
             ))}
+            {showInitialGuidance ? (
+              <ChatInitialGuidance
+                prompts={quickPrompts}
+                onPromptClick={handleSendMessage}
+                disabled={isSending}
+                copy={uiCopy}
+              />
+            ) : null}
 
             {isSending ? <TypingIndicator copy={uiCopy} /> : null}
 
