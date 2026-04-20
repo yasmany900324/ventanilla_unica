@@ -11,8 +11,10 @@ const MAX_MESSAGE_LENGTH = 500;
 const MAX_TEXTAREA_HEIGHT = 168;
 const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
 const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
+const CHATBOT_MESSAGES_STORAGE_KEY = "chatbot_messages";
 const CHATBOT_RESUME_PENDING_KEY = "chatbot_resume_pending";
 const DEFAULT_CHAT_COMMAND = "none";
+const MAX_PERSISTED_MESSAGES = 80;
 
 function createLocalMessage(partial) {
   return {
@@ -156,6 +158,89 @@ function safeRemoveLocalStorageItem(key) {
   }
 
   window.localStorage.removeItem(key);
+}
+
+function normalizePersistedMessage(rawMessage, index) {
+  if (!rawMessage || typeof rawMessage !== "object") {
+    return null;
+  }
+
+  const sender = rawMessage.sender === "user" ? "user" : rawMessage.sender === "bot" ? "bot" : "";
+  if (!sender) {
+    return null;
+  }
+
+  const text = normalizeChipLabel(rawMessage.text);
+  if (!text) {
+    return null;
+  }
+
+  const createdAt = normalizeContextParam(rawMessage.createdAt, 80);
+  const hasValidDate = createdAt && !Number.isNaN(new Date(createdAt).getTime());
+  const actionOptions = normalizeActionOptions(rawMessage.actionOptions);
+  const suggestedReplies = Array.isArray(rawMessage.suggestedReplies)
+    ? rawMessage.suggestedReplies
+        .map((value) => normalizeChipLabel(value))
+        .filter(Boolean)
+        .slice(0, 8)
+    : [];
+
+  return {
+    id: normalizeContextParam(rawMessage.id, 80) || `msg-restored-${Date.now()}-${index}`,
+    sender,
+    text,
+    createdAt: hasValidDate ? createdAt : new Date().toISOString(),
+    kind: normalizeContextParam(rawMessage.kind, 40) || undefined,
+    intent: normalizeContextParam(rawMessage.intent, 60) || null,
+    confidence: normalizeContextParam(rawMessage.confidence, 20) || null,
+    action: normalizeContextParam(rawMessage.action, 80) || null,
+    suggestedReplies,
+    actionOptions,
+    nextStep:
+      rawMessage.nextStep && typeof rawMessage.nextStep === "object"
+        ? {
+            type: normalizeContextParam(rawMessage.nextStep.type, 60) || null,
+            field: normalizeContextParam(rawMessage.nextStep.field, 60) || null,
+          }
+        : null,
+    mode: normalizeContextParam(rawMessage.mode, 40) || null,
+    redirectTo: normalizeContextParam(rawMessage.redirectTo, 180) || null,
+    redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
+    needsClarification: Boolean(rawMessage.needsClarification),
+  };
+}
+
+function parsePersistedMessages(serializedMessages) {
+  if (typeof serializedMessages !== "string" || !serializedMessages.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(serializedMessages);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .slice(-MAX_PERSISTED_MESSAGES)
+      .map((rawMessage, index) => normalizePersistedMessage(rawMessage, index))
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function buildPersistedMessagesPayload(messages) {
+  if (!Array.isArray(messages)) {
+    return "[]";
+  }
+
+  const normalized = messages
+    .slice(-MAX_PERSISTED_MESSAGES)
+    .map((message, index) => normalizePersistedMessage(message, index))
+    .filter(Boolean);
+
+  return JSON.stringify(normalized);
 }
 
 function normalizeContextParam(value, maxLength = 120) {
@@ -579,6 +664,7 @@ export default function AssistantChatPage() {
     if (!shouldResume) {
       safeRemoveLocalStorageItem(SESSION_ID_STORAGE_KEY);
       safeRemoveLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
+      safeRemoveLocalStorageItem(CHATBOT_MESSAGES_STORAGE_KEY);
       setSessionId("");
       setSessionLocale("");
       return;
@@ -592,6 +678,13 @@ export default function AssistantChatPage() {
     const existingSessionLocale = safeGetLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
     if (existingSessionLocale) {
       setSessionLocale(existingSessionLocale);
+    }
+
+    const persistedMessages = parsePersistedMessages(
+      safeGetLocalStorageItem(CHATBOT_MESSAGES_STORAGE_KEY)
+    );
+    if (persistedMessages.length > 0) {
+      setMessages(persistedMessages);
     }
   }, []);
 
@@ -610,6 +703,14 @@ export default function AssistantChatPage() {
 
     safeSetLocalStorageItem(SESSION_LOCALE_STORAGE_KEY, sessionLocale);
   }, [sessionLocale]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    safeSetLocalStorageItem(CHATBOT_MESSAGES_STORAGE_KEY, buildPersistedMessagesPayload(messages));
+  }, [messages]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -644,6 +745,7 @@ export default function AssistantChatPage() {
 
     safeRemoveLocalStorageItem(SESSION_ID_STORAGE_KEY);
     safeRemoveLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
+    safeRemoveLocalStorageItem(CHATBOT_MESSAGES_STORAGE_KEY);
     safeRemoveLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
     contextualPromptSentRef.current = "";
     lastFailedInputRef.current = {
