@@ -115,6 +115,27 @@ function CarouselChevronIcon({ direction = "next" }) {
   );
 }
 
+function FrequentCardCtaChevronIcon() {
+  return (
+    <svg
+      className="home-frequent-card__cta-icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M5.25 3.5 9.75 8l-4.5 4.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function FrequentItemCard({ item, href, serviceKind, ctaLabel, typeLabel, openItemAriaPrefix }) {
   return (
     <li className="home-frequent-carousel__slide">
@@ -145,7 +166,7 @@ function FrequentItemCard({ item, href, serviceKind, ctaLabel, typeLabel, openIt
         </div>
         <span className="home-frequent-card__cta">
           {ctaLabel}
-          <span aria-hidden="true">→</span>
+          <FrequentCardCtaChevronIcon />
         </span>
       </Link>
     </li>
