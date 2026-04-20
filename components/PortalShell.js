@@ -544,16 +544,18 @@ export default function PortalShell({ children }) {
         </div>
       </footer>
 
-      <Link
-        href={assistantHref}
-        className={`floating-chat-button${isFooterVisible ? " floating-chat-button--footer-aware" : ""}`}
-        aria-label={copy.portal.floatingChatLabel}
-        onClick={handleFloatingChatClick}
-      >
-        <span className="floating-chat-button__icon" aria-hidden="true">
-          +
-        </span>
-      </Link>
+      {pathname !== "/asistente" ? (
+        <Link
+          href={assistantHref}
+          className={`floating-chat-button${isFooterVisible ? " floating-chat-button--footer-aware" : ""}`}
+          aria-label={copy.portal.floatingChatLabel}
+          onClick={handleFloatingChatClick}
+        >
+          <span className="floating-chat-button__icon" aria-hidden="true">
+            +
+          </span>
+        </Link>
+      ) : null}
 
       <nav className="mobile-bottom-nav" aria-label={copy.portal.mobileNavAriaLabel}>
         <ul className="mobile-bottom-nav__list">
