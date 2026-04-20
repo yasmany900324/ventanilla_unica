@@ -17,7 +17,7 @@ import {
 import { detectLocaleFromText } from "../../../../lib/languageDetection";
 import { createIncident } from "../../../../lib/incidents";
 import {
-  FLOW_KEY_TREE,
+  FLOW_KEY_INCIDENT,
   FLOW_KEY_PROCEDURE,
   buildAuthRequiredReply,
   buildCancelledIncidentReply,
@@ -27,15 +27,14 @@ import {
   buildProcedureStartReply,
   buildPhotoActionOptions,
   buildQuestionForStep,
-  buildTreeFlowSeedFromContext,
-  createTreeFlowSnapshotPatch,
-  getNextTreeFlowStep,
-  isTreeIncidentCollectedData,
+  buildIncidentFlowSeedFromContext,
+  createIncidentFlowSnapshotPatch,
+  getNextIncidentFlowStep,
   isProcedureFlowActive,
-  isTreeFlowActive,
+  isIncidentFlowActive,
   mergeCollectedDataFromInterpretation,
   parseUserCommandFromText,
-  shouldActivateTreeFlow,
+  shouldActivateIncidentFlow,
   shouldSwitchToIncidentFlow,
   shouldSwitchToProcedureFlow,
   createProcedureFlowSnapshotPatch,
@@ -123,7 +122,7 @@ function mapFieldToStep(fieldName) {
 }
 
 function buildModeFromSnapshot(snapshot) {
-  if (snapshot?.flowKey === FLOW_KEY_TREE) {
+  if (snapshot?.flowKey === FLOW_KEY_INCIDENT) {
     return "incident";
   }
   if (snapshot?.flowKey === FLOW_KEY_PROCEDURE) {
@@ -628,25 +627,25 @@ export async function POST(request) {
     }
   }
 
-  const isTreeContextStart =
+  const isIncidentContextStart =
     (effectiveCommand === "start_contextual_flow" ||
       effectiveCommand === "start_contextual_entry") &&
     contextEntry &&
-    shouldActivateTreeFlow({
+    shouldActivateIncidentFlow({
       interpretation: null,
       text: `${contextEntry.title || ""} ${contextEntry.description || ""}`,
       contextEntry,
     });
 
-  if (isTreeContextStart) {
-    const seededData = buildTreeFlowSeedFromContext(contextEntry);
-    const nextStep = getNextTreeFlowStep(seededData);
+  if (isIncidentContextStart) {
+    const seededData = buildIncidentFlowSeedFromContext(contextEntry);
+    const nextStep = getNextIncidentFlowStep(seededData);
     const nextState =
       nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
         ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
         : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
     const confirmationState = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none";
-    const patch = createTreeFlowSnapshotPatch({
+    const patch = createIncidentFlowSnapshotPatch({
       locale: effectiveLocale,
       userId: authenticatedUser?.id || snapshot.userId || null,
       collectedData: seededData,
@@ -689,7 +688,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
+      replyText: buildQuestionForStep({ step: nextStep }),
       snapshot: savedSnapshot,
       actionOptions,
       nextStepType: "ask_field",
@@ -719,7 +718,7 @@ export async function POST(request) {
     });
   }
 
-  if (effectiveCommand === "edit_field" && isTreeFlowActive(snapshot)) {
+  if (effectiveCommand === "edit_field" && isIncidentFlowActive(snapshot)) {
     const targetStep = mapFieldToStep(effectiveCommandField);
     const resetCollectedData = {
       ...snapshot.collectedData,
@@ -735,7 +734,7 @@ export async function POST(request) {
     }
     const updatedSnapshot = await setConversationState(
       sessionId,
-      createTreeFlowSnapshotPatch({
+      createIncidentFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
         collectedData: resetCollectedData,
@@ -752,7 +751,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: targetStep, isTreeSpecific: true }),
+      replyText: buildQuestionForStep({ step: targetStep }),
       snapshot: updatedSnapshot,
       actionOptions:
         targetStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -763,13 +762,13 @@ export async function POST(request) {
 
   if (
     (effectiveCommand === "set_photo_pending" || effectiveCommand === "skip_photo") &&
-    isTreeFlowActive(snapshot)
+    isIncidentFlowActive(snapshot)
   ) {
     const updatedData = {
       ...snapshot.collectedData,
       photoStatus: effectiveCommand === "set_photo_pending" ? "pending_upload" : "skipped",
     };
-    const nextStep = getNextTreeFlowStep(updatedData);
+    const nextStep = getNextIncidentFlowStep(updatedData);
     const nextState =
       nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
         ? CHATBOT_CONVERSATION_STATES.AWAITING_CONFIRMATION
@@ -778,7 +777,7 @@ export async function POST(request) {
 
     const updatedSnapshot = await setConversationState(
       sessionId,
-      createTreeFlowSnapshotPatch({
+      createIncidentFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
         collectedData: updatedData,
@@ -813,7 +812,7 @@ export async function POST(request) {
     return buildChatResponse({
       sessionId,
       locale: effectiveLocale,
-      replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
+      replyText: buildQuestionForStep({ step: nextStep }),
       snapshot: updatedSnapshot,
       actionOptions:
         nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -822,13 +821,13 @@ export async function POST(request) {
     });
   }
 
-  if (effectiveCommand === "resume_confirmation" && isTreeFlowActive(snapshot)) {
+  if (effectiveCommand === "resume_confirmation" && isIncidentFlowActive(snapshot)) {
     const missingFields = getRequiredMissingFields(snapshot.collectedData);
     if (missingFields.length > 0) {
       const nextStep = mapFieldToStep(missingFields[0]);
       const updatedSnapshot = await setConversationState(
         sessionId,
-        createTreeFlowSnapshotPatch({
+        createIncidentFlowSnapshotPatch({
           locale: effectiveLocale,
           userId: authenticatedUser?.id || snapshot.userId || null,
           collectedData: snapshot.collectedData,
@@ -845,7 +844,7 @@ export async function POST(request) {
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
+        replyText: buildQuestionForStep({ step: nextStep }),
         snapshot: updatedSnapshot,
         actionOptions:
           nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -856,7 +855,7 @@ export async function POST(request) {
 
     const updatedSnapshot = await setConversationState(
       sessionId,
-      createTreeFlowSnapshotPatch({
+      createIncidentFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
         collectedData: snapshot.collectedData,
@@ -881,13 +880,13 @@ export async function POST(request) {
     });
   }
 
-  if (effectiveCommand === "confirm" && isTreeFlowActive(snapshot)) {
+  if (effectiveCommand === "confirm" && isIncidentFlowActive(snapshot)) {
     const missingFields = getRequiredMissingFields(snapshot.collectedData);
     if (missingFields.length > 0) {
       const nextStep = mapFieldToStep(missingFields[0]);
       const updatedSnapshot = await setConversationState(
         sessionId,
-        createTreeFlowSnapshotPatch({
+        createIncidentFlowSnapshotPatch({
           locale: effectiveLocale,
           userId: authenticatedUser?.id || snapshot.userId || null,
           collectedData: snapshot.collectedData,
@@ -904,7 +903,7 @@ export async function POST(request) {
       return buildChatResponse({
         sessionId,
         locale: effectiveLocale,
-        replyText: buildQuestionForStep({ step: nextStep, isTreeSpecific: true }),
+        replyText: buildQuestionForStep({ step: nextStep }),
         snapshot: updatedSnapshot,
         actionOptions:
           nextStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
@@ -944,7 +943,7 @@ export async function POST(request) {
       const descriptionWithRisk = `${snapshot.collectedData.description} (Riesgo: ${snapshot.collectedData.risk})`;
       const incident = await createIncident({
         userId: authenticatedUser.id,
-        category: snapshot.collectedData.category || "infraestructura",
+        category: snapshot.collectedData.category || "incidencia_general",
         description: descriptionWithRisk,
         location: snapshot.collectedData.location,
       });
@@ -953,7 +952,7 @@ export async function POST(request) {
         locale: effectiveLocale,
         userId: authenticatedUser.id,
         state: CHATBOT_CONVERSATION_STATES.CLOSED,
-        flowKey: FLOW_KEY_TREE,
+        flowKey: FLOW_KEY_INCIDENT,
         currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
         confirmationState: "confirmed",
         collectedData: snapshot.collectedData,
@@ -1218,12 +1217,12 @@ export async function POST(request) {
     });
   }
 
-  if (switchToIncident && !isTreeFlowActive(snapshot) && !isProcedureFlowActive(snapshot)) {
+  if (switchToIncident && !isIncidentFlowActive(snapshot) && !isProcedureFlowActive(snapshot)) {
     const isGenericIncidentStart = isGenericIncidentStartRequest(text);
     const seedData = {
       ...EMPTY_COLLECTED_DATA,
-      category: "infraestructura",
-      subcategory: "arbol_caido_ramas_peligrosas",
+      category: "incidencia_general",
+      subcategory: "reporte_general",
     };
     const mergedFromIntent = mergeCollectedDataFromInterpretation({
       collectedData: seedData,
@@ -1233,7 +1232,7 @@ export async function POST(request) {
     });
     const hasDescription = Boolean(mergedFromIntent.collectedData?.description);
     const nextStep = hasDescription
-      ? getNextTreeFlowStep(mergedFromIntent.collectedData)
+      ? getNextIncidentFlowStep(mergedFromIntent.collectedData)
       : CHATBOT_CURRENT_STEPS.DESCRIPTION;
     const nextState =
       nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION
@@ -1241,7 +1240,7 @@ export async function POST(request) {
         : CHATBOT_CONVERSATION_STATES.FLOW_ACTIVE;
     const savedSnapshot = await setConversationState(
       sessionId,
-      createTreeFlowSnapshotPatch({
+      createIncidentFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
         collectedData: mergedFromIntent.collectedData,
@@ -1287,7 +1286,6 @@ export async function POST(request) {
           ? buildIncidentStartReply()
           : buildQuestionForStep({
               step: nextStep,
-              isTreeSpecific: false,
               suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
             }),
       snapshot: savedSnapshot,
@@ -1514,33 +1512,33 @@ export async function POST(request) {
 
     const procedureSwitchToIncident =
       shouldSwitchToIncidentFlow({ text, interpretation }) ||
-      shouldActivateTreeFlow({
+      shouldActivateIncidentFlow({
         interpretation,
         text,
         contextEntry,
       });
     if (procedureSwitchToIncident) {
-      const treeSeed = {
+      const incidentSeed = {
         ...EMPTY_COLLECTED_DATA,
-        category: "infraestructura",
-        subcategory: "arbol_caido_ramas_peligrosas",
+        category: "incidencia_general",
+        subcategory: "reporte_general",
       };
       const mergedFromSwitch = mergeCollectedDataFromInterpretation({
-        collectedData: treeSeed,
+        collectedData: incidentSeed,
         interpretation,
         text,
         currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
       });
-      const nextTreeStep = getNextTreeFlowStep(mergedFromSwitch.collectedData);
+      const nextIncidentStep = getNextIncidentFlowStep(mergedFromSwitch.collectedData);
       const switchedSnapshot = await setConversationState(
         sessionId,
-        createTreeFlowSnapshotPatch({
+        createIncidentFlowSnapshotPatch({
           locale: effectiveLocale,
           userId: authenticatedUser?.id || snapshot.userId || null,
           collectedData: mergedFromSwitch.collectedData,
-          currentStep: nextTreeStep,
+          currentStep: nextIncidentStep,
           confirmationState:
-            nextTreeStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none",
+            nextIncidentStep === CHATBOT_CURRENT_STEPS.CONFIRMATION ? "ready" : "none",
           lastInterpretation: interpretation,
           lastIntent: "report_incident",
           lastAction: "switch_to_incident",
@@ -1553,7 +1551,7 @@ export async function POST(request) {
         outcome: "switch_procedure_to_incident",
       });
 
-      if (nextTreeStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
+      if (nextIncidentStep === CHATBOT_CURRENT_STEPS.CONFIRMATION) {
         return buildChatResponse({
           sessionId,
           locale: effectiveLocale,
@@ -1569,15 +1567,14 @@ export async function POST(request) {
         sessionId,
         locale: effectiveLocale,
         replyText: buildQuestionForStep({
-          step: nextTreeStep,
-          isTreeSpecific: false,
+          step: nextIncidentStep,
           suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
         }),
         snapshot: switchedSnapshot,
         actionOptions:
-          nextTreeStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
+          nextIncidentStep === CHATBOT_CURRENT_STEPS.PHOTO ? buildPhotoActionOptions() : [],
         nextStepType: "ask_field",
-        nextStepField: nextTreeStep,
+        nextStepField: nextIncidentStep,
       });
     }
 
@@ -1743,7 +1740,7 @@ export async function POST(request) {
   }
 
   if (
-    isTreeFlowActive(snapshot) &&
+    isIncidentFlowActive(snapshot) &&
     shouldSwitchToProcedureFlow({ text, interpretation })
   ) {
     const procedureMatch = await findMatchingProcedure({
@@ -1834,8 +1831,8 @@ export async function POST(request) {
     });
   }
 
-  if (!isTreeFlowActive(snapshot)) {
-    const shouldActivate = shouldActivateTreeFlow({
+  if (!isIncidentFlowActive(snapshot)) {
+    const shouldActivate = shouldActivateIncidentFlow({
       interpretation,
       text,
       contextEntry,
@@ -1877,15 +1874,15 @@ export async function POST(request) {
     }
 
     const seedData = contextEntry
-      ? buildTreeFlowSeedFromContext(contextEntry)
+      ? buildIncidentFlowSeedFromContext(contextEntry)
       : {
           ...EMPTY_COLLECTED_DATA,
-          category: "infraestructura",
-          subcategory: "arbol_caido_ramas_peligrosas",
+          category: "incidencia_general",
+          subcategory: "reporte_general",
         };
     snapshot = await setConversationState(
       sessionId,
-      createTreeFlowSnapshotPatch({
+      createIncidentFlowSnapshotPatch({
         locale: effectiveLocale,
         userId: authenticatedUser?.id || snapshot.userId || null,
         collectedData: seedData,
@@ -1922,7 +1919,7 @@ export async function POST(request) {
     }
   }
   const mergedData = mergedResult.collectedData;
-  const nextStep = getNextTreeFlowStep(mergedData);
+  const nextStep = getNextIncidentFlowStep(mergedData);
   const isReadyForConfirmation = nextStep === CHATBOT_CURRENT_STEPS.CONFIRMATION;
 
   if (mergedResult.acceptedEntities.length > 0) {
@@ -1957,7 +1954,7 @@ export async function POST(request) {
 
   const savedSnapshot = await setConversationState(
     sessionId,
-    createTreeFlowSnapshotPatch({
+    createIncidentFlowSnapshotPatch({
       locale: effectiveLocale,
       userId: authenticatedUser?.id || snapshot.userId || null,
       collectedData: mergedData,
@@ -1992,7 +1989,6 @@ export async function POST(request) {
   const replyText = buildQuestionForStep({
     step: nextStep,
     lowConfidence: currentStepHasLowConfidence,
-    isTreeSpecific: isTreeIncidentCollectedData(savedSnapshot.collectedData),
     suggestedReply: interpretation?.assistantStyle?.suggestedReply || null,
   });
   return buildChatResponse({

@@ -56,7 +56,7 @@ La integracion del asistente sigue una arquitectura de control en backend:
 
 ### Flujo prioritario implementado
 
-Caso: **Árbol caído / ramas peligrosas**
+Caso: **Incidencia general**
 
 Secuencia:
 1. ubicacion
