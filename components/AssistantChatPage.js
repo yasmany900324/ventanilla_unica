@@ -483,7 +483,10 @@ function ChatErrorMessage({ onRetry, disabled, copy }) {
 
 function ChatQuickReplies({ prompts, onPromptClick, disabled, copy }) {
   return (
-    <div className="assistant-chat-quick-replies" aria-label={copy.quickRepliesTitle}>
+    <div
+      className="assistant-chat-quick-replies assistant-chat-quick-replies--global"
+      aria-label={copy.quickRepliesTitle}
+    >
       <p className="assistant-chat-quick-replies__title">{copy.quickRepliesTitle}</p>
       <div className="assistant-chat-quick-replies__list">
         {prompts.map((prompt) => (
