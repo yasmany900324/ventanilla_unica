@@ -672,6 +672,7 @@ export default function AssistantChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(clientDebugEnabled ? { "x-chatbot-debug": "1" } : {}),
         },
         body: JSON.stringify({
           text,

@@ -483,6 +483,14 @@ function logChatDebug(label, payload) {
   console.info(`[chatbot-debug] ${label}`, payload);
 }
 
+function isChatDebugRequested(request) {
+  const debugHeader = normalizeStringField(request.headers.get("x-chatbot-debug"), 10);
+  if (debugHeader === "1" || debugHeader.toLowerCase() === "true") {
+    return true;
+  }
+  return process.env.CHATBOT_DEBUG === "1";
+}
+
 function resolveEffectiveLocale({ preferredLocale, sessionLocale, text, request }) {
   const detectedTextLocale = detectLocaleFromText(text);
   const selectedLocale =
@@ -527,7 +535,7 @@ export async function POST(request) {
     commandField: commandFieldFromPayload,
     contextEntry,
   } = validationResult.value;
-  const chatDebugEnabled = process.env.CHATBOT_DEBUG === "1";
+  const chatDebugEnabled = isChatDebugRequested(request);
 
   const authenticatedUser = await requireAuthenticatedUser(request);
   await ensureProcedureCatalogSchema();
