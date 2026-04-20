@@ -168,6 +168,12 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
       "avance",
       "avanza",
       "progreso",
+      "notificacion",
+      "notifica",
+      "respuesta",
+      "respuesta",
+      "avisaron",
+      "avisar",
     ];
     const statusPhraseSignals = ["como va", "en que va"];
     const statusObjectSignals = [
@@ -181,6 +187,20 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
       "incidencia",
     ];
     const tokens = new Set(normalized.split(" "));
+    const hasPotentialTypos = [
+      "no eh",
+      "no he",
+      "recivido",
+      "resivido",
+      "resibido",
+      "notificacion",
+      "notificacion de mi solicitud",
+      "no recibi",
+      "no recibi notificacion",
+      "no he recibido",
+      "no he recibido notificacion",
+      "no recibi respuesta",
+    ].some((snippet) => normalized.includes(snippet));
     const hasStatusSignal =
       statusWordSignals.some((signal) => tokens.has(signal)) ||
       statusPhraseSignals.some((signal) => normalized.includes(signal));
@@ -188,7 +208,16 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
     const hasStatusByPattern = /(?:estado|seguimiento|status)\s+de(?:l| la| mi| un| una)?\s*(?:tramite|solicitud|ticket|expediente|caso|gestion|reporte|incidencia)\b/u.test(
       normalized
     );
-    if (hasStatusByPattern || (hasStatusSignal && hasStatusObjectSignal)) {
+    const hasNotificationStatusPattern =
+      /(no\s+(?:eh|he)\s+)?(?:recibi|recibido|recivido|resibido|resivido)?\s*(?:notificacion|respuesta|aviso)/u.test(
+        normalized
+      ) && hasStatusObjectSignal;
+    if (
+      hasStatusByPattern ||
+      (hasStatusSignal && hasStatusObjectSignal) ||
+      hasNotificationStatusPattern ||
+      (hasPotentialTypos && hasStatusObjectSignal)
+    ) {
       return true;
     }
 
