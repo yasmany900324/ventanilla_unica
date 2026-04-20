@@ -644,6 +644,19 @@ export default function AssistantChatPage() {
       return;
     }
 
+    const clientDebugEnabled =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("chatbot_debug") === "1";
+    if (clientDebugEnabled) {
+      console.info("[chatbot][client][send]", {
+        sessionId: sessionId || null,
+        locale: sessionLocale || locale || "es",
+        command,
+        commandField,
+        text,
+      });
+    }
+
     setServiceError(false);
     if (appendUserMessage && text) {
       setInputValue("");
@@ -685,6 +698,19 @@ export default function AssistantChatPage() {
       }
       if (typeof data?.locale === "string" && data.locale && data.locale !== sessionLocale) {
         setSessionLocale(data.locale);
+      }
+
+      if (clientDebugEnabled) {
+        console.info("[chatbot][client][response]", {
+          requestSessionId: sessionId || null,
+          responseSessionId: data?.sessionId || null,
+          mode: data?.mode || null,
+          action: data?.action || null,
+          intent: data?.intent || null,
+          nextStep: data?.nextStep || null,
+          draft: data?.draft || null,
+          needsClarification: Boolean(data?.needsClarification),
+        });
       }
       setMessages((previousMessages) => [
         ...previousMessages,
