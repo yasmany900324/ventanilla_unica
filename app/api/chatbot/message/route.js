@@ -390,6 +390,19 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
       "avisar",
     ];
     const statusPhraseSignals = ["como va", "en que va"];
+    const statusNarrativeSignals = [
+      "no se nada",
+      "sin novedades",
+      "no tengo novedades",
+      "no tuve novedades",
+      "ya registre",
+      "hace unos dias registre",
+      "hace dias registre",
+      "como puedo ver su estado",
+      "como ver su estado",
+      "quiero ver su estado",
+      "consultar su estado",
+    ];
     const statusObjectSignals = [
       "tramite",
       "solicitud",
@@ -401,6 +414,7 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
       "incidencia",
     ];
     const tokens = new Set(normalized.split(" "));
+    const hasIdentifierSignal = Boolean(extractStatusIdentifierFromText(text));
     const hasPotentialTypos = [
       "no eh",
       "no he",
@@ -418,6 +432,9 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
     const hasStatusSignal =
       statusWordSignals.some((signal) => tokens.has(signal)) ||
       statusPhraseSignals.some((signal) => normalized.includes(signal));
+    const hasStatusNarrativeSignal = statusNarrativeSignals.some((signal) =>
+      normalized.includes(signal)
+    );
     const hasStatusObjectSignal = statusObjectSignals.some((signal) => tokens.has(signal));
     const hasStatusByPattern = /(?:estado|seguimiento|status)\s+de(?:l| la| mi| un| una)?\s*(?:tramite|solicitud|ticket|expediente|caso|gestion|reporte|incidencia)\b/u.test(
       normalized
@@ -429,7 +446,11 @@ function shouldSwitchToStatusIntent({ text, interpretation }) {
     if (
       hasStatusByPattern ||
       (hasStatusSignal && hasStatusObjectSignal) ||
+      (hasStatusNarrativeSignal && hasStatusObjectSignal) ||
       hasNotificationStatusPattern ||
+      (hasIdentifierSignal &&
+        (hasStatusObjectSignal ||
+          /\b(?:id|identificador|ticket|codigo|expediente)\b/u.test(normalized))) ||
       (hasPotentialTypos && hasStatusObjectSignal)
     ) {
       return true;
@@ -1561,7 +1582,7 @@ export async function POST(request) {
   }
 
   const statusIdentifierFromText = extractStatusIdentifierFromText(text);
-  const statusFlowActive = snapshot?.lastIntent === "check_status" && !switchToIncident && !switchToProcedure;
+  const statusFlowActive = snapshot?.lastIntent === "check_status";
   const isStatusFollowUp =
     statusFlowActive &&
     effectiveCommand === "none" &&
