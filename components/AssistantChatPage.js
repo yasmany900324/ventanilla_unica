@@ -203,9 +203,11 @@ function normalizePersistedMessage(rawMessage, index) {
             field: normalizeContextParam(rawMessage.nextStep.field, 60) || null,
           }
         : null,
+    statusSummary: normalizeStatusSummary(rawMessage.statusSummary),
     mode: normalizeContextParam(rawMessage.mode, 40) || null,
     redirectTo: normalizeContextParam(rawMessage.redirectTo, 180) || null,
     redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
+    statusSummary: normalizeStatusSummary(rawMessage.statusSummary),
     needsClarification: Boolean(rawMessage.needsClarification),
   };
 }
@@ -322,6 +324,180 @@ function buildContextWelcomeMessage({ context, copy }) {
   return copy.contextualEntry.incidentMessage.replace("{title}", context.title);
 }
 
+function formatStatusTimestamp(value) {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  return parsed.toLocaleString("es-UY", {
+    hour: "2-digit",
+    minute: "2-digit",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function normalizeStatusSummary(rawSummary) {
+  if (!rawSummary || typeof rawSummary !== "object") {
+    return null;
+  }
+  const kind = normalizeContextParam(rawSummary.kind, 30).toLowerCase();
+  if (kind !== "incident" && kind !== "procedure") {
+    return null;
+  }
+  const displayCode = normalizeContextParam(rawSummary.displayCode, 120);
+  const status = normalizeContextParam(rawSummary.status, 80);
+  const category = normalizeContextParam(rawSummary.category, 120);
+  const location = normalizeContextParam(rawSummary.location, 200);
+  const description = normalizeContextParam(rawSummary.description, 400);
+  const procedureName = normalizeContextParam(rawSummary.procedureName, 180);
+  const procedureCategory = normalizeContextParam(rawSummary.procedureCategory, 120);
+  const summary = normalizeContextParam(rawSummary.summary, 400);
+  const risk = normalizeContextParam(rawSummary.risk, 80);
+  const updatedAt = formatStatusTimestamp(rawSummary.updatedAt);
+  const createdAt = formatStatusTimestamp(rawSummary.createdAt);
+
+  return {
+    kind,
+    displayCode,
+    status,
+    category,
+    location,
+    description,
+    procedureName,
+    procedureCategory,
+    summary,
+    risk,
+    updatedAt,
+    createdAt,
+  };
+}
+
+function buildStatusDetailRows(statusSummary) {
+  if (!statusSummary) {
+    return [];
+  }
+  if (statusSummary.kind === "incident") {
+    return [
+      { label: "Última actualización", value: statusSummary.updatedAt || "Sin dato" },
+      { label: "Ubicación", value: statusSummary.location || "Sin dato" },
+      { label: "Tipo", value: statusSummary.category || "Incidencia" },
+      { label: "Descripción", value: statusSummary.description || "Sin dato" },
+      ...(statusSummary.risk
+        ? [{ label: "Riesgo reportado", value: statusSummary.risk }]
+        : []),
+    ];
+  }
+  return [
+    { label: "Última actualización", value: statusSummary.updatedAt || "Sin dato" },
+    { label: "Trámite", value: statusSummary.procedureName || "Sin dato" },
+    { label: "Categoría", value: statusSummary.procedureCategory || "Sin dato" },
+    { label: "Detalle", value: statusSummary.summary || "Sin dato" },
+  ];
+}
+
+function dedupeActionOptions(actionOptions) {
+  if (!Array.isArray(actionOptions)) {
+    return [];
+  }
+  const seenLabels = new Set();
+  const deduped = [];
+  actionOptions.forEach((option) => {
+    if (!option?.label) {
+      return;
+    }
+    const key = option.label.toLowerCase();
+    if (seenLabels.has(key)) {
+      return;
+    }
+    seenLabels.add(key);
+    deduped.push(option);
+  });
+  return deduped;
+}
+
+function humanizeStatusLabel(value) {
+  const normalized = normalizeContextParam(value, 80).toLowerCase();
+  if (!normalized) {
+    return "Sin estado";
+  }
+  if (normalized === "recibido") {
+    return "Recibido";
+  }
+  if (normalized === "en revision") {
+    return "En revisión";
+  }
+  if (normalized === "en proceso") {
+    return "En proceso";
+  }
+  if (normalized === "resuelto") {
+    return "Resuelto";
+  }
+  return value;
+}
+
+function inferStatusExplanation(statusSummary) {
+  const normalized = normalizeContextParam(statusSummary?.status, 80).toLowerCase();
+  if (normalized === "recibido") {
+    return "Tu incidencia fue registrada correctamente y está pendiente de revisión por el equipo correspondiente.";
+  }
+  if (normalized === "en revision") {
+    return "Tu incidencia está siendo revisada por el equipo correspondiente.";
+  }
+  if (normalized === "en proceso") {
+    return "Tu incidencia está en proceso de atención.";
+  }
+  if (normalized === "resuelto") {
+    return "Tu incidencia figura como resuelta.";
+  }
+  return "Te comparto el estado actualizado de tu caso.";
+}
+
+function StatusSummaryCard({ message }) {
+  const statusSummary = normalizeStatusSummary(message?.statusSummary);
+  if (!statusSummary) {
+    return null;
+  }
+  const statusLabel = humanizeStatusLabel(statusSummary.status);
+  const detailRows = buildStatusDetailRows(statusSummary);
+  const explanation = inferStatusExplanation(statusSummary);
+  const title =
+    statusSummary.kind === "incident"
+      ? `Incidencia ${statusSummary.displayCode || ""}`.trim()
+      : `Solicitud ${statusSummary.displayCode || ""}`.trim();
+
+  return (
+    <section className="assistant-status-card" aria-label={title}>
+      <header className="assistant-status-card__header">
+        <h3>{title}</h3>
+      </header>
+      <div className="assistant-status-card__status-wrap">
+        <p className="assistant-status-card__status-label">Estado actual</p>
+        <span className={`assistant-status-card__pill assistant-status-card__pill--${normalizeContextParam(statusSummary.status, 40).toLowerCase().replace(/\s+/g, "-")}`}>
+          {statusLabel}
+        </span>
+      </div>
+      <p className="assistant-status-card__explanation">{explanation}</p>
+      <hr className="assistant-status-card__divider" />
+      <div className="assistant-status-card__details">
+        <p className="assistant-status-card__details-title">Detalles del caso</p>
+        <dl className="assistant-status-card__details-list">
+          {detailRows.map((row) => (
+            <div key={row.label} className="assistant-status-card__detail-row">
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
@@ -377,6 +553,9 @@ function ChatMessageBubble({
           <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
         <p>{message.text}</p>
+        {isBot && message.statusSummary ? (
+          <StatusSummaryCard statusSummary={message.statusSummary} />
+        ) : null}
 
         {isBot && message.needsClarification ? (
           <p className="assistant-message__clarification">
@@ -384,7 +563,7 @@ function ChatMessageBubble({
           </p>
         ) : null}
 
-        {isBot && message.redirectTo ? (
+        {isBot && message.redirectTo && !message.statusSummary ? (
           <div className="assistant-message__redirect-wrap">
             <p className="assistant-message__redirect-text">
               {copy.redirectIntro}
@@ -836,6 +1015,10 @@ export default function AssistantChatPage() {
         : [];
       const suggestedReplies = extractPayloadChips(fulfillmentMessages);
       const actionOptions = normalizeActionOptions(data?.actionOptions);
+      const statusSummary = normalizeStatusSummary(data?.statusSummary);
+      const effectiveActionOptions = statusSummary
+        ? dedupeActionOptions(actionOptions).slice(0, 3)
+        : actionOptions;
       if (data?.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
       }
@@ -867,13 +1050,14 @@ export default function AssistantChatPage() {
           action: data?.action || null,
           fulfillmentMessages,
           suggestedReplies,
-          actionOptions,
+          actionOptions: effectiveActionOptions,
           nextStep: data?.nextStep || null,
           mode: data?.mode || null,
           draft: data?.draft || null,
           redirectTo: data?.redirectTo || null,
           redirectLabel: data?.redirectLabel || null,
           needsClarification: Boolean(data?.needsClarification),
+          statusSummary,
         }),
       ]);
       lastFailedInputRef.current = {
