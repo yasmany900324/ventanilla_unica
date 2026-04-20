@@ -575,6 +575,15 @@ export default function AssistantChatPage() {
       return;
     }
 
+    const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY) === "1";
+    if (!shouldResume) {
+      safeRemoveLocalStorageItem(SESSION_ID_STORAGE_KEY);
+      safeRemoveLocalStorageItem(SESSION_LOCALE_STORAGE_KEY);
+      setSessionId("");
+      setSessionLocale("");
+      return;
+    }
+
     const existingSessionId = safeGetLocalStorageItem(SESSION_ID_STORAGE_KEY);
     if (existingSessionId) {
       setSessionId(existingSessionId);
