@@ -409,6 +409,80 @@ function buildChatResponse({
   });
 }
 
+function buildChatDebugHeaders(snapshot) {
+  if (process.env.CHATBOT_DEBUG !== "1") {
+    return null;
+  }
+  const safeSnapshot = sanitizeSnapshot(snapshot || {});
+  return {
+    "x-chatbot-debug-flow-key": safeSnapshot.flowKey || "",
+    "x-chatbot-debug-state": safeSnapshot.state || "",
+    "x-chatbot-debug-current-step": safeSnapshot.currentStep || "",
+    "x-chatbot-debug-confirmation-state": safeSnapshot.confirmationState || "",
+    "x-chatbot-debug-procedure-code":
+      normalizeStringField(safeSnapshot.collectedData?.procedureCode || "", 120),
+  };
+}
+
+function applyChatDebugHeaders(response, snapshot) {
+  const headers = buildChatDebugHeaders(snapshot);
+  if (!headers || !response || !response.headers) {
+    return response;
+  }
+  Object.entries(headers).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  return response;
+}
+
+function buildChatDebugPayload({
+  sessionId,
+  text,
+  command,
+  commandField,
+  contextEntry,
+  snapshotBefore,
+  snapshotAfter,
+  interpretation,
+  llmMeta,
+  decision = {},
+}) {
+  const sanitizeSnapshot = (snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") {
+      return null;
+    }
+    return {
+      locale: snapshot.locale || null,
+      state: snapshot.state || null,
+      flowKey: snapshot.flowKey || null,
+      currentStep: snapshot.currentStep || null,
+      confirmationState: snapshot.confirmationState || null,
+      lastIntent: snapshot.lastIntent || null,
+      lastAction: snapshot.lastAction || null,
+      collectedData: snapshot.collectedData || null,
+    };
+  };
+  return {
+    sessionId,
+    text,
+    command,
+    commandField,
+    contextEntry: contextEntry || null,
+    snapshotBefore: sanitizeSnapshot(snapshotBefore),
+    snapshotAfter: sanitizeSnapshot(snapshotAfter),
+    interpretation: interpretation || {},
+    llmMeta: llmMeta || null,
+    decision,
+  };
+}
+
+function logChatDebug(label, payload) {
+  if (process.env.CHATBOT_DEBUG !== "1") {
+    return;
+  }
+  console.info(`[chatbot-debug] ${label}`, payload);
+}
+
 function resolveEffectiveLocale({ preferredLocale, sessionLocale, text, request }) {
   const detectedTextLocale = detectLocaleFromText(text);
   const selectedLocale =
@@ -453,10 +527,24 @@ export async function POST(request) {
     commandField: commandFieldFromPayload,
     contextEntry,
   } = validationResult.value;
+  const chatDebugEnabled = process.env.CHATBOT_DEBUG === "1";
 
   const authenticatedUser = await requireAuthenticatedUser(request);
   await ensureProcedureCatalogSchema();
   let snapshot = (await getSessionSnapshot(sessionId)) || getDefaultSnapshot();
+  if (chatDebugEnabled) {
+    logChatDebug(
+      "request_received",
+      buildChatDebugPayload({
+        sessionId,
+        text,
+        command: commandFromPayload,
+        commandField: commandFieldFromPayload,
+        contextEntry,
+        snapshotBefore: snapshot,
+      })
+    );
+  }
   if (authenticatedUser?.id && snapshot.userId !== authenticatedUser.id) {
     await setSessionUserId(sessionId, authenticatedUser.id);
     snapshot = {
@@ -1003,6 +1091,26 @@ export async function POST(request) {
   const switchToProcedure = shouldSwitchToProcedureFlow({ text, interpretation });
   const switchToIncident = shouldSwitchToIncidentFlow({ text, interpretation });
   const switchToStatus = shouldSwitchToStatusIntent({ text, interpretation });
+  if (chatDebugEnabled) {
+    logChatDebug(
+      "intent_switch_evaluation",
+      buildChatDebugPayload({
+        sessionId,
+        text,
+        command: effectiveCommand,
+        commandField: effectiveCommandField,
+        contextEntry,
+        snapshotBefore: snapshot,
+        interpretation,
+        llmMeta,
+        decision: {
+          switchToProcedure,
+          switchToIncident,
+          switchToStatus,
+        },
+      })
+    );
+  }
 
   if (switchToStatus) {
     const statusSnapshot = await setConversationState(sessionId, {
@@ -1148,6 +1256,32 @@ export async function POST(request) {
       text,
       interpretation,
     });
+    if (chatDebugEnabled) {
+      logChatDebug(
+        "procedure_match_initial",
+        buildChatDebugPayload({
+          sessionId,
+          text,
+          command: effectiveCommand,
+          commandField: effectiveCommandField,
+          contextEntry,
+          snapshotBefore: snapshot,
+          interpretation,
+          llmMeta,
+          decision: {
+            hasSpecificProcedureRequest,
+            activeProcedures: activeProcedures.map((procedure) => procedure.code),
+            procedureMatch: procedureMatch
+              ? {
+                  code: procedureMatch.code,
+                  name: procedureMatch.name,
+                  matchScore: procedureMatch.matchScore,
+                }
+              : null,
+          },
+        })
+      );
+    }
     if (!procedureMatch) {
       const closedSnapshot = await setConversationState(sessionId, {
         locale: effectiveLocale,
@@ -1316,6 +1450,26 @@ export async function POST(request) {
     }
 
     const activeProcedure = await getProcedureByCode(snapshot.collectedData?.procedureCode);
+    if (chatDebugEnabled) {
+      logChatDebug(
+        "procedure_flow_active",
+        buildChatDebugPayload({
+          sessionId,
+          text,
+          command: effectiveCommand,
+          commandField: effectiveCommandField,
+          contextEntry,
+          snapshotBefore: snapshot,
+          interpretation,
+          llmMeta,
+          decision: {
+            procedureCodeFromSnapshot: snapshot.collectedData?.procedureCode || null,
+            activeProcedureFound: Boolean(activeProcedure),
+            activeProcedureCode: activeProcedure?.code || null,
+          },
+        })
+      );
+    }
     if (!activeProcedure) {
       const closedSnapshot = await setConversationState(sessionId, {
         locale: effectiveLocale,
@@ -1369,6 +1523,29 @@ export async function POST(request) {
       } else {
         validationError = validationResult.error;
       }
+    }
+    if (chatDebugEnabled) {
+      logChatDebug(
+        "procedure_field_processing",
+        buildChatDebugPayload({
+          sessionId,
+          text,
+          command: effectiveCommand,
+          commandField: effectiveCommandField,
+          contextEntry,
+          snapshotBefore: snapshot,
+          snapshotAfter: updatedProcedureSnapshot,
+          interpretation,
+          llmMeta,
+          decision: {
+            normalizedText,
+            currentMissingField,
+            hasProcedureUpdate,
+            validationError,
+            nextMissingField,
+          },
+        })
+      );
     }
 
     const procedureMissing = getProcedureMissingFields(procedureData);
