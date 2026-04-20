@@ -198,6 +198,28 @@ function isGenericIncidentStartRequest(text) {
   return normalized === "incidencia" || normalized === "problema";
 }
 
+function isGenericProcedureStartRequest(text) {
+  const normalized = normalizeIntentLookup(text);
+  if (!normalized) {
+    return false;
+  }
+
+  const genericProcedureSignals = [
+    "necesito hacer un tramite",
+    "quiero hacer un tramite",
+    "quiero iniciar un tramite",
+    "necesito iniciar un tramite",
+    "quisiera iniciar un tramite",
+    "necesito realizar una gestion",
+    "quiero realizar una gestion",
+    "iniciar un tramite",
+    "hacer un tramite",
+    "tramite",
+  ];
+
+  return genericProcedureSignals.includes(normalized);
+}
+
 function buildProcedureActionOptions({ nextMissingField = null, isCompleted = false } = {}) {
   if (isCompleted) {
     return [
@@ -1397,6 +1419,59 @@ export async function POST(request) {
   }
 
   if (isProcedureFlowActive(snapshot)) {
+    const genericProcedureRestartRequest = isGenericProcedureStartRequest(text);
+    if (genericProcedureRestartRequest) {
+      const activeProcedures = await listActiveProcedureCatalog();
+      if (activeProcedures.length > 0) {
+        const resetSnapshot = await setConversationState(sessionId, {
+          locale: effectiveLocale,
+          userId: authenticatedUser?.id || snapshot.userId || null,
+          state: CHATBOT_CONVERSATION_STATES.IDLE,
+          flowKey: null,
+          currentStep: CHATBOT_CURRENT_STEPS.LOCATION,
+          confirmationState: "none",
+          collectedData: { ...EMPTY_COLLECTED_DATA },
+          lastInterpretation: interpretation,
+          lastIntent: "start_procedure",
+          lastAction: "restart_procedure_selection",
+          lastConfidence: interpretation?.intent?.confidence || null,
+        });
+        return buildChatResponse({
+          sessionId,
+          locale: effectiveLocale,
+          replyText: buildProcedureCatalogIntroReply(activeProcedures),
+          snapshot: resetSnapshot,
+          actionOptions: buildProcedureCatalogActionOptions(activeProcedures),
+          nextStepType: "clarify_procedure",
+          nextStepField: "procedureName",
+          needsClarification: false,
+        });
+      }
+
+      const closedSnapshot = await setConversationState(sessionId, {
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        state: CHATBOT_CONVERSATION_STATES.CLOSED,
+        flowKey: null,
+        currentStep: CHATBOT_CURRENT_STEPS.CLOSED,
+        confirmationState: "none",
+        collectedData: { ...EMPTY_COLLECTED_DATA },
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: "unsupported_procedure",
+        lastConfidence: interpretation?.intent?.confidence || null,
+      });
+      return buildChatResponse({
+        sessionId,
+        locale: effectiveLocale,
+        replyText: buildUnsupportedProcedureReply(),
+        snapshot: closedSnapshot,
+        actionOptions: [],
+        nextStepType: "closed",
+        nextStepField: null,
+      });
+    }
+
     const procedureSwitchToIncident =
       shouldSwitchToIncidentFlow({ text, interpretation }) ||
       shouldActivateTreeFlow({
@@ -1540,6 +1615,26 @@ export async function POST(request) {
         validationError = validationResult.error;
       }
     }
+
+    const procedureMissing = getProcedureMissingFields(procedureData);
+    const nextMissingField = procedureMissing[0] || null;
+    const procedureStep = nextMissingField
+      ? mapProcedureFieldToStep(nextMissingField)
+      : CHATBOT_CURRENT_STEPS.CONFIRMATION;
+    const updatedProcedureSnapshot = await setConversationState(
+      sessionId,
+      createProcedureFlowSnapshotPatch({
+        locale: effectiveLocale,
+        userId: authenticatedUser?.id || snapshot.userId || null,
+        collectedData: procedureData,
+        currentStep: procedureStep,
+        confirmationState: procedureMissing.length > 0 ? "none" : "ready",
+        lastInterpretation: interpretation,
+        lastIntent: "start_procedure",
+        lastAction: effectiveCommand === "none" ? "message" : effectiveCommand,
+        lastConfidence: interpretation?.intent?.confidence || null,
+      })
+    );
     if (chatDebugEnabled) {
       logChatDebug(
         "procedure_field_processing",
@@ -1563,26 +1658,6 @@ export async function POST(request) {
         })
       );
     }
-
-    const procedureMissing = getProcedureMissingFields(procedureData);
-    const nextMissingField = procedureMissing[0] || null;
-    const procedureStep = nextMissingField
-      ? mapProcedureFieldToStep(nextMissingField)
-      : CHATBOT_CURRENT_STEPS.CONFIRMATION;
-    const updatedProcedureSnapshot = await setConversationState(
-      sessionId,
-      createProcedureFlowSnapshotPatch({
-        locale: effectiveLocale,
-        userId: authenticatedUser?.id || snapshot.userId || null,
-        collectedData: procedureData,
-        currentStep: procedureStep,
-        confirmationState: procedureMissing.length > 0 ? "none" : "ready",
-        lastInterpretation: interpretation,
-        lastIntent: "start_procedure",
-        lastAction: effectiveCommand === "none" ? "message" : effectiveCommand,
-        lastConfidence: interpretation?.intent?.confidence || null,
-      })
-    );
 
     if (procedureMissing.length === 0) {
       const replyText = hasProcedureUpdate
