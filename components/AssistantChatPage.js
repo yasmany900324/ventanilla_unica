@@ -483,7 +483,10 @@ function ChatErrorMessage({ onRetry, disabled, copy }) {
 
 function ChatQuickReplies({ prompts, onPromptClick, disabled, copy }) {
   return (
-    <div className="assistant-chat-quick-replies" aria-label={copy.quickRepliesTitle}>
+    <div
+      className="assistant-chat-quick-replies assistant-chat-quick-replies--global"
+      aria-label={copy.quickRepliesTitle}
+    >
       <p className="assistant-chat-quick-replies__title">{copy.quickRepliesTitle}</p>
       <div className="assistant-chat-quick-replies__list">
         {prompts.map((prompt) => (
@@ -994,6 +997,19 @@ export default function AssistantChatPage() {
   };
 
   const characterCount = inputValue.length;
+  const lastBotMessage = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.sender === "bot") {
+        return messages[index];
+      }
+    }
+    return null;
+  }, [messages]);
+  const hasDynamicBotActions = Boolean(
+    lastBotMessage &&
+      ((Array.isArray(lastBotMessage.suggestedReplies) && lastBotMessage.suggestedReplies.length > 0) ||
+        (Array.isArray(lastBotMessage.actionOptions) && lastBotMessage.actionOptions.length > 0))
+  );
   const showInitialGuidance =
     !entryContext &&
     !serviceError &&
@@ -1002,9 +1018,11 @@ export default function AssistantChatPage() {
     messages[0]?.sender === "bot";
   const showQuickReplies =
     messages.some((message) => message.sender === "bot") &&
+    messages.length <= 4 &&
     !isSending &&
     !entryContext &&
-    !showInitialGuidance;
+    !showInitialGuidance &&
+    !hasDynamicBotActions;
 
   return (
     <main className="page page--assistant" lang={locale}>
