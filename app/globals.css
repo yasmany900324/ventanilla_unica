@@ -1389,8 +1389,8 @@ h3 {
 }
 
 .home-frequent-card__cta {
-  justify-self: start;
-  align-self: flex-start;
+  justify-self: stretch;
+  align-self: stretch;
   margin-top: auto;
   border-radius: 11px;
   border: 1px solid #1a4e9a;
@@ -1398,9 +1398,12 @@ h3 {
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 700;
-  padding: 0.46rem 0.76rem;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.58rem 0.84rem;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.34rem;
   transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
