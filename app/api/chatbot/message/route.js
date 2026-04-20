@@ -143,6 +143,14 @@ function normalizeProcedureText(value, maxLength = 320) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function normalizeStringField(value, maxLength = 320) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
 function shouldSwitchToStatusIntent({ text, interpretation }) {
   const normalized = normalizeIntentLookup(text);
   if (normalized) {
