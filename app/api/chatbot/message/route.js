@@ -182,6 +182,36 @@ function normalizeStatusIdentifier(value) {
   return value.replace(/\s+/g, "").trim();
 }
 
+function isLikelyStatusIdentifierToken(value) {
+  const normalized = normalizeStatusIdentifier(value).toUpperCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.length < 6 || normalized.length > 120) {
+    return false;
+  }
+  if (!/^[A-Z0-9-]+$/u.test(normalized)) {
+    return false;
+  }
+  if (
+    /^(ID|TICKET|IDENTIFICADOR|CODIGO|EXPEDIENTE|SOLICITUD|CASO|TRAMITE|INCIDENCIA)$/u.test(
+      normalized
+    )
+  ) {
+    return false;
+  }
+  if (/^(INC|TRA|PROC|SOL)-?[A-Z0-9]{4,}$/u.test(normalized)) {
+    return true;
+  }
+  if (/^[A-F0-9]{8,}$/u.test(normalized)) {
+    return true;
+  }
+  if (normalized.includes("-")) {
+    return true;
+  }
+  return /[0-9]/u.test(normalized);
+}
+
 function extractStatusIdentifierFromText(text) {
   if (typeof text !== "string") {
     return "";
@@ -193,19 +223,24 @@ function extractStatusIdentifierFromText(text) {
   }
 
   const keywordMatch = rawText.match(
-    /(?:ticket|id|identificador|codigo|c[oó]digo|expediente|solicitud|caso)\s*(?:es|:|#)?\s*([A-Za-z0-9-]{4,120})/iu
+    /\b(?:ticket|id|identificador|codigo|c[oó]digo|expediente|solicitud|caso)\b\s*(?:es|:|#)?\s*([A-Za-z0-9-]{4,120})\b/iu
   );
-  if (keywordMatch?.[1]) {
+  if (keywordMatch?.[1] && isLikelyStatusIdentifierToken(keywordMatch[1])) {
     return normalizeStatusIdentifier(keywordMatch[1]);
   }
 
-  const prefixedMatch = rawText.match(/(INC|TRA|PROC|SOL)[-:#]?[A-Za-z0-9-]{4,120}/iu);
+  const prefixedMatch = rawText.match(
+    /\b(?:INC|TRA|PROC|SOL)(?:[-:#][A-Za-z0-9]{4,120}|[0-9][A-Za-z0-9]{3,120})\b/iu
+  );
   if (prefixedMatch?.[0]) {
     return normalizeStatusIdentifier(prefixedMatch[0]);
   }
 
+  if (/\s/u.test(rawText)) {
+    return "";
+  }
   const cleanSingleToken = rawText.replace(/\s+/g, "");
-  if (/^[A-Za-z0-9-]{6,120}$/u.test(cleanSingleToken)) {
+  if (isLikelyStatusIdentifierToken(cleanSingleToken)) {
     return normalizeStatusIdentifier(cleanSingleToken);
   }
 
