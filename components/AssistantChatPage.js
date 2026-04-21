@@ -340,6 +340,57 @@ function formatStatusTimestamp(value) {
   });
 }
 
+function humanizeIncidentType(value) {
+  const normalized = normalizeContextParam(value, 120).toLowerCase();
+  if (!normalized) {
+    return "Incidencia general";
+  }
+  if (normalized === "incidencia_general" || normalized === "reporte_general") {
+    return "Incidencia general";
+  }
+  return normalized
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+function extractRiskFromDescription(descriptionText) {
+  const normalizedDescription = normalizeContextParam(descriptionText, 500);
+  if (!normalizedDescription) {
+    return {
+      cleanedDescription: "",
+      extractedRisk: "",
+    };
+  }
+
+  const riskMatch = normalizedDescription.match(/\(\s*Riesgo:\s*([^)]+)\)\s*$/iu);
+  if (!riskMatch?.[1]) {
+    return {
+      cleanedDescription: normalizedDescription,
+      extractedRisk: "",
+    };
+  }
+
+  const extractedRisk = normalizeContextParam(riskMatch[1], 80);
+  const cleanedDescription = normalizeContextParam(
+    normalizedDescription.replace(riskMatch[0], ""),
+    500
+  );
+  return {
+    cleanedDescription,
+    extractedRisk,
+  };
+}
+
+function isMeaningfulRiskValue(value) {
+  const normalized = normalizeContextParam(value, 80).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return !["no", "ninguno", "ninguna", "sin", "n/a", "na", "no aplica"].includes(
+    normalized
+  );
+}
+
 function normalizeStatusSummary(rawSummary) {
   if (!rawSummary || typeof rawSummary !== "object") {
     return null;
@@ -352,11 +403,13 @@ function normalizeStatusSummary(rawSummary) {
   const status = normalizeContextParam(rawSummary.status, 80);
   const category = normalizeContextParam(rawSummary.category, 120);
   const location = normalizeContextParam(rawSummary.location, 200);
-  const description = normalizeContextParam(rawSummary.description, 400);
+  const rawDescription = normalizeContextParam(rawSummary.description, 500);
   const procedureName = normalizeContextParam(rawSummary.procedureName, 180);
   const procedureCategory = normalizeContextParam(rawSummary.procedureCategory, 120);
   const summary = normalizeContextParam(rawSummary.summary, 400);
   const risk = normalizeContextParam(rawSummary.risk, 80);
+  const { cleanedDescription, extractedRisk } = extractRiskFromDescription(rawDescription);
+  const effectiveRisk = risk || extractedRisk;
   const updatedAt = formatStatusTimestamp(rawSummary.updatedAt);
   const createdAt = formatStatusTimestamp(rawSummary.createdAt);
 
@@ -364,13 +417,13 @@ function normalizeStatusSummary(rawSummary) {
     kind,
     displayCode,
     status,
-    category,
+    category: humanizeIncidentType(category),
     location,
-    description,
+    description: cleanedDescription,
     procedureName,
     procedureCategory,
     summary,
-    risk,
+    risk: isMeaningfulRiskValue(effectiveRisk) ? effectiveRisk : "",
     updatedAt,
     createdAt,
   };
@@ -381,8 +434,11 @@ function buildStatusDetailRows(statusSummary) {
     return [];
   }
   if (statusSummary.kind === "incident") {
+    const updateLabel = statusSummary.updatedAt ? "Última actualización" : "Fecha de registro";
+    const updateValue =
+      statusSummary.updatedAt || statusSummary.createdAt || "Sin dato";
     return [
-      { label: "Última actualización", value: statusSummary.updatedAt || "Sin dato" },
+      { label: updateLabel, value: updateValue },
       { label: "Ubicación", value: statusSummary.location || "Sin dato" },
       { label: "Tipo", value: statusSummary.category || "Incidencia" },
       { label: "Descripción", value: statusSummary.description || "Sin dato" },
