@@ -1026,6 +1026,8 @@ export default function AssistantChatPage() {
     command: DEFAULT_CHAT_COMMAND,
     commandField: null,
   });
+  /** Si se abrió el mapa desde «Cambiar ubicación», guarda el pending para restaurarlo al cancelar el modal. */
+  const locationPickerRestoreSnapshotRef = useRef(null);
   const [messages, setMessages] = useState([
     createLocalMessage({
       sender: "bot",
@@ -1366,6 +1368,8 @@ export default function AssistantChatPage() {
 
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [pendingLocationSelection, setPendingLocationSelection] = useState(null);
+  /** null = usar centro por defecto al abrir el mapa; { lat, lng } = reabrir en la última selección (p. ej. editar). */
+  const [mapPickerInitialCenter, setMapPickerInitialCenter] = useState(null);
 
   const handleLocationResolution = useCallback(
     async ({ source, latitude, longitude }) => {
@@ -1441,17 +1445,26 @@ export default function AssistantChatPage() {
     if (isSending) {
       return;
     }
+    locationPickerRestoreSnapshotRef.current = null;
+    setMapPickerInitialCenter(null);
     setPendingLocationSelection(null);
     setLocationPickerOpen(true);
   }, [isSending]);
 
   const handleCancelLocationPicker = useCallback(() => {
     setLocationPickerOpen(false);
+    setMapPickerInitialCenter(null);
+    if (locationPickerRestoreSnapshotRef.current) {
+      setPendingLocationSelection({ ...locationPickerRestoreSnapshotRef.current });
+      locationPickerRestoreSnapshotRef.current = null;
+    }
   }, []);
 
   const handleConfirmLocationPicker = useCallback(
     async ({ latitude, longitude }) => {
+      locationPickerRestoreSnapshotRef.current = null;
       setLocationPickerOpen(false);
+      setMapPickerInitialCenter(null);
       await handleLocationResolution({
         source: LOCATION_SHARE_SOURCE_MAP,
         latitude,
@@ -1468,10 +1481,22 @@ export default function AssistantChatPage() {
       }
       const locationMapCopy = uiCopy.locationMap || {};
       if (!shouldContinue) {
+        const snap = pendingLocationSelection;
+        const lat = Number(snap.latitude);
+        const lng = Number(snap.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          locationPickerRestoreSnapshotRef.current = snap;
+          setMapPickerInitialCenter({ lat, lng });
+        } else {
+          locationPickerRestoreSnapshotRef.current = null;
+          setMapPickerInitialCenter(null);
+        }
         setPendingLocationSelection(null);
         setLocationPickerOpen(true);
         return;
       }
+
+      locationPickerRestoreSnapshotRef.current = null;
 
       const internalTemplate =
         pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
@@ -1662,7 +1687,7 @@ export default function AssistantChatPage() {
 
         <LocationPickerModal
           isOpen={isLocationPickerOpen}
-          initialCenter={DEFAULT_LOCATION_MAP_CENTER}
+          initialCenter={mapPickerInitialCenter ?? DEFAULT_LOCATION_MAP_CENTER}
           onConfirm={handleConfirmLocationPicker}
           onCancel={handleCancelLocationPicker}
           copy={uiCopy}
