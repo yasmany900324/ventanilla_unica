@@ -1085,6 +1085,15 @@ export async function POST(request) {
     }
   }
 
+  if (
+    effectiveCommand === "set_geo_location" &&
+    isIncidentFlowActive(snapshot) &&
+    snapshot.currentStep === CHATBOT_CURRENT_STEPS.LOCATION
+  ) {
+    effectiveCommand = "edit_field";
+    effectiveCommandField = "location";
+  }
+
   const isIncidentContextStart =
     (effectiveCommand === "start_contextual_flow" ||
       effectiveCommand === "start_contextual_entry") &&
@@ -2559,7 +2568,10 @@ export async function POST(request) {
     text,
     currentStep: snapshot.currentStep,
   });
-  if (effectiveCommand === "edit_field" && effectiveCommandField) {
+  if (
+    (effectiveCommand === "edit_field" || effectiveCommand === "set_geo_location") &&
+    effectiveCommandField
+  ) {
     if (effectiveCommandField === "location") {
       mergedResult.collectedData.location = text;
     } else if (effectiveCommandField === "description") {
