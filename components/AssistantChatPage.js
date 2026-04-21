@@ -15,6 +15,11 @@ const CHATBOT_MESSAGES_STORAGE_KEY = "chatbot_messages";
 const CHATBOT_RESUME_PENDING_KEY = "chatbot_resume_pending";
 const DEFAULT_CHAT_COMMAND = "none";
 const MAX_PERSISTED_MESSAGES = 80;
+const DEFAULT_LOCATION_MAP_CENTER = {
+  lat: -34.9011,
+  lng: -56.1645,
+};
+const LOCATION_MAP_DELTA = 0.015;
 
 function createLocalMessage(partial) {
   return {
@@ -250,6 +255,48 @@ function normalizeContextParam(value, maxLength = 120) {
   }
 
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function toFiniteNumber(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function buildOpenStreetMapEmbedUrl(center) {
+  const lat = toFiniteNumber(center?.lat, DEFAULT_LOCATION_MAP_CENTER.lat);
+  const lng = toFiniteNumber(center?.lng, DEFAULT_LOCATION_MAP_CENTER.lng);
+  const left = lng - LOCATION_MAP_DELTA;
+  const right = lng + LOCATION_MAP_DELTA;
+  const top = lat + LOCATION_MAP_DELTA;
+  const bottom = lat - LOCATION_MAP_DELTA;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
+}
+
+function buildOpenStreetMapViewUrl(center) {
+  const lat = toFiniteNumber(center?.lat, DEFAULT_LOCATION_MAP_CENTER.lat);
+  const lng = toFiniteNumber(center?.lng, DEFAULT_LOCATION_MAP_CENTER.lng);
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+}
+
+function isLocationPromptStep(message) {
+  if (message?.sender !== "bot" || message?.nextStep?.type !== "ask_field") {
+    return false;
+  }
+  const stepField = normalizeContextParam(message?.nextStep?.field, 80).toLowerCase();
+  if (!stepField) {
+    return false;
+  }
+  if (stepField === "location") {
+    return true;
+  }
+  return (
+    stepField.includes("ubic") ||
+    stepField.includes("direcc") ||
+    stepField.includes("address")
+  );
 }
 
 function getChatEntryContext(searchParams) {
@@ -560,6 +607,124 @@ function StatusSummaryCard({ statusSummary }) {
   );
 }
 
+function LocationMapPrompt({ disabled, onShareLocation, copy }) {
+  const locationMapCopy = copy?.locationMap || {};
+  const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION_MAP_CENTER);
+  const [isLocating, setIsLocating] = useState(false);
+  const [feedback, setFeedback] = useState("");
+
+  const title = locationMapCopy.title || "Ubicación en mapa";
+  const description =
+    locationMapCopy.description ||
+    "Puedes compartir una referencia escrita o usar tu ubicación actual para completar este paso.";
+  const iframeTitle = locationMapCopy.iframeTitle || "Mapa de referencia para ubicación";
+  const useCurrentLocationLabel = locationMapCopy.useCurrentLocation || "Usar mi ubicación actual";
+  const openMapLabel = locationMapCopy.openMap || "Abrir mapa";
+  const loadingLabel = locationMapCopy.loading || "Obteniendo ubicación...";
+  const unsupportedLabel =
+    locationMapCopy.unsupported || "Tu navegador no permite compartir ubicación automática.";
+  const permissionDeniedLabel =
+    locationMapCopy.permissionDenied ||
+    "No pude acceder a tu ubicación. Revisa los permisos del navegador e inténtalo de nuevo.";
+  const unavailableLabel =
+    locationMapCopy.unavailable ||
+    "No fue posible obtener tu ubicación ahora. Puedes escribir una referencia manual.";
+
+  const embedUrl = useMemo(() => buildOpenStreetMapEmbedUrl(mapCenter), [mapCenter]);
+  const viewUrl = useMemo(() => buildOpenStreetMapViewUrl(mapCenter), [mapCenter]);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    if (disabled || isLocating) {
+      return;
+    }
+    if (typeof window === "undefined" || !window.navigator?.geolocation) {
+      setFeedback(unsupportedLabel);
+      return;
+    }
+
+    setFeedback("");
+    setIsLocating(true);
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCenter = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        const accuracy = Number.isFinite(position.coords.accuracy)
+          ? Math.round(position.coords.accuracy)
+          : null;
+
+        setMapCenter(nextCenter);
+        setIsLocating(false);
+        if (typeof onShareLocation === "function") {
+          const locationText = `Mi ubicación aproximada es ${nextCenter.lat.toFixed(6)}, ${nextCenter.lng.toFixed(6)}${
+            accuracy ? ` (precisión estimada ${accuracy} m)` : ""
+          }.`;
+          void onShareLocation(locationText);
+        }
+      },
+      (error) => {
+        setIsLocating(false);
+        if (error?.code === 1) {
+          setFeedback(permissionDeniedLabel);
+          return;
+        }
+        setFeedback(unavailableLabel);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, [
+    disabled,
+    isLocating,
+    onShareLocation,
+    permissionDeniedLabel,
+    unavailableLabel,
+    unsupportedLabel,
+  ]);
+
+  return (
+    <section className="assistant-location-map" aria-label={title}>
+      <p className="assistant-location-map__title">{title}</p>
+      <p className="assistant-location-map__description">{description}</p>
+      <div className="assistant-location-map__frame-wrap">
+        <iframe
+          title={iframeTitle}
+          src={embedUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      </div>
+      <div className="assistant-location-map__actions">
+        <button
+          type="button"
+          className="assistant-location-map__button"
+          onClick={handleUseCurrentLocation}
+          disabled={disabled || isLocating}
+        >
+          {isLocating ? loadingLabel : useCurrentLocationLabel}
+        </button>
+        <a
+          className="assistant-location-map__link"
+          href={viewUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {openMapLabel}
+        </a>
+      </div>
+      {feedback ? (
+        <p className="assistant-location-map__feedback" role="status" aria-live="polite">
+          {feedback}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
@@ -601,6 +766,7 @@ function ChatMessageBubble({
   message,
   onChipClick,
   onActionOptionClick,
+  onShareLocation,
   onRedirectClick,
   disabled,
   copy,
@@ -617,6 +783,13 @@ function ChatMessageBubble({
         {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
+        ) : null}
+        {isLocationPromptStep(message) ? (
+          <LocationMapPrompt
+            disabled={disabled}
+            onShareLocation={onShareLocation}
+            copy={copy}
+          />
         ) : null}
 
         {isBot && message.needsClarification ? (
@@ -1201,6 +1374,17 @@ export default function AssistantChatPage() {
     });
   };
 
+  const handleLocationMapShare = async (locationText) => {
+    if (!locationText || isSending) {
+      return;
+    }
+    await submitMessage({
+      rawValue: locationText,
+      command: DEFAULT_CHAT_COMMAND,
+      appendUserMessage: true,
+    });
+  };
+
   const handleRetry = async () => {
     const lastFailedInput = lastFailedInputRef.current;
     if (
@@ -1302,6 +1486,7 @@ export default function AssistantChatPage() {
                 message={message}
                 onChipClick={handleSendMessage}
                 onActionOptionClick={handleActionOption}
+                onShareLocation={handleLocationMapShare}
                 onRedirectClick={handleRedirectClick}
                 disabled={isSending}
                 copy={uiCopy}
