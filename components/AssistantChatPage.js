@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
+import { resolveLocationReferenceLabel } from "../lib/resolveLocationReferenceLabel";
 import LocationPickerModal from "./LocationPickerModal";
 
 const MAX_MESSAGE_LENGTH = 500;
