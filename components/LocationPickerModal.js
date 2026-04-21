@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,6 +15,16 @@ const DEFAULT_CENTER = {
   lat: -34.9011,
   lng: -56.1645,
 };
+
+const emptySubscribe = () => () => {};
+
+/**
+ * True only in the browser after hydration can match SSR (server snapshot is false).
+ * Replaces useEffect(() => setMounted(true)) to satisfy react-hooks/set-state-in-effect.
+ */
+function useIsClient() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
 
 function normalizeCenter(center) {
   if (
@@ -200,11 +216,7 @@ export default function LocationPickerModal({
   onConfirm,
   onCancel,
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const isClient = useIsClient();
 
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") {
@@ -217,7 +229,7 @@ export default function LocationPickerModal({
     };
   }, [isOpen]);
 
-  if (!mounted || !isOpen || typeof document === "undefined") {
+  if (!isClient || !isOpen || typeof document === "undefined") {
     return null;
   }
 
