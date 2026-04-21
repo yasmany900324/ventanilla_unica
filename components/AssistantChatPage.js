@@ -7,6 +7,7 @@ import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 import { resolveLocationReferenceLabel } from "../lib/resolveLocationReferenceLabel";
 import LocationPickerModal from "./LocationPickerModal";
+import LocationMapPreview from "./LocationMapPreview";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -652,45 +653,38 @@ function buildOpenStreetMapLink(latitude, longitude) {
 
 function PendingLocationConfirmCard({ selection, copy }) {
   const locationMapCopy = copy?.locationMap || {};
-  const isGeo = selection?.source === LOCATION_SHARE_SOURCE_GEO;
   const title =
-    (isGeo ? locationMapCopy.pendingConfirmTitleGeo : locationMapCopy.pendingConfirmTitleMap) ||
-    (isGeo ? "Ubicación detectada" : "Ubicación seleccionada en el mapa");
-  const lead =
-    locationMapCopy.pendingConfirmLead ||
-    "Revisá que coincida con el lugar que querés informar antes de continuar.";
-  const referenceLabel = locationMapCopy.pendingConfirmReferenceLabel || "Referencia";
-  const coordsLabel = locationMapCopy.pendingConfirmCoordsLabel || "Coordenadas aproximadas (WGS84)";
-  const openMapLabel = locationMapCopy.pendingConfirmOpenMap || "Ver en OpenStreetMap";
-  const continueHint =
-    locationMapCopy.pendingConfirmContinueHint ||
-    "Si es correcto, usá «Sí, continuar». Si no, «Cambiar ubicación».";
+    locationMapCopy.pendingConfirmHeading ||
+    locationMapCopy.pendingConfirmTitleMap ||
+    "Ubicación seleccionada";
+  const openMapLabel = locationMapCopy.pendingConfirmOpenMap || "Ver en mapa";
+  const techSummary =
+    locationMapCopy.pendingConfirmTechSummary || "Coordenadas (opcional)";
+  const coordsLabel = locationMapCopy.pendingConfirmCoordsLabel || "WGS84";
   const referenceText = normalizeContextParam(selection?.reference, 200) || "—";
   const coordLine = formatApproxWgs84Coordinates(selection?.latitude, selection?.longitude);
   const mapUrl = buildOpenStreetMapLink(selection?.latitude, selection?.longitude);
 
   return (
     <section
-      className="assistant-location-pending-card"
+      className="assistant-location-pending-card assistant-location-pending-card--visual"
       aria-labelledby="assistant-pending-location-title"
       aria-live="polite"
     >
       <h3 id="assistant-pending-location-title" className="assistant-location-pending-card__title">
         {title}
       </h3>
-      <p className="assistant-location-pending-card__lead">{lead}</p>
-      <div className="assistant-location-pending-card__reference-block">
-        <p className="assistant-location-pending-card__reference-label">{referenceLabel}</p>
-        <p className="assistant-location-pending-card__reference-text">{referenceText}</p>
-      </div>
-      {coordLine ? (
-        <p className="assistant-location-pending-card__meta">
-          {coordsLabel}: <code>{coordLine}</code>
-        </p>
-      ) : null}
+      <LocationMapPreview
+        latitude={selection?.latitude}
+        longitude={selection?.longitude}
+        ariaLabel={
+          locationMapCopy.pendingConfirmMapPreviewAria || "Vista aproximada del punto en el mapa"
+        }
+      />
+      <p className="assistant-location-pending-card__place">{referenceText}</p>
       {mapUrl ? (
         <a
-          className="assistant-location-pending-card__link"
+          className="assistant-location-pending-card__link assistant-location-pending-card__link--subtle"
           href={mapUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -698,7 +692,14 @@ function PendingLocationConfirmCard({ selection, copy }) {
           {openMapLabel}
         </a>
       ) : null}
-      <p className="assistant-location-pending-card__hint">{continueHint}</p>
+      {coordLine ? (
+        <details className="assistant-location-pending-card__details">
+          <summary>{techSummary}</summary>
+          <p className="assistant-location-pending-card__meta">
+            {coordsLabel}: <code>{coordLine}</code>
+          </p>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -1377,6 +1378,7 @@ export default function AssistantChatPage() {
         latitude,
         longitude,
         fallbackLabel: fallbackReference,
+        locale,
       });
       setPendingLocationSelection({
         source,
@@ -1385,7 +1387,7 @@ export default function AssistantChatPage() {
         reference: resolvedReference || fallbackReference,
       });
     },
-    [uiCopy.locationMap]
+    [locale, uiCopy.locationMap]
   );
 
   const handleUseCurrentLocation = useCallback(() => {

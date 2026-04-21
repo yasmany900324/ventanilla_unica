@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { buildCitizenGeocodeLabel } from "../../../../lib/formatCitizenGeocodeLabel";
 
 const NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse";
 
-function clampDisplayName(value, maxLength) {
+function clampLabel(value, maxLength) {
   if (typeof value !== "string") {
     return "";
   }
@@ -15,10 +16,22 @@ function clampDisplayName(value, maxLength) {
   return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1).trimEnd()}…` : trimmed;
 }
 
+function normalizeLocaleParam(raw) {
+  const s = typeof raw === "string" ? raw.trim().slice(0, 8).toLowerCase() : "";
+  if (s.startsWith("en")) {
+    return "en";
+  }
+  if (s.startsWith("pt")) {
+    return "pt";
+  }
+  return "es";
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const lat = Number(searchParams.get("lat"));
   const lon = Number(searchParams.get("lon"));
+  const locale = normalizeLocaleParam(searchParams.get("locale"));
 
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
@@ -47,7 +60,8 @@ export async function GET(request) {
     }
 
     const payload = await upstream.json();
-    const label = clampDisplayName(payload?.display_name, 120);
+    const friendly = buildCitizenGeocodeLabel(payload, locale);
+    const label = clampLabel(friendly, 130);
 
     return NextResponse.json({ label });
   } catch {

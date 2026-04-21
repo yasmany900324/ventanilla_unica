@@ -2972,6 +2972,65 @@ button:disabled {
   box-shadow: 0 6px 16px rgba(18, 56, 120, 0.08);
 }
 
+.assistant-location-pending-card--visual {
+  gap: 0.45rem;
+  padding: 0.58rem 0.64rem 0.64rem;
+}
+
+.assistant-location-preview-map {
+  position: relative;
+  width: 100%;
+  height: 128px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #c9daf2;
+  background: #dfeefb;
+}
+
+.assistant-location-preview-map__leaflet.leaflet-container {
+  width: 100%;
+  height: 100%;
+  font: inherit;
+}
+
+.assistant-location-preview-map .leaflet-control-attribution {
+  font-size: 0.56rem;
+  line-height: 1.15;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.assistant-location-pending-card__place {
+  margin: 0;
+  color: #1f2f4d;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.assistant-location-pending-card__link--subtle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #4564a0;
+}
+
+.assistant-location-pending-card__details {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #6a7b92;
+}
+
+.assistant-location-pending-card__details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #5c6c86;
+}
+
+.assistant-location-pending-card__details[open] summary {
+  margin-bottom: 0.28rem;
+}
+
 .assistant-location-pending-card__title {
   margin: 0;
   color: #123878;
@@ -3704,6 +3763,14 @@ textarea:focus-visible {
 
   .assistant-location-pending-card__reference-text {
     font-size: 0.8rem;
+  }
+
+  .assistant-location-preview-map {
+    height: 118px;
+  }
+
+  .assistant-location-pending-card__place {
+    font-size: 0.84rem;
   }
 
   .assistant-location-dialog {
