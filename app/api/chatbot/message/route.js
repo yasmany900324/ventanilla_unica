@@ -1185,7 +1185,14 @@ export async function POST(request) {
     });
   }
 
-  if (effectiveCommand === "edit_field" && isIncidentFlowActive(snapshot)) {
+  // Reabrir un campo para reingreso (vacía el valor y vuelve a preguntar).
+  // No aplicar a set_geo_location: ese comando ya se normaliza a edit_field + location
+  // para persistir el texto de ubicación y avanzar de paso (ver merge más abajo).
+  if (
+    effectiveCommand === "edit_field" &&
+    isIncidentFlowActive(snapshot) &&
+    commandFromPayload !== "set_geo_location"
+  ) {
     const targetStep = mapFieldToStep(effectiveCommandField);
     const resetCollectedData = {
       ...snapshot.collectedData,
