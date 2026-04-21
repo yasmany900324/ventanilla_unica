@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
+import LocationPickerModal from "./LocationPickerModal";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -20,7 +21,6 @@ const DEFAULT_LOCATION_MAP_CENTER = {
   lng: -56.1645,
 };
 const LOCATION_MAP_DELTA = 0.015;
-
 const LOCATION_SHARE_SOURCE_GEO = "geo";
 const LOCATION_SHARE_SOURCE_MAP = "map";
 
@@ -260,46 +260,6 @@ function normalizeContextParam(value, maxLength = 120) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function toFiniteNumber(value, fallback) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function buildOpenStreetMapEmbedUrl(center) {
-  const lat = toFiniteNumber(center?.lat, DEFAULT_LOCATION_MAP_CENTER.lat);
-  const lng = toFiniteNumber(center?.lng, DEFAULT_LOCATION_MAP_CENTER.lng);
-  const left = lng - LOCATION_MAP_DELTA;
-  const right = lng + LOCATION_MAP_DELTA;
-  const top = lat + LOCATION_MAP_DELTA;
-  const bottom = lat - LOCATION_MAP_DELTA;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
-}
-
-function buildOpenStreetMapViewUrl(center) {
-  const lat = toFiniteNumber(center?.lat, DEFAULT_LOCATION_MAP_CENTER.lat);
-  const lng = toFiniteNumber(center?.lng, DEFAULT_LOCATION_MAP_CENTER.lng);
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
-}
-
-function buildFriendlyLocationReply(copy, source = LOCATION_SHARE_SOURCE_GEO) {
-  const defaultGeoReply = "Perfecto, registré una ubicación aproximada en la zona seleccionada.";
-  const defaultMapReply = "Perfecto, tomo la referencia del punto que seleccionaste en el mapa.";
-  const locationMapCopy = copy?.locationMap || {};
-  if (source === LOCATION_SHARE_SOURCE_MAP) {
-    return (
-      normalizeContextParam(locationMapCopy.confirmationFromMap, MAX_MESSAGE_LENGTH) ||
-      defaultMapReply
-    );
-  }
-  return (
-    normalizeContextParam(locationMapCopy.confirmationFromGeo, MAX_MESSAGE_LENGTH) ||
-    defaultGeoReply
-  );
-}
-
 function isLocationPromptStep(message) {
   if (message?.sender !== "bot" || message?.nextStep?.type !== "ask_field") {
     return false;
@@ -316,6 +276,18 @@ function isLocationPromptStep(message) {
     stepField.includes("direcc") ||
     stepField.includes("address")
   );
+}
+
+function buildFriendlyLocationConfirmation({ copy, referenceLabel }) {
+  const locationMapCopy = copy?.locationMap || {};
+  const template =
+    normalizeContextParam(locationMapCopy.confirmationQuestionTemplate, 220) ||
+    "Detecté una ubicación aproximada en la zona de {reference}. ¿Es correcta?";
+  const safeReference =
+    normalizeContextParam(referenceLabel, 120) ||
+    normalizeContextParam(locationMapCopy.referenceFallback, 120) ||
+    "la zona seleccionada";
+  return normalizeContextParam(template.replace("{reference}", safeReference), MAX_MESSAGE_LENGTH);
 }
 
 function getChatEntryContext(searchParams) {
@@ -626,202 +598,35 @@ function StatusSummaryCard({ statusSummary }) {
   );
 }
 
-function LocationMapPrompt({ disabled, onShareLocation, copy }) {
+function LocationMapPrompt({ disabled, onUseCurrentLocation, onOpenMapPicker, copy }) {
   const locationMapCopy = copy?.locationMap || {};
-  const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION_MAP_CENTER);
-  const [isLocating, setIsLocating] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const [pendingValidation, setPendingValidation] = useState(false);
-  const [lastSource, setLastSource] = useState(LOCATION_SHARE_SOURCE_GEO);
-
-  const title = locationMapCopy.title || "Ubicación en mapa";
-  const description =
-    locationMapCopy.description ||
-    "Puedes compartir una referencia escrita o usar tu ubicación actual para completar este paso.";
-  const iframeTitle = locationMapCopy.iframeTitle || "Mapa de referencia para ubicación";
-  const useCurrentLocationLabel = locationMapCopy.useCurrentLocation || "Usar mi ubicación actual";
-  const openMapLabel = locationMapCopy.openMap || "Abrir mapa";
-  const loadingLabel = locationMapCopy.loading || "Obteniendo ubicación...";
-  const useSelectedPointLabel =
-    locationMapCopy.useSelectedPoint || "Usar este punto del mapa";
-  const adjustPointHint =
-    locationMapCopy.adjustPointHint || "Puedes ajustar el punto en el mapa antes de continuar.";
-  const validationQuestion =
-    locationMapCopy.validationQuestion || "¿Es correcta esta ubicación aproximada?";
-  const validationHint =
-    locationMapCopy.validationHint ||
-    "Si necesitas, puedes mover el mapa o abrirlo para ajustar el punto.";
-  const validationConfirm = locationMapCopy.validationConfirm || "Sí, usar esta ubicación";
-  const validationAdjust = locationMapCopy.validationAdjust || "Ajustar ubicación";
-  const internalGeoValue =
-    locationMapCopy.internalGeoValue || "Ubicación aproximada compartida desde geolocalización.";
-  const internalMapValue =
-    locationMapCopy.internalMapValue || "Referencia de ubicación compartida desde mapa.";
-  const unsupportedLabel =
-    locationMapCopy.unsupported || "Tu navegador no permite compartir ubicación automática.";
-  const permissionDeniedLabel =
-    locationMapCopy.permissionDenied ||
-    "No pude acceder a tu ubicación. Revisa los permisos del navegador e inténtalo de nuevo.";
-  const unavailableLabel =
-    locationMapCopy.unavailable ||
-    "No fue posible obtener tu ubicación ahora. Puedes escribir una referencia manual.";
-
-  const embedUrl = useMemo(() => buildOpenStreetMapEmbedUrl(mapCenter), [mapCenter]);
-  const viewUrl = useMemo(() => buildOpenStreetMapViewUrl(mapCenter), [mapCenter]);
-
-  const handleUseCurrentLocation = useCallback(() => {
-    if (disabled || isLocating) {
-      return;
-    }
-    if (typeof window === "undefined" || !window.navigator?.geolocation) {
-      setFeedback(unsupportedLabel);
-      return;
-    }
-
-    setFeedback("");
-    setIsLocating(true);
-    window.navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const nextCenter = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        const accuracy = Number.isFinite(position.coords.accuracy)
-          ? Math.round(position.coords.accuracy)
-          : null;
-
-        setMapCenter(nextCenter);
-        setIsLocating(false);
-        setLastSource(LOCATION_SHARE_SOURCE_GEO);
-        setFeedback(validationHint);
-        setPendingValidation(true);
-      },
-      (error) => {
-        setIsLocating(false);
-        if (error?.code === 1) {
-          setFeedback(permissionDeniedLabel);
-          return;
-        }
-        setFeedback(unavailableLabel);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
-  }, [
-    disabled,
-    isLocating,
-    permissionDeniedLabel,
-    unavailableLabel,
-    unsupportedLabel,
-    validationHint,
-  ]);
-
-  const handleUseMapPoint = useCallback(() => {
-    if (disabled || isLocating) {
-      return;
-    }
-    setPendingValidation(true);
-    setLastSource(LOCATION_SHARE_SOURCE_MAP);
-    setFeedback(validationHint);
-  }, [disabled, isLocating, validationHint]);
-
-  const handleValidationConfirm = useCallback(() => {
-    if (disabled || typeof onShareLocation !== "function") {
-      return;
-    }
-    const friendlyText = buildFriendlyLocationReply(copy, lastSource);
-    const internalValue =
-      lastSource === LOCATION_SHARE_SOURCE_GEO ? internalGeoValue : internalMapValue;
-    void onShareLocation({
-      text: friendlyText,
-      internalValue,
-      source: lastSource,
-    });
-    setPendingValidation(false);
-  }, [
-    copy,
-    disabled,
-    internalGeoValue,
-    internalMapValue,
-    lastSource,
-    onShareLocation,
-  ]);
-
-  const handleValidationAdjust = useCallback(() => {
-    setPendingValidation(false);
-    setFeedback(validationHint);
-  }, [validationHint]);
+  const promptText =
+    locationMapCopy.prompt ||
+    "Indicame la dirección, una referencia cercana o usa tu ubicación actual.";
+  const useCurrentLocationLabel = locationMapCopy.useCurrentLocation || "Usar mi ubicación";
+  const chooseOnMapLabel = locationMapCopy.useMapSelection || "Elegir en mapa";
 
   return (
-    <section className="assistant-location-map" aria-label={title}>
-      <p className="assistant-location-map__title">{title}</p>
-      <p className="assistant-location-map__description">{description}</p>
-      <div className="assistant-location-map__frame-wrap">
-        <iframe
-          title={iframeTitle}
-          src={embedUrl}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-      </div>
+    <section className="assistant-location-map" aria-label={locationMapCopy.title || "Ubicación"}>
+      <p className="assistant-location-map__prompt">{promptText}</p>
       <div className="assistant-location-map__actions">
         <button
           type="button"
           className="assistant-location-map__button"
-          onClick={handleUseCurrentLocation}
-          disabled={disabled || isLocating}
+          onClick={onUseCurrentLocation}
+          disabled={disabled}
         >
-          {isLocating ? loadingLabel : useCurrentLocationLabel}
+          {useCurrentLocationLabel}
         </button>
-        <a
-          className="assistant-location-map__link"
-          href={viewUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {openMapLabel}
-        </a>
         <button
           type="button"
-          className="assistant-location-map__link-button"
-          onClick={handleUseMapPoint}
-          disabled={disabled || isLocating}
+          className="assistant-location-map__button assistant-location-map__button--ghost"
+          onClick={onOpenMapPicker}
+          disabled={disabled}
         >
-          {useSelectedPointLabel}
+          {chooseOnMapLabel}
         </button>
       </div>
-      <p className="assistant-location-map__hint">{adjustPointHint}</p>
-      {pendingValidation ? (
-        <div className="assistant-location-map__validation" role="group" aria-label={validationQuestion}>
-          <p className="assistant-location-map__validation-title">{validationQuestion}</p>
-          <div className="assistant-location-map__validation-actions">
-            <button
-              type="button"
-              className="assistant-location-map__button"
-              onClick={handleValidationConfirm}
-              disabled={disabled || isLocating}
-            >
-              {validationConfirm}
-            </button>
-            <button
-              type="button"
-              className="assistant-location-map__button assistant-location-map__button--ghost"
-              onClick={handleValidationAdjust}
-              disabled={disabled || isLocating}
-            >
-              {validationAdjust}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {feedback ? (
-        <p className="assistant-location-map__feedback" role="status" aria-live="polite">
-          {feedback}
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -867,7 +672,8 @@ function ChatMessageBubble({
   message,
   onChipClick,
   onActionOptionClick,
-  onShareLocation,
+  onUseCurrentLocation,
+  onOpenMapPicker,
   onRedirectClick,
   disabled,
   copy,
@@ -888,7 +694,8 @@ function ChatMessageBubble({
         {isLocationPromptStep(message) ? (
           <LocationMapPrompt
             disabled={disabled}
-            onShareLocation={onShareLocation}
+            onUseCurrentLocation={onUseCurrentLocation}
+            onOpenMapPicker={onOpenMapPicker}
             copy={copy}
           />
         ) : null}
@@ -1475,45 +1282,153 @@ export default function AssistantChatPage() {
     });
   };
 
-  const handleLocationMapShare = async (locationPayload) => {
-    if (!locationPayload || isSending) {
+  const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [pendingLocationSelection, setPendingLocationSelection] = useState(null);
+
+  const handleLocationResolution = useCallback(
+    async ({ source, latitude, longitude }) => {
+      const locationMapCopy = uiCopy.locationMap || {};
+      const fallbackReference =
+        source === LOCATION_SHARE_SOURCE_GEO
+          ? normalizeContextParam(locationMapCopy.geoFallbackReference, 120) || "tu zona"
+          : normalizeContextParam(locationMapCopy.mapFallbackReference, 120) || "el punto seleccionado";
+      const resolvedReference = await resolveLocationReferenceLabel({
+        latitude,
+        longitude,
+        fallbackLabel: fallbackReference,
+      });
+      setPendingLocationSelection({
+        source,
+        latitude,
+        longitude,
+        reference: resolvedReference || fallbackReference,
+      });
+    },
+    [uiCopy.locationMap]
+  );
+
+  const handleUseCurrentLocation = useCallback(() => {
+    if (isSending || typeof window === "undefined") {
       return;
     }
-    const normalizedPayload =
-      typeof locationPayload === "string"
-        ? {
-            text: locationPayload,
-            source: LOCATION_SHARE_SOURCE_GEO,
-            metadata: null,
-          }
-        : locationPayload;
-    if (!normalizedPayload?.text) {
-      return;
-    }
-    const confirmationText = normalizeContextParam(normalizedPayload.text, MAX_MESSAGE_LENGTH);
-    if (confirmationText) {
+    const locationMapCopy = uiCopy.locationMap || {};
+    if (!window.navigator?.geolocation) {
+      const unsupportedMessage =
+        normalizeContextParam(locationMapCopy.unsupported, MAX_MESSAGE_LENGTH) ||
+        "Tu navegador no permite compartir ubicación automática.";
       setMessages((previousMessages) => [
         ...previousMessages,
-        createLocalMessage({
-          sender: "bot",
-          text: confirmationText,
-        }),
+        createLocalMessage({ sender: "bot", text: unsupportedMessage }),
       ]);
-    }
-    const submissionText = normalizeContextParam(
-      normalizedPayload.internalValue || normalizedPayload.text,
-      MAX_MESSAGE_LENGTH
-    );
-    if (!submissionText) {
       return;
     }
-    await submitMessage({
-      rawValue: submissionText,
-      command: "set_geo_location",
-      commandField: "location",
-      appendUserMessage: false,
-    });
-  };
+
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void handleLocationResolution({
+          source: LOCATION_SHARE_SOURCE_GEO,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        const deniedMessage =
+          normalizeContextParam(locationMapCopy.permissionDenied, MAX_MESSAGE_LENGTH) ||
+          "No pude acceder a tu ubicación. Revisa los permisos del navegador e inténtalo de nuevo.";
+        const unavailableMessage =
+          normalizeContextParam(locationMapCopy.unavailable, MAX_MESSAGE_LENGTH) ||
+          "No fue posible obtener tu ubicación ahora. Puedes escribir una referencia manual.";
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          createLocalMessage({
+            sender: "bot",
+            text: error?.code === 1 ? deniedMessage : unavailableMessage,
+          }),
+        ]);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, [handleLocationResolution, isSending, uiCopy.locationMap]);
+
+  const handleOpenMapPicker = useCallback(() => {
+    if (isSending) {
+      return;
+    }
+    setLocationPickerOpen(true);
+  }, [isSending]);
+
+  const handleCancelLocationPicker = useCallback(() => {
+    setLocationPickerOpen(false);
+  }, []);
+
+  const handleConfirmLocationPicker = useCallback(
+    async ({ latitude, longitude }) => {
+      setLocationPickerOpen(false);
+      await handleLocationResolution({
+        source: LOCATION_SHARE_SOURCE_MAP,
+        latitude,
+        longitude,
+      });
+    },
+    [handleLocationResolution]
+  );
+
+  const handleLocationDecision = useCallback(
+    async (shouldContinue) => {
+      if (!pendingLocationSelection || isSending) {
+        return;
+      }
+      const locationMapCopy = uiCopy.locationMap || {};
+      if (!shouldContinue) {
+        setPendingLocationSelection(null);
+        setLocationPickerOpen(true);
+        return;
+      }
+
+      const confirmationTemplate =
+        pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
+          ? locationMapCopy.confirmationDetectedGeo
+          : locationMapCopy.confirmationDetectedMap;
+      const confirmationText = normalizeContextParam(
+        (confirmationTemplate || "Detecté una ubicación aproximada en la zona de {reference}. ¿Es correcta?").replace(
+          "{reference}",
+          pendingLocationSelection.reference || "la zona seleccionada"
+        ),
+        MAX_MESSAGE_LENGTH
+      );
+      if (confirmationText) {
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          createLocalMessage({ sender: "bot", text: confirmationText }),
+        ]);
+      }
+
+      const internalTemplate =
+        pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
+          ? locationMapCopy.internalGeoValue
+          : locationMapCopy.internalMapValue;
+      const internalText = normalizeContextParam(
+        (internalTemplate || "Ubicación aproximada validada en {reference}.").replace(
+          "{reference}",
+          pendingLocationSelection.reference || "la zona seleccionada"
+        ),
+        MAX_MESSAGE_LENGTH
+      );
+
+      setPendingLocationSelection(null);
+      await submitMessage({
+        rawValue: internalText,
+        command: "set_geo_location",
+        commandField: "location",
+        appendUserMessage: false,
+      });
+    },
+    [isSending, pendingLocationSelection, submitMessage, uiCopy.locationMap]
+  );
 
   const handleRetry = async () => {
     const lastFailedInput = lastFailedInputRef.current;
@@ -1616,7 +1531,8 @@ export default function AssistantChatPage() {
                 message={message}
                 onChipClick={handleSendMessage}
                 onActionOptionClick={handleActionOption}
-                onShareLocation={handleLocationMapShare}
+                onUseCurrentLocation={handleUseCurrentLocation}
+                onOpenMapPicker={handleOpenMapPicker}
                 onRedirectClick={handleRedirectClick}
                 disabled={isSending}
                 copy={uiCopy}
@@ -1647,6 +1563,36 @@ export default function AssistantChatPage() {
             copy={uiCopy}
           />
         ) : null}
+
+        {pendingLocationSelection ? (
+          <div className="assistant-location-map__actions" style={{ marginTop: "0.2rem" }}>
+            <button
+              type="button"
+              className="assistant-location-map__button"
+              onClick={() => void handleLocationDecision(true)}
+              disabled={isSending}
+            >
+              {uiCopy.locationMap?.continueAction || "Sí, continuar"}
+            </button>
+            <button
+              type="button"
+              className="assistant-location-map__button assistant-location-map__button--ghost"
+              onClick={() => void handleLocationDecision(false)}
+              disabled={isSending}
+            >
+              {uiCopy.locationMap?.changeLocation || "Cambiar ubicación"}
+            </button>
+          </div>
+        ) : null}
+
+        <LocationPickerModal
+          isOpen={isLocationPickerOpen}
+          initialCenter={DEFAULT_LOCATION_MAP_CENTER}
+          onConfirm={handleConfirmLocationPicker}
+          onCancel={handleCancelLocationPicker}
+          copy={uiCopy}
+          disabled={isSending}
+        />
 
         <ChatComposer
           inputValue={inputValue}
