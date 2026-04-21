@@ -1370,24 +1370,42 @@ export default function AssistantChatPage() {
   const [pendingLocationSelection, setPendingLocationSelection] = useState(null);
   /** null = usar centro por defecto al abrir el mapa; { lat, lng } = reabrir en la última selección (p. ej. editar). */
   const [mapPickerInitialCenter, setMapPickerInitialCenter] = useState(null);
+  const [isLocationPickResolving, setIsLocationPickResolving] = useState(false);
 
   const handleLocationResolution = useCallback(
-    async ({ source, latitude, longitude }) => {
+    async ({ source, latitude, longitude, priorReference = null }) => {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+
       const locationMapCopy = uiCopy.locationMap || {};
+      const loadingLine =
+        normalizeContextParam(locationMapCopy.loading, MAX_MESSAGE_LENGTH) ||
+        "Obteniendo ubicación…";
+      const stablePrior = normalizeContextParam(priorReference, 200);
+      setPendingLocationSelection({
+        source,
+        latitude: lat,
+        longitude: lng,
+        reference: stablePrior || loadingLine,
+      });
+
       const fallbackReference =
         source === LOCATION_SHARE_SOURCE_GEO
           ? normalizeContextParam(locationMapCopy.geoFallbackReference, 120) || "tu zona"
           : normalizeContextParam(locationMapCopy.mapFallbackReference, 120) || "el punto seleccionado";
       const resolvedReference = await resolveLocationReferenceLabel({
-        latitude,
-        longitude,
+        latitude: lat,
+        longitude: lng,
         fallbackLabel: fallbackReference,
         locale,
       });
       setPendingLocationSelection({
         source,
-        latitude,
-        longitude,
+        latitude: lat,
+        longitude: lng,
         reference: resolvedReference || fallbackReference,
       });
     },
@@ -1462,14 +1480,23 @@ export default function AssistantChatPage() {
 
   const handleConfirmLocationPicker = useCallback(
     async ({ latitude, longitude }) => {
+      const editSnapshot = locationPickerRestoreSnapshotRef.current;
+      const priorReference =
+        typeof editSnapshot?.reference === "string" ? editSnapshot.reference.trim() : "";
       locationPickerRestoreSnapshotRef.current = null;
-      setLocationPickerOpen(false);
-      setMapPickerInitialCenter(null);
-      await handleLocationResolution({
-        source: LOCATION_SHARE_SOURCE_MAP,
-        latitude,
-        longitude,
-      });
+      setIsLocationPickResolving(true);
+      try {
+        await handleLocationResolution({
+          source: LOCATION_SHARE_SOURCE_MAP,
+          latitude,
+          longitude,
+          priorReference: priorReference || null,
+        });
+      } finally {
+        setIsLocationPickResolving(false);
+        setLocationPickerOpen(false);
+        setMapPickerInitialCenter(null);
+      }
     },
     [handleLocationResolution]
   );
@@ -1691,7 +1718,7 @@ export default function AssistantChatPage() {
           onConfirm={handleConfirmLocationPicker}
           onCancel={handleCancelLocationPicker}
           copy={uiCopy}
-          disabled={isSending}
+          disabled={isSending || isLocationPickResolving}
         />
 
         <ChatComposer
