@@ -651,6 +651,17 @@ function buildOpenStreetMapLink(latitude, longitude) {
   return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
 }
 
+function buildLocationConfirmedHistoryMessage({ reference, copy }) {
+  const locationMapCopy = copy?.locationMap || {};
+  const prefix =
+    normalizeContextParam(locationMapCopy.locationHistoryConfirmedPrefix, 72) || "Ubicación confirmada";
+  const ref = normalizeContextParam(reference, Math.max(40, MAX_MESSAGE_LENGTH - prefix.length - 3));
+  if (ref) {
+    return normalizeContextParam(`${prefix} · ${ref}`, MAX_MESSAGE_LENGTH);
+  }
+  return normalizeContextParam(prefix, MAX_MESSAGE_LENGTH);
+}
+
 function PendingLocationConfirmCard({ selection, copy }) {
   const locationMapCopy = copy?.locationMap || {};
   const title =
@@ -1525,27 +1536,20 @@ export default function AssistantChatPage() {
 
       locationPickerRestoreSnapshotRef.current = null;
 
-      const internalTemplate =
-        pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
-          ? locationMapCopy.internalGeoValue
-          : locationMapCopy.internalMapValue;
-      const internalText = normalizeContextParam(
-        (internalTemplate || "Ubicación aproximada validada en {reference}.").replace(
-          "{reference}",
-          pendingLocationSelection.reference || "la zona seleccionada"
-        ),
-        MAX_MESSAGE_LENGTH
-      );
+      const userHistoryText = buildLocationConfirmedHistoryMessage({
+        reference: pendingLocationSelection.reference,
+        copy: uiCopy,
+      });
 
       setPendingLocationSelection(null);
       await submitMessage({
-        rawValue: internalText,
+        rawValue: userHistoryText,
         command: "set_geo_location",
         commandField: "location",
-        appendUserMessage: false,
+        appendUserMessage: true,
       });
     },
-    [isSending, pendingLocationSelection, submitMessage, uiCopy.locationMap]
+    [isSending, pendingLocationSelection, submitMessage, uiCopy]
   );
 
   const handleRetry = async () => {
