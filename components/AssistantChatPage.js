@@ -632,6 +632,77 @@ function LocationMapPrompt({ disabled, onUseCurrentLocation, onOpenMapPicker, co
   );
 }
 
+function formatApproxWgs84Coordinates(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return "";
+  }
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function buildOpenStreetMapLink(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
+}
+
+function PendingLocationConfirmCard({ selection, copy }) {
+  const locationMapCopy = copy?.locationMap || {};
+  const isGeo = selection?.source === LOCATION_SHARE_SOURCE_GEO;
+  const title =
+    (isGeo ? locationMapCopy.pendingConfirmTitleGeo : locationMapCopy.pendingConfirmTitleMap) ||
+    (isGeo ? "Ubicación detectada" : "Ubicación seleccionada en el mapa");
+  const lead =
+    locationMapCopy.pendingConfirmLead ||
+    "Revisá que coincida con el lugar que querés informar antes de continuar.";
+  const referenceLabel = locationMapCopy.pendingConfirmReferenceLabel || "Referencia";
+  const coordsLabel = locationMapCopy.pendingConfirmCoordsLabel || "Coordenadas aproximadas (WGS84)";
+  const openMapLabel = locationMapCopy.pendingConfirmOpenMap || "Ver en OpenStreetMap";
+  const continueHint =
+    locationMapCopy.pendingConfirmContinueHint ||
+    "Si es correcto, usá «Sí, continuar». Si no, «Cambiar ubicación».";
+  const referenceText = normalizeContextParam(selection?.reference, 200) || "—";
+  const coordLine = formatApproxWgs84Coordinates(selection?.latitude, selection?.longitude);
+  const mapUrl = buildOpenStreetMapLink(selection?.latitude, selection?.longitude);
+
+  return (
+    <section
+      className="assistant-location-pending-card"
+      aria-labelledby="assistant-pending-location-title"
+      aria-live="polite"
+    >
+      <h3 id="assistant-pending-location-title" className="assistant-location-pending-card__title">
+        {title}
+      </h3>
+      <p className="assistant-location-pending-card__lead">{lead}</p>
+      <div className="assistant-location-pending-card__reference-block">
+        <p className="assistant-location-pending-card__reference-label">{referenceLabel}</p>
+        <p className="assistant-location-pending-card__reference-text">{referenceText}</p>
+      </div>
+      {coordLine ? (
+        <p className="assistant-location-pending-card__meta">
+          {coordsLabel}: <code>{coordLine}</code>
+        </p>
+      ) : null}
+      {mapUrl ? (
+        <a
+          className="assistant-location-pending-card__link"
+          href={mapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {openMapLabel}
+        </a>
+      ) : null}
+      <p className="assistant-location-pending-card__hint">{continueHint}</p>
+    </section>
+  );
+}
+
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
@@ -679,6 +750,7 @@ function ChatMessageBubble({
   disabled,
   copy,
   mapPickerOpen = false,
+  pendingLocationSelection = null,
 }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
@@ -693,7 +765,14 @@ function ChatMessageBubble({
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
-        {isLocationPromptStep(message) && !mapPickerOpen ? (
+        {isLocationPromptStep(message) && !mapPickerOpen && pendingLocationSelection ? (
+          <div className="assistant-location-map assistant-location-map--resolved" role="status">
+            <p className="assistant-location-map__resolved-badge">
+              {copy.locationMap?.locationStepDoneBadge || "Ubicación elegida — confirmala abajo"}
+            </p>
+          </div>
+        ) : null}
+        {isLocationPromptStep(message) && !mapPickerOpen && !pendingLocationSelection ? (
           <LocationMapPrompt
             disabled={disabled}
             onUseCurrentLocation={onUseCurrentLocation}
@@ -1392,24 +1471,6 @@ export default function AssistantChatPage() {
         return;
       }
 
-      const confirmationTemplate =
-        pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
-          ? locationMapCopy.confirmationDetectedGeo
-          : locationMapCopy.confirmationDetectedMap;
-      const confirmationText = normalizeContextParam(
-        (confirmationTemplate || "Detecté una ubicación aproximada en la zona de {reference}. ¿Es correcta?").replace(
-          "{reference}",
-          pendingLocationSelection.reference || "la zona seleccionada"
-        ),
-        MAX_MESSAGE_LENGTH
-      );
-      if (confirmationText) {
-        setMessages((previousMessages) => [
-          ...previousMessages,
-          createLocalMessage({ sender: "bot", text: confirmationText }),
-        ]);
-      }
-
       const internalTemplate =
         pendingLocationSelection.source === LOCATION_SHARE_SOURCE_GEO
           ? locationMapCopy.internalGeoValue
@@ -1501,7 +1562,8 @@ export default function AssistantChatPage() {
     !entryContext &&
     !showInitialGuidance &&
     !hasDynamicBotActions &&
-    !isLocationPickerOpen;
+    !isLocationPickerOpen &&
+    !pendingLocationSelection;
 
   return (
     <main className="page page--assistant" lang={locale}>
@@ -1541,6 +1603,7 @@ export default function AssistantChatPage() {
                 disabled={isSending}
                 copy={uiCopy}
                 mapPickerOpen={isLocationPickerOpen}
+                pendingLocationSelection={pendingLocationSelection}
               />
             ))}
             {showInitialGuidance ? (
@@ -1570,25 +1633,28 @@ export default function AssistantChatPage() {
         ) : null}
 
         {pendingLocationSelection && !isLocationPickerOpen ? (
-          <div className="assistant-location-map__actions" style={{ marginTop: "0.2rem" }}>
-            <button
-              type="button"
-              className="assistant-location-map__button"
-              onClick={() => void handleLocationDecision(true)}
-              disabled={isSending}
-            >
-              {uiCopy.locationMap?.continueLabel || uiCopy.locationMap?.continueAction || "Sí, continuar"}
-            </button>
-            <button
-              type="button"
-              className="assistant-location-map__button assistant-location-map__button--ghost"
-              onClick={() => void handleLocationDecision(false)}
-              disabled={isSending}
-            >
-              {uiCopy.locationMap?.changeLocationLabel ||
-                uiCopy.locationMap?.changeLocation ||
-                "Cambiar ubicación"}
-            </button>
+          <div className="assistant-location-pending-stack">
+            <PendingLocationConfirmCard selection={pendingLocationSelection} copy={uiCopy} />
+            <div className="assistant-location-map__actions">
+              <button
+                type="button"
+                className="assistant-location-map__button"
+                onClick={() => void handleLocationDecision(true)}
+                disabled={isSending}
+              >
+                {uiCopy.locationMap?.continueLabel || uiCopy.locationMap?.continueAction || "Sí, continuar"}
+              </button>
+              <button
+                type="button"
+                className="assistant-location-map__button assistant-location-map__button--ghost"
+                onClick={() => void handleLocationDecision(false)}
+                disabled={isSending}
+              >
+                {uiCopy.locationMap?.changeLocationLabel ||
+                  uiCopy.locationMap?.changeLocation ||
+                  "Cambiar ubicación"}
+              </button>
+            </div>
           </div>
         ) : null}
 
