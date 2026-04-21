@@ -207,7 +207,6 @@ function normalizePersistedMessage(rawMessage, index) {
     mode: normalizeContextParam(rawMessage.mode, 40) || null,
     redirectTo: normalizeContextParam(rawMessage.redirectTo, 180) || null,
     redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
-    statusSummary: normalizeStatusSummary(rawMessage.statusSummary),
     needsClarification: Boolean(rawMessage.needsClarification),
   };
 }
@@ -457,18 +456,18 @@ function inferStatusExplanation(statusSummary) {
   return "Te comparto el estado actualizado de tu caso.";
 }
 
-function StatusSummaryCard({ message }) {
-  const statusSummary = normalizeStatusSummary(message?.statusSummary);
-  if (!statusSummary) {
+function StatusSummaryCard({ statusSummary }) {
+  const normalizedStatusSummary = normalizeStatusSummary(statusSummary);
+  if (!normalizedStatusSummary) {
     return null;
   }
-  const statusLabel = humanizeStatusLabel(statusSummary.status);
-  const detailRows = buildStatusDetailRows(statusSummary);
-  const explanation = inferStatusExplanation(statusSummary);
+  const statusLabel = humanizeStatusLabel(normalizedStatusSummary.status);
+  const detailRows = buildStatusDetailRows(normalizedStatusSummary);
+  const explanation = inferStatusExplanation(normalizedStatusSummary);
   const title =
-    statusSummary.kind === "incident"
-      ? `Incidencia ${statusSummary.displayCode || ""}`.trim()
-      : `Solicitud ${statusSummary.displayCode || ""}`.trim();
+    normalizedStatusSummary.kind === "incident"
+      ? `Incidencia ${normalizedStatusSummary.displayCode || ""}`.trim()
+      : `Solicitud ${normalizedStatusSummary.displayCode || ""}`.trim();
 
   return (
     <section className="assistant-status-card" aria-label={title}>
@@ -477,7 +476,14 @@ function StatusSummaryCard({ message }) {
       </header>
       <div className="assistant-status-card__status-wrap">
         <p className="assistant-status-card__status-label">Estado actual</p>
-        <span className={`assistant-status-card__pill assistant-status-card__pill--${normalizeContextParam(statusSummary.status, 40).toLowerCase().replace(/\s+/g, "-")}`}>
+        <span
+          className={`assistant-status-card__pill assistant-status-card__pill--${normalizeContextParam(
+            normalizedStatusSummary.status,
+            40
+          )
+            .toLowerCase()
+            .replace(/\s+/g, "-")}`}
+        >
           {statusLabel}
         </span>
       </div>
@@ -552,7 +558,7 @@ function ChatMessageBubble({
         {message.kind === "error" ? (
           <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
-        <p>{message.text}</p>
+        {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
