@@ -605,7 +605,7 @@ function LocationMapPrompt({ disabled, onUseCurrentLocation, onOpenMapPicker, co
     locationMapCopy.prompt ||
     "Indicame la dirección, una referencia cercana o usa tu ubicación actual.";
   const useCurrentLocationLabel = locationMapCopy.useCurrentLocation || "Usar mi ubicación";
-  const chooseOnMapLabel = locationMapCopy.useMapSelection || "Elegir en mapa";
+  const chooseOnMapLabel = locationMapCopy.chooseOnMap || locationMapCopy.useMapSelection || "Elegir en mapa";
 
   return (
     <section className="assistant-location-map" aria-label={locationMapCopy.title || "Ubicación"}>
@@ -678,6 +678,7 @@ function ChatMessageBubble({
   onRedirectClick,
   disabled,
   copy,
+  mapPickerOpen = false,
 }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
@@ -692,7 +693,7 @@ function ChatMessageBubble({
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
-        {isLocationPromptStep(message) ? (
+        {isLocationPromptStep(message) && !mapPickerOpen ? (
           <LocationMapPrompt
             disabled={disabled}
             onUseCurrentLocation={onUseCurrentLocation}
@@ -1359,6 +1360,7 @@ export default function AssistantChatPage() {
     if (isSending) {
       return;
     }
+    setPendingLocationSelection(null);
     setLocationPickerOpen(true);
   }, [isSending]);
 
@@ -1498,7 +1500,8 @@ export default function AssistantChatPage() {
     !isSending &&
     !entryContext &&
     !showInitialGuidance &&
-    !hasDynamicBotActions;
+    !hasDynamicBotActions &&
+    !isLocationPickerOpen;
 
   return (
     <main className="page page--assistant" lang={locale}>
@@ -1537,6 +1540,7 @@ export default function AssistantChatPage() {
                 onRedirectClick={handleRedirectClick}
                 disabled={isSending}
                 copy={uiCopy}
+                mapPickerOpen={isLocationPickerOpen}
               />
             ))}
             {showInitialGuidance ? (
@@ -1565,7 +1569,7 @@ export default function AssistantChatPage() {
           />
         ) : null}
 
-        {pendingLocationSelection ? (
+        {pendingLocationSelection && !isLocationPickerOpen ? (
           <div className="assistant-location-map__actions" style={{ marginTop: "0.2rem" }}>
             <button
               type="button"
@@ -1573,7 +1577,7 @@ export default function AssistantChatPage() {
               onClick={() => void handleLocationDecision(true)}
               disabled={isSending}
             >
-              {uiCopy.locationMap?.continueAction || "Sí, continuar"}
+              {uiCopy.locationMap?.continueLabel || uiCopy.locationMap?.continueAction || "Sí, continuar"}
             </button>
             <button
               type="button"
@@ -1581,7 +1585,9 @@ export default function AssistantChatPage() {
               onClick={() => void handleLocationDecision(false)}
               disabled={isSending}
             >
-              {uiCopy.locationMap?.changeLocation || "Cambiar ubicación"}
+              {uiCopy.locationMap?.changeLocationLabel ||
+                uiCopy.locationMap?.changeLocation ||
+                "Cambiar ubicación"}
             </button>
           </div>
         ) : null}
