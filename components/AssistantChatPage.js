@@ -51,12 +51,14 @@ function formatConfidence(confidence) {
 }
 
 function buildUserPhotoAttachedLine(fileName, copy) {
+  const fallback = "Listo, adjunte tu foto.";
   const rawTemplate =
-    normalizeContextParam(copy?.incidentPhoto?.userAttachedLine, MAX_MESSAGE_LENGTH) ||
-    "Adjunté la imagen «{name}».";
+    normalizeContextParam(copy?.incidentPhoto?.userAttachedLine, MAX_MESSAGE_LENGTH) || fallback;
   const safeName = normalizeChipLabel(fileName).slice(0, 120) || "imagen";
-  const merged = rawTemplate.replace("{name}", safeName);
-  return normalizeChipLabel(merged) || `Adjunté: ${safeName}`;
+  const merged = rawTemplate.includes("{name}")
+    ? rawTemplate.replace("{name}", safeName)
+    : rawTemplate;
+  return normalizeChipLabel(merged) || fallback;
 }
 
 function formatMessageTime(dateInput) {
