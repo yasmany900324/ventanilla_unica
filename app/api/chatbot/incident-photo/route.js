@@ -45,15 +45,26 @@ export async function POST(request) {
       ? originHeader
       : new URL(request.url).origin;
 
-  const result = await persistIncidentPhotoForChatSession({
-    sessionId,
-    userId: user.id,
-    bytes,
-    mimeType,
-    originalName,
-    preferredLocale,
-    origin,
-  });
+  try {
+    const result = await persistIncidentPhotoForChatSession({
+      sessionId,
+      userId: user.id,
+      bytes,
+      mimeType,
+      originalName,
+      preferredLocale,
+      origin,
+    });
 
-  return NextResponse.json(result.body, { status: result.status });
+    return NextResponse.json(result.body, { status: result.status });
+  } catch (error) {
+    console.error("[api/chatbot/incident-photo] Error no controlado", error);
+    return NextResponse.json(
+      {
+        error:
+          "Ocurrió un error al procesar la imagen. Intentá de nuevo en unos segundos o tocá «Omitir foto».",
+      },
+      { status: 500 }
+    );
+  }
 }
