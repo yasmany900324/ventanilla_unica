@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { processAssistantTurn } from "../../../../lib/assistant";
 import { resolvePortalUserFromWhatsAppWaId } from "../../../../lib/assistant/resolveAssistantIdentity";
 import { verifyMetaAppSecretSignature } from "../../../../lib/whatsapp/metaSignature";
-import { extractInboundTextMessages } from "../../../../lib/whatsapp/whatsappInboundAdapter";
+import {
+  extractInboundNormalizedMessages,
+  interactiveMessageToCommandText,
+} from "../../../../lib/whatsapp/whatsappInboundAdapter";
 import { sendWhatsAppTextMessage } from "../../../../lib/whatsapp/whatsappOutboundClient";
 import { buildWhatsAppAssistantSessionId } from "../../../../lib/whatsapp/whatsappSessionId";
 
@@ -41,7 +44,7 @@ export async function GET(request) {
 }
 
 /**
- * Receives WhatsApp Cloud API events; processes inbound text and replies via Graph API.
+ * Receives WhatsApp Cloud API events; normalizes tipos de mensaje y responde vía Graph API.
  */
 export async function POST(request) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
@@ -88,7 +91,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const inbound = extractInboundTextMessages(payload);
+  const inbound = extractInboundNormalizedMessages(payload);
   if (inbound.length === 0) {
     return NextResponse.json({ ok: true, processed: 0 });
   }
@@ -98,11 +101,34 @@ export async function POST(request) {
     const linkedUser = await resolvePortalUserFromWhatsAppWaId(item.waId);
     const authenticatedUser = linkedUser || null;
 
+    const { normalized } = item;
+    let text = "";
+    let channelInbound = null;
+
+    if (normalized.type === "text") {
+      text = normalized.text;
+    } else if (normalized.type === "interactive") {
+      text = interactiveMessageToCommandText(normalized);
+    } else if (
+      normalized.type === "location" ||
+      normalized.type === "image" ||
+      normalized.type === "audio" ||
+      normalized.type === "unknown"
+    ) {
+      channelInbound = normalized;
+    }
+
+    console.info("[whatsapp] webhook inbound", {
+      waId: maskWaId(item.waId),
+      messageId: item.messageId,
+      inboundType: normalized.type,
+    });
+
     try {
       const result = await processAssistantTurn({
         channel: "whatsapp",
         sessionId,
-        text: item.text,
+        text,
         preferredLocale: null,
         command: "none",
         commandField: null,
@@ -110,6 +136,7 @@ export async function POST(request) {
         authenticatedUser,
         acceptLanguage: null,
         chatDebugEnabled: false,
+        channelInbound,
       });
 
       if (result.status >= 400) {

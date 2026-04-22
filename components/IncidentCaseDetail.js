@@ -75,6 +75,18 @@ export default function IncidentCaseDetail({
             <p className="small">
               <strong>{copy.incident.location}:</strong> {incident.location}
             </p>
+            {typeof incident.locationLatitude === "number" &&
+            typeof incident.locationLongitude === "number" &&
+            Number.isFinite(incident.locationLatitude) &&
+            Number.isFinite(incident.locationLongitude) ? (
+              <p className="small">
+                <strong>
+                  {locale === "en" ? "Coordinates" : locale === "pt" ? "Coordenadas" : "Coordenadas"}
+                  :
+                </strong>{" "}
+                {incident.locationLatitude.toFixed(5)}, {incident.locationLongitude.toFixed(5)}
+              </p>
+            ) : null}
             <p className="small">
               <strong>{copy.incident.createdAt}:</strong> {formatDate(incident.createdAt, locale)}
             </p>
