@@ -7,6 +7,7 @@ import InstitutionalLogo from "./InstitutionalLogo";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
+import { getAppDisplayVersion } from "../config/appVersion";
 
 const TOPBAR_LINKS = [
   { href: "/#accesibilidad", labelKey: "accessibility" },
@@ -531,6 +532,9 @@ export default function PortalShell({ children }) {
         </div>
         <div className="portal-footer__legal">
           <p>{copy.portal.footerRights}</p>
+          <p className="portal-footer__version">
+            {copy.portal.footerAppVersionLabel} {getAppDisplayVersion()}
+          </p>
         </div>
       </footer>
 

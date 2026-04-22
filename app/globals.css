@@ -2390,6 +2390,12 @@ button:disabled {
   font-size: 0.8rem;
 }
 
+.portal-footer__version {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
 .floating-chat-button {
   position: fixed;
   right: 1.1rem;
