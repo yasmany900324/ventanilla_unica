@@ -2813,6 +2813,17 @@ button:disabled {
   gap: 0.52rem;
 }
 
+.assistant-status-card--draft {
+  border-style: dashed;
+  border-color: #b8c9e6;
+  background: #fafcfe;
+}
+
+.assistant-status-card__explanation--draft {
+  font-size: 0.8rem;
+  color: #4a5d78;
+}
+
 .assistant-status-card__header h3 {
   margin: 0;
   color: #1f3f77;

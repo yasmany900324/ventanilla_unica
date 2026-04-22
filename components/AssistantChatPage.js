@@ -235,6 +235,7 @@ function normalizePersistedMessage(rawMessage, index) {
           }
         : null,
     statusSummary: normalizeStatusSummary(rawMessage.statusSummary),
+    incidentDraftPreview: normalizeIncidentDraftPreview(rawMessage.incidentDraftPreview),
     mode: normalizeContextParam(rawMessage.mode, 40) || null,
     redirectTo: normalizeContextParam(rawMessage.redirectTo, 180) || null,
     redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
@@ -491,6 +492,37 @@ function normalizeStatusSummary(rawSummary) {
   };
 }
 
+function normalizeIncidentDraftPreview(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  if (normalizeContextParam(raw.kind, 40).toLowerCase() !== "incident_draft") {
+    return null;
+  }
+  return {
+    kind: "incident_draft",
+    typeLine: normalizeContextParam(raw.typeLine, 200) || "—",
+    location: normalizeContextParam(raw.location, 400) || "—",
+    riskRaw: normalizeContextParam(raw.riskRaw, 20).toLowerCase(),
+    photoAttached: Boolean(raw.photoAttached),
+  };
+}
+
+function formatDraftRiskLabel(riskRaw, draftCopy) {
+  const c = draftCopy || {};
+  const r = normalizeContextParam(riskRaw, 20).toLowerCase();
+  if (r === "alto") {
+    return c.riskAlto || "Alto";
+  }
+  if (r === "medio") {
+    return c.riskMedio || "Medio";
+  }
+  if (r === "bajo") {
+    return c.riskBajo || "Bajo";
+  }
+  return c.riskUnknown || "Sin dato";
+}
+
 function buildStatusDetailRows(statusSummary) {
   if (!statusSummary) {
     return [];
@@ -572,6 +604,53 @@ function inferStatusExplanation(statusSummary) {
     return "Tu incidencia figura como resuelta.";
   }
   return "Te comparto el estado actualizado de tu caso.";
+}
+
+function IncidentDraftPreviewCard({ preview, copy }) {
+  const normalized = normalizeIncidentDraftPreview(preview);
+  if (!normalized) {
+    return null;
+  }
+  const draftCopy = copy?.incidentDraftPreview || {};
+  const photoLabel = normalized.photoAttached ? draftCopy.photoYes || "Sí" : draftCopy.photoNo || "No";
+  const riskLabel = formatDraftRiskLabel(normalized.riskRaw, draftCopy);
+  const statusLabel = draftCopy.statusPending || "Pendiente de confirmación";
+  const rows = [
+    { label: draftCopy.rowType || "Tipo", value: normalized.typeLine || "—" },
+    { label: draftCopy.rowLocation || "Ubicación", value: normalized.location || "—" },
+    { label: draftCopy.rowRisk || "Nivel de riesgo", value: riskLabel },
+    { label: draftCopy.rowPhoto || "Foto adjunta", value: photoLabel },
+    { label: draftCopy.rowStatus || "Estado", value: statusLabel },
+  ];
+
+  return (
+    <section
+      className="assistant-status-card assistant-status-card--draft"
+      aria-label={draftCopy.ariaLabel || "Vista previa del reporte antes de crear la incidencia"}
+    >
+      <header className="assistant-status-card__header">
+        <h3>{draftCopy.title || "Resumen de la incidencia"}</h3>
+      </header>
+      <p className="assistant-status-card__explanation assistant-status-card__explanation--draft">
+        {draftCopy.subtitle ||
+          "Vista previa: todavía no se creó el caso en el sistema ni se asignó un número de ticket."}
+      </p>
+      <hr className="assistant-status-card__divider" />
+      <div className="assistant-status-card__details">
+        <p className="assistant-status-card__details-title">
+          {draftCopy.detailsTitle || "Datos del reporte"}
+        </p>
+        <dl className="assistant-status-card__details-list">
+          {rows.map((row) => (
+            <div key={row.label} className="assistant-status-card__detail-row">
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
 }
 
 function StatusSummaryCard({ statusSummary }) {
@@ -809,6 +888,9 @@ function ChatMessageBubble({
           />
         ) : null}
         {!(isBot && message.statusSummary) && !hidePrimaryForLocationMap ? <p>{message.text}</p> : null}
+        {isBot && message.incidentDraftPreview ? (
+          <IncidentDraftPreviewCard preview={message.incidentDraftPreview} copy={copy} />
+        ) : null}
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
@@ -1290,6 +1372,7 @@ export default function AssistantChatPage() {
       const suggestedReplies = extractPayloadChips(fulfillmentMessages);
       const actionOptions = normalizeActionOptions(data?.actionOptions);
       const statusSummary = normalizeStatusSummary(data?.statusSummary);
+      const incidentDraftPreview = normalizeIncidentDraftPreview(data?.incidentDraftPreview);
       const effectiveActionOptions = statusSummary
         ? dedupeActionOptions(actionOptions).slice(0, 3)
         : actionOptions;
@@ -1332,6 +1415,7 @@ export default function AssistantChatPage() {
           redirectLabel: data?.redirectLabel || null,
           needsClarification: Boolean(data?.needsClarification),
           statusSummary,
+          incidentDraftPreview,
         }),
       ]);
       lastFailedInputRef.current = {
@@ -1451,6 +1535,7 @@ export default function AssistantChatPage() {
         const suggestedReplies = extractPayloadChips(fulfillmentMessages);
         const actionOptions = normalizeActionOptions(data?.actionOptions);
         const statusSummary = normalizeStatusSummary(data?.statusSummary);
+        const incidentDraftPreview = normalizeIncidentDraftPreview(data?.incidentDraftPreview);
         const effectiveActionOptions = statusSummary
           ? dedupeActionOptions(actionOptions).slice(0, 3)
           : actionOptions;
@@ -1489,6 +1574,7 @@ export default function AssistantChatPage() {
             redirectLabel: data?.redirectLabel || null,
             needsClarification: Boolean(data?.needsClarification),
             statusSummary,
+            incidentDraftPreview,
           }),
         ]);
         lastFailedInputRef.current = {
