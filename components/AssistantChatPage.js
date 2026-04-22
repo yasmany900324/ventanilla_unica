@@ -50,6 +50,15 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
+function buildUserPhotoAttachedLine(fileName, copy) {
+  const rawTemplate =
+    normalizeContextParam(copy?.incidentPhoto?.userAttachedLine, MAX_MESSAGE_LENGTH) ||
+    "Adjunté la imagen «{name}».";
+  const safeName = normalizeChipLabel(fileName).slice(0, 120) || "imagen";
+  const merged = rawTemplate.replace("{name}", safeName);
+  return normalizeChipLabel(merged) || `Adjunté: ${safeName}`;
+}
+
 function formatMessageTime(dateInput) {
   const date = new Date(dateInput);
   if (Number.isNaN(date.getTime())) {
@@ -218,6 +227,7 @@ function normalizePersistedMessage(rawMessage, index) {
     redirectTo: normalizeContextParam(rawMessage.redirectTo, 180) || null,
     redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
     needsClarification: Boolean(rawMessage.needsClarification),
+    attachmentImageUrl: normalizeContextParam(rawMessage.attachmentImageUrl, 600) || null,
   };
 }
 
@@ -778,6 +788,14 @@ function ChatMessageBubble({
         {message.kind === "error" ? (
           <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
+        {!isBot && message.attachmentImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- vista previa desde URL del API (sesión autenticada)
+          <img
+            src={message.attachmentImageUrl}
+            alt=""
+            className="assistant-message__image-attachment"
+          />
+        ) : null}
         {!(isBot && message.statusSummary) && !hidePrimaryForLocationMap ? <p>{message.text}</p> : null}
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
@@ -1035,6 +1053,7 @@ export default function AssistantChatPage() {
   const restartKey = useMemo(() => normalizeContextParam(searchParams.get("restart"), 8), [searchParams]);
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const incidentPhotoInputRef = useRef(null);
   const initializedSessionRef = useRef(false);
   const contextualPromptSentRef = useRef("");
   const lastFailedInputRef = useRef({
@@ -1359,12 +1378,134 @@ export default function AssistantChatPage() {
     });
   };
 
+  const handleIncidentPhotoInputChange = useCallback(
+    async (event) => {
+      const input = event.target;
+      const file = input.files && input.files[0];
+      input.value = "";
+      if (!file || isSending) {
+        return;
+      }
+
+      const photoCopy = uiCopy.incidentPhoto || {};
+      if (!sessionId) {
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          createLocalMessage({
+            sender: "bot",
+            text: photoCopy.needSession || "Todavía no está lista la sesión del chat.",
+          }),
+        ]);
+        return;
+      }
+
+      const clientDebugEnabled =
+        typeof window !== "undefined" && window.localStorage.getItem("chatbot_debug") === "1";
+
+      setIsSending(true);
+      try {
+        const formData = new FormData();
+        formData.append("sessionId", sessionId);
+        formData.append("file", file);
+        formData.append("preferredLocale", sessionLocale || locale || "es");
+
+        const response = await fetch("/api/chatbot/incident-photo", {
+          method: "POST",
+          body: formData,
+          ...(clientDebugEnabled ? { headers: { "x-chatbot-debug": "1" } } : {}),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof data?.error === "string" && data.error.trim()
+              ? data.error
+              : photoCopy.uploadFailed || uiCopy.networkError
+          );
+        }
+
+        const fulfillmentMessages = Array.isArray(data?.fulfillmentMessages)
+          ? data.fulfillmentMessages
+          : [];
+        const suggestedReplies = extractPayloadChips(fulfillmentMessages);
+        const actionOptions = normalizeActionOptions(data?.actionOptions);
+        const statusSummary = normalizeStatusSummary(data?.statusSummary);
+        const effectiveActionOptions = statusSummary
+          ? dedupeActionOptions(actionOptions).slice(0, 3)
+          : actionOptions;
+        if (data?.sessionId && data.sessionId !== sessionId) {
+          setSessionId(data.sessionId);
+        }
+        if (typeof data?.locale === "string" && data.locale && data.locale !== sessionLocale) {
+          setSessionLocale(data.locale);
+        }
+
+        const userLine = buildUserPhotoAttachedLine(file.name, uiCopy);
+        const previewUrl =
+          typeof data.photoPreviewUrl === "string" && data.photoPreviewUrl.startsWith("http")
+            ? data.photoPreviewUrl
+            : null;
+
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          createLocalMessage({
+            sender: "user",
+            text: userLine,
+            attachmentImageUrl: previewUrl,
+          }),
+          createLocalMessage({
+            sender: "bot",
+            text: data?.replyText || uiCopy.fallbackReply,
+            intent: data?.intent || null,
+            confidence: formatConfidence(data?.confidence),
+            action: data?.action || null,
+            fulfillmentMessages,
+            suggestedReplies,
+            actionOptions: effectiveActionOptions,
+            nextStep: data?.nextStep || null,
+            mode: data?.mode || null,
+            draft: data?.draft || null,
+            redirectTo: data?.redirectTo || null,
+            redirectLabel: data?.redirectLabel || null,
+            needsClarification: Boolean(data?.needsClarification),
+            statusSummary,
+          }),
+        ]);
+        lastFailedInputRef.current = {
+          rawValue: "",
+          command: DEFAULT_CHAT_COMMAND,
+          commandField: null,
+        };
+      } catch (error) {
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          createLocalMessage({
+            sender: "bot",
+            text:
+              typeof error?.message === "string" && error.message.trim()
+                ? error.message.trim()
+                : photoCopy.uploadFailed || uiCopy.networkError,
+          }),
+        ]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [isSending, locale, sessionId, sessionLocale, uiCopy]
+  );
+
   const handleActionOption = async (actionOption) => {
     if (!actionOption || isSending) {
       return;
     }
 
     const command = actionOption.command || DEFAULT_CHAT_COMMAND;
+    if (command === "set_photo_pending") {
+      if (typeof window === "undefined") {
+        return;
+      }
+      incidentPhotoInputRef.current?.click();
+      return;
+    }
     if (command !== DEFAULT_CHAT_COMMAND) {
       await submitMessage({
         rawValue: "",
@@ -1728,6 +1869,16 @@ export default function AssistantChatPage() {
           onCancel={handleCancelLocationPicker}
           copy={uiCopy}
           disabled={isSending || isLocationPickResolving}
+        />
+
+        <input
+          ref={incidentPhotoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+          className="assistant-chat-composer__sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(photoEvent) => void handleIncidentPhotoInputChange(photoEvent)}
         />
 
         <ChatComposer
