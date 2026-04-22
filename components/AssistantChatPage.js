@@ -155,6 +155,16 @@ function normalizeActionOptions(actionOptions) {
     .filter(Boolean);
 }
 
+function buildPhotoStepActionOptionsFromCopy(photoCopy) {
+  const attach =
+    normalizeContextParam(photoCopy?.attachLabel, 40) || "Adjuntar foto";
+  const omit = normalizeContextParam(photoCopy?.omitLabel, 40) || "Omitir foto";
+  return normalizeActionOptions([
+    { label: attach, command: "set_photo_pending", value: "", commandField: null },
+    { label: omit, command: "skip_photo", value: "", commandField: null },
+  ]);
+}
+
 function safeSetLocalStorageItem(key, value) {
   if (typeof window === "undefined") {
     return;
@@ -1414,13 +1424,23 @@ export default function AssistantChatPage() {
           body: formData,
           ...(clientDebugEnabled ? { headers: { "x-chatbot-debug": "1" } } : {}),
         });
-        const data = await response.json();
-        if (!response.ok) {
+        const rawText = await response.text();
+        let data;
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = null;
+        }
+        if (data === null || typeof data !== "object") {
           throw new Error(
-            typeof data?.error === "string" && data.error.trim()
-              ? data.error
-              : photoCopy.uploadFailed || uiCopy.networkError
+            photoCopy.uploadInvalidResponse ||
+              uiCopy.networkError
           );
+        }
+        if (!response.ok) {
+          const serverMsg =
+            typeof data.error === "string" && data.error.trim() ? data.error.trim() : "";
+          throw new Error(serverMsg || photoCopy.uploadFailed || uiCopy.networkError);
         }
 
         const fulfillmentMessages = Array.isArray(data?.fulfillmentMessages)
@@ -1440,10 +1460,9 @@ export default function AssistantChatPage() {
         }
 
         const userLine = buildUserPhotoAttachedLine(file.name, uiCopy);
+        const rawPreview = typeof data.photoPreviewUrl === "string" ? data.photoPreviewUrl.trim() : "";
         const previewUrl =
-          typeof data.photoPreviewUrl === "string" && data.photoPreviewUrl.startsWith("http")
-            ? data.photoPreviewUrl
-            : null;
+          rawPreview.startsWith("http") || rawPreview.startsWith("/") ? rawPreview : null;
 
         setMessages((previousMessages) => [
           ...previousMessages,
@@ -1476,6 +1495,7 @@ export default function AssistantChatPage() {
           commandField: null,
         };
       } catch (error) {
+        const photoActions = buildPhotoStepActionOptionsFromCopy(photoCopy);
         setMessages((previousMessages) => [
           ...previousMessages,
           createLocalMessage({
@@ -1484,6 +1504,8 @@ export default function AssistantChatPage() {
               typeof error?.message === "string" && error.message.trim()
                 ? error.message.trim()
                 : photoCopy.uploadFailed || uiCopy.networkError,
+            actionOptions: photoActions,
+            nextStep: { type: "ask_field", field: "photo" },
           }),
         ]);
       } finally {
