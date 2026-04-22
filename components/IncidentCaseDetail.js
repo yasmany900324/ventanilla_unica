@@ -91,6 +91,33 @@ export default function IncidentCaseDetail({
             <strong>{copy.incident.fullDescription}:</strong> {incident.description}
           </p>
 
+          {incident.hasAttachment && incident.attachmentImageUrl ? (
+            <div className="incident-detail-attachment">
+              <h3>{copy.incident.attachmentSectionTitle}</h3>
+              {incident.attachmentOriginalName ? (
+                <p className="small">
+                  <strong>{copy.incident.attachmentFileName}:</strong> {incident.attachmentOriginalName}
+                </p>
+              ) : null}
+              {incident.attachmentUploadedAt ? (
+                <p className="small">
+                  <strong>{copy.incident.attachmentUploadedLabel}:</strong>{" "}
+                  {formatDate(incident.attachmentUploadedAt, locale)}
+                </p>
+              ) : null}
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL autenticada por cookie en el mismo sitio */}
+              <img
+                src={incident.attachmentImageUrl}
+                alt={copy.incident.attachmentImageAlt}
+                className="incident-detail-attachment__image"
+              />
+            </div>
+          ) : incident.hasAttachment ? (
+            <p className="small" role="status">
+              {copy.incident.attachmentUnavailable}
+            </p>
+          ) : null}
+
           <div className="timeline-section">
             <h3>{copy.incident.caseProgress}</h3>
             <ol className="timeline-steps" aria-label={copy.incident.caseTimelineAria}>

@@ -37,6 +37,11 @@ export default function IncidentListItem({
           <span className={badgeClassName}>
             {statusLabels[incident.status] || incident.status}
           </span>
+          {incident.hasAttachment ? (
+            <span className="incident-card__attachment-badge" title={copy.incident.listAttachmentHint}>
+              {copy.incident.listAttachmentBadge}
+            </span>
+          ) : null}
           {isSelected ? <span className="selected-indicator">{copy.incident.selected}</span> : null}
         </div>
       </div>
