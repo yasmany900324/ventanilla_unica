@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "../../../lib/auth";
 import {
+  coerceIncidentGeoCoords,
   createIncident,
   listIncidents,
   listIncidentsPaginated,
@@ -61,6 +62,10 @@ export async function POST(request) {
     const category = body?.category?.trim();
     const description = body?.description?.trim();
     const location = body?.location?.trim();
+    const { locationLatitude, locationLongitude } = coerceIncidentGeoCoords(
+      body?.locationLatitude,
+      body?.locationLongitude
+    );
 
     if (!category || !description || !location) {
       return NextResponse.json(
@@ -74,6 +79,8 @@ export async function POST(request) {
       category,
       description,
       location,
+      locationLatitude,
+      locationLongitude,
     });
     return NextResponse.json({ incident }, { status: 201 });
   } catch (error) {
