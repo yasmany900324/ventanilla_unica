@@ -766,6 +766,11 @@ function ChatMessageBubble({
 }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
+  const hidePrimaryForLocationMap =
+    isBot &&
+    isLocationPromptStep(message) &&
+    !message.statusSummary &&
+    !mapPickerOpen;
 
   return (
     <li className={`assistant-thread__item assistant-thread__item--${message.sender}`}>
@@ -773,7 +778,7 @@ function ChatMessageBubble({
         {message.kind === "error" ? (
           <p className="assistant-message__system-label">{copy.connectionIssue}</p>
         ) : null}
-        {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
+        {!(isBot && message.statusSummary) && !hidePrimaryForLocationMap ? <p>{message.text}</p> : null}
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
