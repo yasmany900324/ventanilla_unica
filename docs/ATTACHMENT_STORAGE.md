@@ -13,6 +13,10 @@ Los archivos de foto del flujo de incidencias (borrador en el chat + adjunto fin
 
 - `ATTACHMENT_STORAGE_PROVIDER` — `vercel_blob` \| `local_fs`
 - `BLOB_READ_WRITE_TOKEN` — token de lectura/escritura del store de Vercel Blob (en Vercel se configura al crear el Blob Store).
+- `ATTACHMENT_VERCEL_BLOB_ACCESS` — `public` (defecto) \| `private`. Debe coincidir con el tipo de **Blob Store** al crearlo en Vercel (público vs privado). Si el store es **privado** y no definís esta variable, `put` fallará con un error sobre “private store”.
+- `VERCEL_BLOB_ACCESS` — alias opcional de `ATTACHMENT_VERCEL_BLOB_ACCESS`.
+
+Con `private`, no se persiste URL pública en `attachment_url`: las imágenes se sirven vía `/api/incidents/.../attachment` y el preview de borrador vía `/api/chatbot/incident-photo/file` (siempre con sesión / token del servidor).
 - `INCIDENT_ATTACHMENT_ROOT` — (solo `local_fs`) directorio persistente para borradores y finales.
 - `INCIDENT_ATTACHMENTS_USE_TMP` — (solo `local_fs` / diagnóstico) fuerza raíz bajo `/tmp` en runtimes serverless.
 
