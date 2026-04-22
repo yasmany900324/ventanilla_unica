@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { processAssistantTurn } from "../../../../lib/assistant";
-import { resolvePortalUserFromWhatsAppWaId } from "../../../../lib/assistant/resolveAssistantIdentity";
 import { verifyMetaAppSecretSignature } from "../../../../lib/whatsapp/metaSignature";
 import {
   extractInboundNormalizedMessages,
@@ -98,8 +97,6 @@ export async function POST(request) {
 
   for (const item of inbound) {
     const sessionId = buildWhatsAppAssistantSessionId(item.waId);
-    const linkedUser = await resolvePortalUserFromWhatsAppWaId(item.waId);
-    const authenticatedUser = linkedUser || null;
 
     const { normalized } = item;
     let text = "";
@@ -133,7 +130,8 @@ export async function POST(request) {
         command: "none",
         commandField: null,
         contextEntry: null,
-        authenticatedUser,
+        authenticatedUser: null,
+        whatsappWaId: item.waId,
         acceptLanguage: null,
         chatDebugEnabled: false,
         channelInbound,
