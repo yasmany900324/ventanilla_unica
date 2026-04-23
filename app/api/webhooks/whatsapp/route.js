@@ -6,6 +6,7 @@ import {
   interactiveMessageToCommandText,
 } from "../../../../lib/whatsapp/whatsappInboundAdapter";
 import { sendWhatsAppTextMessage } from "../../../../lib/whatsapp/whatsappOutboundClient";
+import { processWhatsAppInboundAudioToText } from "../../../../lib/whatsapp/whatsappAudioInbound";
 import { buildWhatsAppAssistantSessionId } from "../../../../lib/whatsapp/whatsappSessionId";
 
 export const runtime = "nodejs";
@@ -101,15 +102,87 @@ export async function POST(request) {
     const { normalized } = item;
     let text = "";
     let channelInbound = null;
+    let inboundUserTextSource = null;
+    let inboundOriginalChannelMeta = null;
 
     if (normalized.type === "text") {
       text = normalized.text;
     } else if (normalized.type === "interactive") {
       text = interactiveMessageToCommandText(normalized);
+    } else if (normalized.type === "audio") {
+      console.info("[whatsapp] webhook inbound audio", {
+        waId: maskWaId(item.waId),
+        messageId: item.messageId,
+        timestamp: item.timestamp,
+      });
+
+      try {
+        const ack = await sendWhatsAppTextMessage({
+          to: item.waId,
+          text: "Recibí tu audio, lo estoy procesando...",
+        });
+        if (!ack.ok) {
+          console.warn("[whatsapp] processing ack message failed (continuing)", {
+            waId: maskWaId(item.waId),
+            httpStatus: ack.status,
+          });
+        }
+      } catch (error) {
+        console.warn("[whatsapp] processing ack message threw (continuing)", {
+          waId: maskWaId(item.waId),
+          message: error?.message,
+        });
+      }
+
+      let audioOutcome;
+      try {
+        audioOutcome = await processWhatsAppInboundAudioToText({
+          sessionId,
+          waId: item.waId,
+          messageId: item.messageId,
+          mediaId: normalized.mediaId,
+          mimeTypeHint: normalized.mimeType,
+          timestamp: item.timestamp,
+        });
+      } catch (error) {
+        console.error("[whatsapp] audio pipeline unexpected error", {
+          waId: maskWaId(item.waId),
+          message: error?.message,
+        });
+        await sendWhatsAppTextMessage({
+          to: item.waId,
+          text: "No pude entender bien tu audio. ¿Podrías enviarlo otra vez o escribir tu mensaje?",
+        });
+        continue;
+      }
+
+      if (!audioOutcome.ok) {
+        const replyText =
+          audioOutcome.reason === "stt_disabled"
+            ? "En este momento no puedo procesar audios. Por favor, escribí tu mensaje en texto."
+            : audioOutcome.reason === "download" || audioOutcome.reason === "mime_rejected"
+              ? "No pude acceder al audio que enviaste. Por favor, intenta enviarlo nuevamente."
+              : "No pude entender bien tu audio. ¿Podrías enviarlo otra vez o escribir tu mensaje?";
+        const sendAudioErr = await sendWhatsAppTextMessage({ to: item.waId, text: replyText });
+        if (!sendAudioErr.ok) {
+          console.error("[whatsapp] failed to send audio error reply", {
+            waId: maskWaId(item.waId),
+            httpStatus: sendAudioErr.status,
+          });
+        }
+        continue;
+      }
+
+      text = audioOutcome.normalizedText.slice(0, 4000);
+      inboundUserTextSource = "speech_to_text";
+      inboundOriginalChannelMeta = {
+        originalMessageType: "audio",
+        whatsappMessageId: item.messageId,
+        mediaId: normalized.mediaId,
+      };
     } else if (
       normalized.type === "location" ||
       normalized.type === "image" ||
-      normalized.type === "audio" ||
       normalized.type === "unknown"
     ) {
       channelInbound = normalized;
@@ -119,6 +192,7 @@ export async function POST(request) {
       waId: maskWaId(item.waId),
       messageId: item.messageId,
       inboundType: normalized.type,
+      fromSpeechToText: inboundUserTextSource === "speech_to_text",
     });
 
     try {
@@ -135,6 +209,8 @@ export async function POST(request) {
         acceptLanguage: null,
         chatDebugEnabled: false,
         channelInbound,
+        inboundUserTextSource,
+        inboundOriginalChannelMeta,
       });
 
       if (result.status >= 400) {
