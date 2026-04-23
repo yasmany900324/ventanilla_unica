@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "../../../lib/auth";
+import { syncIncidentToCamundaAfterCreate } from "../../../lib/camunda/syncLocalCaseToCamunda";
 import {
   coerceIncidentGeoCoords,
   createIncident,
@@ -81,6 +82,11 @@ export async function POST(request) {
       location,
       locationLatitude,
       locationLongitude,
+    });
+    // Camunda se dispara después del INSERT local: el seguimiento BPMN es complementario, no bloqueante.
+    await syncIncidentToCamundaAfterCreate(incident, {
+      channel: "web",
+      authenticatedUser,
     });
     return NextResponse.json({ incident }, { status: 201 });
   } catch (error) {
