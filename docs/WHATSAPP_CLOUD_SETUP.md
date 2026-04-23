@@ -56,7 +56,7 @@ El servidor:
 
 1. Lee el cuerpo **crudo** para validar `X-Hub-Signature-256` con `WHATSAPP_APP_SECRET` (en producción es obligatorio tener secret configurado).
 2. Parsea el JSON y extrae mensajes entrantes (texto, audio, imagen, ubicación, interactivos).
-3. Para **audio**, descarga el adjunto vía Graph API, transcribe con el proveedor STT configurado y reinyecta el texto en el mismo `processAssistantTurn` que el chat web (canal WhatsApp). La respuesta al usuario sigue siendo texto.
+3. Para **audio** y **notas de voz** (`type: voice` en Meta, normalizado internamente como audio), descarga el adjunto vía Graph API, transcribe con el proveedor STT y reinyecta el texto en el mismo `processAssistantTurn` que el chat web. La respuesta al usuario sigue siendo texto.
 4. Para el resto de tipos, ejecuta `processAssistantTurn` y envía la respuesta con la API de mensajes salientes.
 
 ## 4. Cómo probar con número de prueba

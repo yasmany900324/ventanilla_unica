@@ -148,15 +148,24 @@ export async function POST(request) {
         console.error("[whatsapp] audio pipeline unexpected error", {
           waId: maskWaId(item.waId),
           message: error?.message,
+          stack: typeof error?.stack === "string" ? error.stack.slice(0, 500) : undefined,
+          discardReason: "unhandled_exception",
         });
         await sendWhatsAppTextMessage({
           to: item.waId,
-          text: "No pude entender bien tu audio. ¿Podrías enviarlo otra vez o escribir tu mensaje?",
+          text:
+            "Tuve un problema técnico al procesar el audio. ¿Podrías intentar de nuevo o escribir tu mensaje?",
         });
         continue;
       }
 
       if (!audioOutcome.ok) {
+        console.warn("[whatsapp] audio pipeline outcome not ok", {
+          waId: maskWaId(item.waId),
+          reason: audioOutcome.reason,
+          error: audioOutcome.error,
+          discardReason: `pipeline_${audioOutcome.reason}`,
+        });
         const replyText =
           audioOutcome.reason === "stt_disabled"
             ? "En este momento no puedo procesar audios. Por favor, escribí tu mensaje en texto."
