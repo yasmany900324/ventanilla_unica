@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { processAssistantTurn } from "../../../../lib/assistant";
+import { runWithOpenAiCorrelationId } from "../../../../lib/openai/correlationContext";
 import { verifyMetaAppSecretSignature } from "../../../../lib/whatsapp/metaSignature";
 import {
   extractInboundNormalizedMessages,
@@ -97,6 +99,8 @@ export async function POST(request) {
   }
 
   for (const item of inbound) {
+    const correlationId = randomUUID();
+    await runWithOpenAiCorrelationId(correlationId, async () => {
     const sessionId = buildWhatsAppAssistantSessionId(item.waId);
 
     const { normalized } = item;
@@ -156,7 +160,7 @@ export async function POST(request) {
           text:
             "Tuve un problema técnico al procesar el audio. ¿Podrías intentar de nuevo o escribir tu mensaje?",
         });
-        continue;
+        return;
       }
 
       if (!audioOutcome.ok) {
@@ -179,7 +183,7 @@ export async function POST(request) {
             httpStatus: sendAudioErr.status,
           });
         }
-        continue;
+        return;
       }
 
       text = audioOutcome.normalizedText.slice(0, 4000);
@@ -232,7 +236,7 @@ export async function POST(request) {
           text:
             "No pudimos procesar tu mensaje en este momento. Intenta de nuevo en unos minutos.",
         });
-        continue;
+        return;
       }
 
       const reply =
@@ -254,6 +258,7 @@ export async function POST(request) {
         text: "Ocurrió un error interno. Intenta más tarde.",
       });
     }
+    });
   }
 
   return NextResponse.json({ ok: true, processed: inbound.length });

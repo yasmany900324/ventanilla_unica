@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { requireAuthenticatedUser } from "../../../../lib/auth";
 import { validateChatMessagePayload } from "../../../../lib/chatbotPayloadValidation";
 import {
   processAssistantTurn,
   buildChatDebugHeaders,
 } from "../../../../lib/assistant";
+import { runWithOpenAiCorrelationId } from "../../../../lib/openai/correlationContext";
 
 export const runtime = "nodejs";
 
@@ -63,25 +65,33 @@ export async function POST(request) {
     contextEntry,
   } = validationResult.value;
 
+  const correlationId =
+    request.headers.get("x-correlation-id")?.trim() ||
+    request.headers.get("x-request-id")?.trim() ||
+    randomUUID();
+
   try {
-    const result = await processAssistantTurn({
-      channel: "web",
-      sessionId,
-      text,
-      preferredLocale,
-      command,
-      commandField,
-      contextEntry,
-      authenticatedUser,
-      acceptLanguage: request.headers.get("accept-language"),
-      chatDebugEnabled: isChatDebugRequested(request),
-    });
+    const result = await runWithOpenAiCorrelationId(correlationId, () =>
+      processAssistantTurn({
+        channel: "web",
+        sessionId,
+        text,
+        preferredLocale,
+        command,
+        commandField,
+        contextEntry,
+        authenticatedUser,
+        acceptLanguage: request.headers.get("accept-language"),
+        chatDebugEnabled: isChatDebugRequested(request),
+      })
+    );
 
     if (result.status >= 400) {
       return NextResponse.json(result.body, { status: result.status });
     }
 
     const response = NextResponse.json(result.body);
+    response.headers.set("x-correlation-id", correlationId);
     applyChatDebugHeaders(response, result.snapshot);
     return response;
   } catch (error) {
