@@ -60,7 +60,8 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const category = body?.category?.trim();
+    const category = body?.category?.trim() || "";
+    const catalogItemId = body?.catalogItemId?.trim() || body?.catalog_item_id?.trim() || null;
     const description = body?.description?.trim();
     const location = body?.location?.trim();
     const { locationLatitude, locationLongitude } = coerceIncidentGeoCoords(
@@ -68,9 +69,9 @@ export async function POST(request) {
       body?.locationLongitude
     );
 
-    if (!category || !description || !location) {
+    if (!description || !location) {
       return NextResponse.json(
-        { error: "category, description y location son obligatorios." },
+        { error: "description y location son obligatorios." },
         { status: 400 }
       );
     }
@@ -78,6 +79,7 @@ export async function POST(request) {
     const incident = await createIncident({
       userId: authenticatedUser.id,
       category,
+      catalogItemId,
       description,
       location,
       locationLatitude,
