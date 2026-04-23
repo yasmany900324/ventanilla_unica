@@ -171,7 +171,9 @@ export async function POST(request) {
             ? "En este momento no puedo procesar audios. Por favor, escribí tu mensaje en texto."
             : audioOutcome.reason === "download" || audioOutcome.reason === "mime_rejected"
               ? "No pude acceder al audio que enviaste. Por favor, intenta enviarlo nuevamente."
-              : "No pude entender bien tu audio. ¿Podrías enviarlo otra vez o escribir tu mensaje?";
+              : audioOutcome.reason === "transcription_api_limit"
+                ? "Ahora no puedo transcribir el audio por un límite del servicio de voz (cuota o uso). Escribí tu mensaje en texto o probá más tarde."
+                : "No pude entender bien tu audio. ¿Podrías enviarlo otra vez o escribir tu mensaje?";
         const sendAudioErr = await sendWhatsAppTextMessage({ to: item.waId, text: replyText });
         if (!sendAudioErr.ok) {
           console.error("[whatsapp] failed to send audio error reply", {
