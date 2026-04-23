@@ -21,6 +21,17 @@ Esta guía complementa el código en `app/api/webhooks/whatsapp`. Describe cómo
 
 Copia también las variables del LLM ya usadas por el asistente (`OPENAI_API_KEY`, etc.) según `.env.example`.
 
+### Audio (speech-to-text)
+
+| Variable | Uso |
+|----------|-----|
+| `STT_PROVIDER` | Vacío, `openai_whisper` o `whisper`: usa Whisper con `OPENAI_API_KEY` o `STT_API_KEY`. `none` / `off`: desactiva STT (el audio no se transcribe; se responde pidiendo texto). |
+| `STT_API_KEY` | Opcional. Si está vacío, se usa `OPENAI_API_KEY` para Whisper. |
+| `STT_MODEL` | Opcional. Por defecto `whisper-1`. |
+| `WHATSAPP_AUDIO_MAX_BYTES` | Tope de tamaño del archivo descargado (bytes). |
+| `WHATSAPP_AUDIO_DOWNLOAD_TIMEOUT_MS` | Timeout de descarga desde Meta. |
+| `WHATSAPP_STT_TIMEOUT_MS` | Timeout de la llamada al servicio de transcripción. |
+
 ## 3. URL del webhook en tu despliegue
 
 - **URL a registrar en Meta:**  
@@ -44,14 +55,16 @@ Suscríbete a los eventos de **messages** del número WhatsApp (en la configurac
 El servidor:
 
 1. Lee el cuerpo **crudo** para validar `X-Hub-Signature-256` con `WHATSAPP_APP_SECRET` (en producción es obligatorio tener secret configurado).
-2. Parsea el JSON y extrae mensajes de texto entrantes.
-3. Ejecuta el mismo `processAssistantTurn` que el chat web y envía la respuesta con la API de mensajes salientes.
+2. Parsea el JSON y extrae mensajes entrantes (texto, audio, imagen, ubicación, interactivos).
+3. Para **audio**, descarga el adjunto vía Graph API, transcribe con el proveedor STT configurado y reinyecta el texto en el mismo `processAssistantTurn` que el chat web (canal WhatsApp). La respuesta al usuario sigue siendo texto.
+4. Para el resto de tipos, ejecuta `processAssistantTurn` y envía la respuesta con la API de mensajes salientes.
 
 ## 4. Cómo probar con número de prueba
 
 1. En **WhatsApp → API Setup**, añade el número de teléfono personal que Meta te pide como “recipient” de prueba (flujo de invitación por código).
 2. Envía un mensaje de texto al número de negocio de prueba que muestra Meta.
 3. Revisa logs del servidor si algo falla (firma, token, `phone_number_id`).
+4. **Audio:** con `OPENAI_API_KEY` (o `STT_API_KEY`) configurado y sin `STT_PROVIDER=none`, envía una nota de voz; en logs deberías ver `[whatsapp] audio pipeline:` y luego la misma conversación que con texto.
 
 ## 5. Checklist rápido
 
