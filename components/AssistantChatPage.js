@@ -132,6 +132,13 @@ function normalizeActionOptions(actionOptions) {
   if (!Array.isArray(actionOptions)) {
     return [];
   }
+  const hiddenCommands = new Set([
+    "confirm",
+    "cancel",
+    "open_incident_correction_menu",
+    "resume_confirmation",
+    "request_text_correction",
+  ]);
 
   return actionOptions
     .map((option) => {
@@ -143,7 +150,7 @@ function normalizeActionOptions(actionOptions) {
       const command = normalizeChipLabel(option.command) || DEFAULT_CHAT_COMMAND;
       const value = normalizeChipLabel(option.value);
       const commandField = normalizeChipLabel(option.commandField);
-      if (!label) {
+      if (!label || hiddenCommands.has(command)) {
         return null;
       }
 
@@ -510,28 +517,32 @@ function normalizeIncidentDraftPreview(raw) {
   if (normalizeContextParam(raw.kind, 40).toLowerCase() !== "incident_draft") {
     return null;
   }
+  const normalizedFields = Array.isArray(raw.fields)
+    ? raw.fields
+        .map((field) => {
+          if (!field || typeof field !== "object") {
+            return null;
+          }
+          const label = normalizeContextParam(field.label, 120);
+          const value = normalizeContextParam(field.value, 320);
+          const key = normalizeContextParam(field.key, 80).toLowerCase();
+          if (!label) {
+            return null;
+          }
+          return {
+            key,
+            label,
+            value: value || "Sin dato",
+          };
+        })
+        .filter(Boolean)
+    : [];
   return {
     kind: "incident_draft",
-    typeLine: normalizeContextParam(raw.typeLine, 200) || "—",
-    location: normalizeContextParam(raw.location, 400) || "—",
-    riskRaw: normalizeContextParam(raw.riskRaw, 20).toLowerCase(),
-    photoAttached: Boolean(raw.photoAttached),
+    procedureLabel: normalizeContextParam(raw.procedureLabel, 180) || "Registrar incidencia",
+    typeLabel: normalizeContextParam(raw.typeLabel, 120) || "Incidencia",
+    fields: normalizedFields,
   };
-}
-
-function formatDraftRiskLabel(riskRaw, draftCopy) {
-  const c = draftCopy || {};
-  const r = normalizeContextParam(riskRaw, 20).toLowerCase();
-  if (r === "alto") {
-    return c.riskAlto || "Alto";
-  }
-  if (r === "medio") {
-    return c.riskMedio || "Medio";
-  }
-  if (r === "bajo") {
-    return c.riskBajo || "Bajo";
-  }
-  return c.riskUnknown || "Sin dato";
 }
 
 function buildStatusDetailRows(statusSummary) {
@@ -623,14 +634,11 @@ function IncidentDraftPreviewCard({ preview, copy }) {
     return null;
   }
   const draftCopy = copy?.incidentDraftPreview || {};
-  const photoLabel = normalized.photoAttached ? draftCopy.photoYes || "Sí" : draftCopy.photoNo || "No";
-  const riskLabel = formatDraftRiskLabel(normalized.riskRaw, draftCopy);
   const statusLabel = draftCopy.statusPending || "Pendiente de confirmación";
   const rows = [
-    { label: draftCopy.rowType || "Tipo", value: normalized.typeLine || "—" },
-    { label: draftCopy.rowLocation || "Ubicación", value: normalized.location || "—" },
-    { label: draftCopy.rowRisk || "Nivel de riesgo", value: riskLabel },
-    { label: draftCopy.rowPhoto || "Foto adjunta", value: photoLabel },
+    { label: draftCopy.rowProcedure || "Procedimiento", value: normalized.procedureLabel || "—" },
+    { label: draftCopy.rowType || "Tipo", value: normalized.typeLabel || "—" },
+    ...normalized.fields,
     { label: draftCopy.rowStatus || "Estado", value: statusLabel },
   ];
 
@@ -652,8 +660,8 @@ function IncidentDraftPreviewCard({ preview, copy }) {
           {draftCopy.detailsTitle || "Datos del reporte"}
         </p>
         <dl className="assistant-status-card__details-list">
-          {rows.map((row) => (
-            <div key={row.label} className="assistant-status-card__detail-row">
+          {rows.map((row, index) => (
+            <div key={`${row.label}-${index}`} className="assistant-status-card__detail-row">
               <dt>{row.label}</dt>
               <dd>{row.value}</dd>
             </div>
