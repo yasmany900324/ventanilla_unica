@@ -3574,12 +3574,82 @@ button:disabled {
 
 .assistant-chat-composer__input-wrap {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.44rem;
   border: 1px solid #c8d8ef;
   border-radius: 12px;
   background: #fbfdff;
   padding: 0.34rem;
+  position: relative;
+}
+
+.assistant-chat-composer__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.assistant-chat-composer__tool {
+  width: 2.66rem;
+  height: 2.66rem;
+  border-radius: 999px;
+  border: 1px solid #b9cce8;
+  background: #ffffff;
+  color: #1a4b9c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.assistant-chat-composer__tool svg {
+  width: 1.08rem;
+  height: 1.08rem;
+  fill: currentColor;
+}
+
+.assistant-chat-composer__tool:hover:not(:disabled) {
+  background: #eaf2ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(20, 65, 142, 0.16);
+}
+
+.assistant-chat-composer__tool:disabled {
+  opacity: 0.6;
+}
+
+.assistant-chat-composer__location-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.38rem);
+  display: grid;
+  gap: 0.26rem;
+  min-width: 172px;
+  border: 1px solid #d2e0f2;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  padding: 0.32rem;
+  z-index: 2;
+}
+
+.assistant-chat-composer__location-menu button {
+  border: 1px solid #d5e2f5;
+  background: #f6f9ff;
+  color: #113f8b;
+  border-radius: 9px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.42rem 0.52rem;
+  text-align: left;
+}
+
+.assistant-chat-composer__location-menu button:hover:not(:disabled) {
+  background: #e8f1ff;
 }
 
 .assistant-chat-composer textarea {
@@ -3640,6 +3710,13 @@ button:disabled {
 
 .assistant-chat-composer__send:disabled {
   opacity: 0.62;
+}
+
+.assistant-chat-composer__tool:focus-visible,
+.assistant-chat-composer__send:focus-visible,
+.assistant-chat-composer__location-menu button:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
 }
 
 @keyframes assistant-message-appear {
@@ -4071,6 +4148,15 @@ textarea:focus-visible {
     border-radius: 10px;
   }
 
+  .assistant-chat-composer__tools {
+    gap: 0.26rem;
+  }
+
+  .assistant-chat-composer__tool {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+
   .assistant-chat-composer textarea {
     min-height: 48px;
     border-radius: 9px;
@@ -4081,6 +4167,10 @@ textarea:focus-visible {
   .assistant-chat-composer__send {
     width: 2.3rem;
     height: 2.3rem;
+  }
+
+  .assistant-chat-composer__location-menu {
+    min-width: 156px;
   }
 
   .assistant-chat-quick-replies {

@@ -310,15 +310,15 @@ function isLocationPromptStep(message) {
   );
 }
 
-function shouldRenderActionOptions(message) {
-  if (!Array.isArray(message?.actionOptions) || message.actionOptions.length === 0) {
+function isPhotoPromptStep(message) {
+  if (message?.sender !== "bot" || message?.nextStep?.type !== "ask_field") {
     return false;
   }
-  const nextStepType = normalizeContextParam(message?.nextStep?.type, 60).toLowerCase();
-  if (nextStepType === "clarify" || nextStepType === "clarify_procedure") {
+  const stepField = normalizeContextParam(message?.nextStep?.field, 80).toLowerCase();
+  if (!stepField) {
     return false;
   }
-  return true;
+  return stepField === "photo" || stepField.includes("foto") || stepField.includes("image");
 }
 
 function buildFriendlyLocationConfirmation({ copy, referenceLabel }) {
@@ -720,39 +720,6 @@ function StatusSummaryCard({ statusSummary }) {
   );
 }
 
-function LocationMapPrompt({ disabled, onUseCurrentLocation, onOpenMapPicker, copy }) {
-  const locationMapCopy = copy?.locationMap || {};
-  const promptText =
-    locationMapCopy.prompt ||
-    "Indicame la dirección, una referencia cercana o usa tu ubicación actual.";
-  const useCurrentLocationLabel = locationMapCopy.useCurrentLocation || "Usar mi ubicación";
-  const chooseOnMapLabel = locationMapCopy.chooseOnMap || locationMapCopy.useMapSelection || "Elegir en mapa";
-
-  return (
-    <section className="assistant-location-map" aria-label={locationMapCopy.title || "Ubicación"}>
-      <p className="assistant-location-map__prompt">{promptText}</p>
-      <div className="assistant-location-map__actions">
-        <button
-          type="button"
-          className="assistant-location-map__button"
-          onClick={onUseCurrentLocation}
-          disabled={disabled}
-        >
-          {useCurrentLocationLabel}
-        </button>
-        <button
-          type="button"
-          className="assistant-location-map__button assistant-location-map__button--ghost"
-          onClick={onOpenMapPicker}
-          disabled={disabled}
-        >
-          {chooseOnMapLabel}
-        </button>
-      </div>
-    </section>
-  );
-}
-
 function formatApproxWgs84Coordinates(latitude, longitude) {
   const lat = Number(latitude);
   const lng = Number(longitude);
@@ -874,23 +841,13 @@ function ChatHeader({ copy }) {
 
 function ChatMessageBubble({
   message,
-  onChipClick,
-  onActionOptionClick,
-  onUseCurrentLocation,
-  onOpenMapPicker,
   onRedirectClick,
-  disabled,
   copy,
   mapPickerOpen = false,
   pendingLocationSelection = null,
 }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
-  const hidePrimaryForLocationMap =
-    isBot &&
-    isLocationPromptStep(message) &&
-    !message.statusSummary &&
-    !mapPickerOpen;
 
   return (
     <li className={`assistant-thread__item assistant-thread__item--${message.sender}`}>
@@ -906,7 +863,7 @@ function ChatMessageBubble({
             className="assistant-message__image-attachment"
           />
         ) : null}
-        {!(isBot && message.statusSummary) && !hidePrimaryForLocationMap ? <p>{message.text}</p> : null}
+        {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
         {isBot && message.incidentDraftPreview ? (
           <IncidentDraftPreviewCard preview={message.incidentDraftPreview} copy={copy} />
         ) : null}
@@ -920,15 +877,6 @@ function ChatMessageBubble({
             </p>
           </div>
         ) : null}
-        {isLocationPromptStep(message) && !mapPickerOpen && !pendingLocationSelection ? (
-          <LocationMapPrompt
-            disabled={disabled}
-            onUseCurrentLocation={onUseCurrentLocation}
-            onOpenMapPicker={onOpenMapPicker}
-            copy={copy}
-          />
-        ) : null}
-
         {isBot && message.needsClarification ? (
           <p className="assistant-message__clarification">
             {copy.clarification}
@@ -947,41 +895,6 @@ function ChatMessageBubble({
             >
               {message.redirectLabel || copy.redirectCta}
             </Link>
-          </div>
-        ) : null}
-
-        {isBot && Array.isArray(message.suggestedReplies) && message.suggestedReplies.length > 0 ? (
-          <div className="assistant-chat-quick-replies" aria-label={copy.dynamicSuggestions}>
-            <div className="assistant-chat-quick-replies__list">
-              {message.suggestedReplies.map((suggestedReply) => (
-                <button
-                  key={`${message.id}-${suggestedReply}`}
-                  type="button"
-                  className="assistant-prompt-chip"
-                  onClick={() => onChipClick(suggestedReply)}
-                  disabled={disabled}
-                >
-                  {suggestedReply}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {isBot && shouldRenderActionOptions(message) ? (
-          <div className="assistant-chat-quick-replies" aria-label={copy.dynamicSuggestions}>
-            <div className="assistant-chat-quick-replies__list">
-              {message.actionOptions.map((actionOption) => (
-                <button
-                  key={`${message.id}-${actionOption.command}-${actionOption.value || actionOption.label}`}
-                  type="button"
-                  className="assistant-prompt-chip"
-                  onClick={() => onActionOptionClick(actionOption)}
-                  disabled={disabled}
-                >
-                  {actionOption.label}
-                </button>
-              ))}
-            </div>
           </div>
         ) : null}
 
@@ -1032,32 +945,11 @@ function ChatErrorMessage({ onRetry, disabled, copy }) {
   );
 }
 
-function ChatQuickReplies({ prompts, onPromptClick, disabled, copy }) {
-  return (
-    <div
-      className="assistant-chat-quick-replies assistant-chat-quick-replies--global"
-      aria-label={copy.quickRepliesTitle}
-    >
-      <p className="assistant-chat-quick-replies__title">{copy.quickRepliesTitle}</p>
-      <div className="assistant-chat-quick-replies__list">
-        {prompts.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            className="assistant-prompt-chip"
-            onClick={() => onPromptClick(prompt)}
-            disabled={disabled}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ChatInitialGuidance({ prompts, onPromptClick, disabled, copy }) {
-  if (!Array.isArray(prompts) || prompts.length === 0) {
+  void prompts;
+  void onPromptClick;
+  void disabled;
+  if (!copy?.initialHelp) {
     return null;
   }
 
@@ -1065,21 +957,6 @@ function ChatInitialGuidance({ prompts, onPromptClick, disabled, copy }) {
     <li className="assistant-thread__item assistant-thread__item--bot">
       <article className="assistant-message assistant-message--bot assistant-message--intro">
         <p className="assistant-message__intro-copy">{copy.initialHelp}</p>
-        <div className="assistant-chat-quick-replies" aria-label={copy.quickRepliesTitle}>
-          <div className="assistant-chat-quick-replies__list">
-            {prompts.map((prompt) => (
-              <button
-                key={`starter-${prompt}`}
-                type="button"
-                className="assistant-prompt-chip"
-                onClick={() => onPromptClick(prompt)}
-                disabled={disabled}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </div>
       </article>
     </li>
   );
@@ -1095,8 +972,14 @@ function ChatComposer({
   characterCount,
   inputRef,
   copy,
+  onLocationClick,
+  onPhotoClick,
+  showLocationMenu,
+  onUseCurrentLocation,
+  onOpenMapPicker,
 }) {
   const shouldShowCounter = characterCount >= MAX_MESSAGE_LENGTH - 80;
+  const locationMapCopy = copy?.locationMap || {};
 
   return (
     <form className="assistant-chat-composer" onSubmit={onSubmit}>
@@ -1104,6 +987,42 @@ function ChatComposer({
         {copy.composer.label}
       </label>
       <div className="assistant-chat-composer__input-wrap">
+        <div className="assistant-chat-composer__tools">
+          <button
+            type="button"
+            className="assistant-chat-composer__tool"
+            onClick={onLocationClick}
+            disabled={isSending}
+            aria-label="Enviar ubicación"
+            title="Enviar ubicación"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.5a7 7 0 0 0-7 7c0 4.9 5.2 10.8 6.5 12.2a.65.65 0 0 0 1 0C13.8 20.3 19 14.4 19 9.5a7 7 0 0 0-7-7Zm0 9.3a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="assistant-chat-composer__tool"
+            onClick={onPhotoClick}
+            disabled={isSending}
+            aria-label="Adjuntar foto"
+            title="Adjuntar foto"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.5 4A3.5 3.5 0 0 0 3 7.5v9A3.5 3.5 0 0 0 6.5 20h11a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 17.5 4h-2.2l-.8-1.2A1.9 1.9 0 0 0 12.9 2h-1.8a1.9 1.9 0 0 0-1.6.8L8.7 4H6.5Zm5.5 4a4.2 4.2 0 1 1 0 8.4A4.2 4.2 0 0 1 12 8Zm0 1.9a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6Z" />
+            </svg>
+          </button>
+          {showLocationMenu ? (
+            <div className="assistant-chat-composer__location-menu" role="menu" aria-label="Opciones de ubicación">
+              <button type="button" role="menuitem" onClick={onUseCurrentLocation} disabled={isSending}>
+                {locationMapCopy.useCurrentLocation || "Usar mi ubicación"}
+              </button>
+              <button type="button" role="menuitem" onClick={onOpenMapPicker} disabled={isSending}>
+                {locationMapCopy.chooseOnMap || locationMapCopy.useMapSelection || "Elegir en mapa"}
+              </button>
+            </div>
+          ) : null}
+        </div>
         <textarea
           ref={inputRef}
           id="assistant-chat-input"
@@ -1121,6 +1040,7 @@ function ChatComposer({
           className="assistant-chat-composer__send"
           disabled={!canSend}
           aria-label={isSending ? copy.composer.sendingAria : copy.composer.sendAria}
+          title={isSending ? copy.composer.sendingAria : "Enviar mensaje"}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3.7 20.3 21.1 12 3.7 3.7v6.4l10.2 1.9-10.2 1.9v6.4Z" />
@@ -1483,6 +1403,7 @@ export default function AssistantChatPage() {
   }, [contextAutoPrompt, contextEntryPayload, contextTriggerKey, isSending, submitMessage]);
 
   const handleSendMessage = async (rawValue) => {
+    setComposerLocationMenuOpen(false);
     await submitMessage({
       rawValue,
       command: DEFAULT_CHAT_COMMAND,
@@ -1619,41 +1540,12 @@ export default function AssistantChatPage() {
     [isSending, locale, sessionId, sessionLocale, uiCopy]
   );
 
-  const handleActionOption = async (actionOption) => {
-    if (!actionOption || isSending) {
-      return;
-    }
-
-    const command = actionOption.command || DEFAULT_CHAT_COMMAND;
-    if (command === "set_photo_pending") {
-      if (typeof window === "undefined") {
-        return;
-      }
-      incidentPhotoInputRef.current?.click();
-      return;
-    }
-    if (command !== DEFAULT_CHAT_COMMAND) {
-      await submitMessage({
-        rawValue: "",
-        command,
-        commandField: actionOption.commandField || null,
-        appendUserMessage: false,
-      });
-      return;
-    }
-
-    await submitMessage({
-      rawValue: actionOption.value || actionOption.label,
-      command: DEFAULT_CHAT_COMMAND,
-      appendUserMessage: true,
-    });
-  };
-
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [pendingLocationSelection, setPendingLocationSelection] = useState(null);
   /** null = usar centro por defecto al abrir el mapa; { lat, lng } = reabrir en la última selección (p. ej. editar). */
   const [mapPickerInitialCenter, setMapPickerInitialCenter] = useState(null);
   const [isLocationPickResolving, setIsLocationPickResolving] = useState(false);
+  const [isComposerLocationMenuOpen, setComposerLocationMenuOpen] = useState(false);
 
   const handleLocationResolution = useCallback(
     async ({ source, latitude, longitude, priorReference = null }) => {
@@ -1699,6 +1591,7 @@ export default function AssistantChatPage() {
     if (isSending || typeof window === "undefined") {
       return;
     }
+    setComposerLocationMenuOpen(false);
     const locationMapCopy = uiCopy.locationMap || {};
     if (!window.navigator?.geolocation) {
       const unsupportedMessage =
@@ -1746,6 +1639,7 @@ export default function AssistantChatPage() {
     if (isSending) {
       return;
     }
+    setComposerLocationMenuOpen(false);
     locationPickerRestoreSnapshotRef.current = null;
     setMapPickerInitialCenter(null);
     setPendingLocationSelection(null);
@@ -1755,6 +1649,7 @@ export default function AssistantChatPage() {
   const handleCancelLocationPicker = useCallback(() => {
     setLocationPickerOpen(false);
     setMapPickerInitialCenter(null);
+    setComposerLocationMenuOpen(false);
     if (locationPickerRestoreSnapshotRef.current) {
       setPendingLocationSelection({ ...locationPickerRestoreSnapshotRef.current });
       locationPickerRestoreSnapshotRef.current = null;
@@ -1779,6 +1674,7 @@ export default function AssistantChatPage() {
         setIsLocationPickResolving(false);
         setLocationPickerOpen(false);
         setMapPickerInitialCenter(null);
+        setComposerLocationMenuOpen(false);
       }
     },
     [handleLocationResolution]
@@ -1789,6 +1685,7 @@ export default function AssistantChatPage() {
       if (!pendingLocationSelection || isSending) {
         return;
       }
+      setComposerLocationMenuOpen(false);
       const locationMapCopy = uiCopy.locationMap || {};
       if (!shouldContinue) {
         const snap = pendingLocationSelection;
@@ -1856,12 +1753,14 @@ export default function AssistantChatPage() {
   const handleInputKeyDown = (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      setComposerLocationMenuOpen(false);
       void handleSendMessage(inputValue);
     }
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setComposerLocationMenuOpen(false);
     void handleSendMessage(inputValue);
   };
 
@@ -1874,26 +1773,53 @@ export default function AssistantChatPage() {
     }
     return null;
   }, [messages]);
-  const hasDynamicBotActions = Boolean(
-    lastBotMessage &&
-      ((Array.isArray(lastBotMessage.suggestedReplies) && lastBotMessage.suggestedReplies.length > 0) ||
-        (Array.isArray(lastBotMessage.actionOptions) && lastBotMessage.actionOptions.length > 0))
-  );
+  const isLocationActionAvailable = useMemo(() => {
+    return isLocationPromptStep(lastBotMessage) || Boolean(pendingLocationSelection) || isLocationPickerOpen;
+  }, [isLocationPickerOpen, lastBotMessage, pendingLocationSelection]);
+  const isPhotoActionAvailable = useMemo(() => {
+    return isPhotoPromptStep(lastBotMessage);
+  }, [lastBotMessage]);
+  const appendControlledComposerMessage = useCallback((text) => {
+    const safeText = normalizeContextParam(text, MAX_MESSAGE_LENGTH);
+    if (!safeText) {
+      return;
+    }
+    setMessages((previousMessages) => [
+      ...previousMessages,
+      createLocalMessage({ sender: "bot", text: safeText }),
+    ]);
+  }, []);
+  const handleComposerLocationIcon = useCallback(() => {
+    if (isSending) {
+      return;
+    }
+    if (!isLocationActionAvailable) {
+      appendControlledComposerMessage(
+        "Primero contame qué necesitás hacer para asociar la ubicación al trámite correcto."
+      );
+      return;
+    }
+    setComposerLocationMenuOpen((previous) => !previous);
+  }, [appendControlledComposerMessage, isLocationActionAvailable, isSending]);
+  const handleComposerPhotoIcon = useCallback(() => {
+    if (isSending) {
+      return;
+    }
+    if (!isPhotoActionAvailable) {
+      appendControlledComposerMessage(
+        "Primero contame qué necesitás hacer para asociar la foto al trámite correcto."
+      );
+      return;
+    }
+    setComposerLocationMenuOpen(false);
+    incidentPhotoInputRef.current?.click();
+  }, [appendControlledComposerMessage, isPhotoActionAvailable, isSending]);
   const showInitialGuidance =
     !entryContext &&
     !serviceError &&
     !isSending &&
     messages.length === 1 &&
     messages[0]?.sender === "bot";
-  const showQuickReplies =
-    messages.some((message) => message.sender === "bot") &&
-    messages.length <= 4 &&
-    !isSending &&
-    !entryContext &&
-    !showInitialGuidance &&
-    !hasDynamicBotActions &&
-    !isLocationPickerOpen &&
-    !pendingLocationSelection;
 
   return (
     <main className="page page--assistant" lang={locale}>
@@ -1925,12 +1851,7 @@ export default function AssistantChatPage() {
               <ChatMessageBubble
                 key={message.id}
                 message={message}
-                onChipClick={handleSendMessage}
-                onActionOptionClick={handleActionOption}
-                onUseCurrentLocation={handleUseCurrentLocation}
-                onOpenMapPicker={handleOpenMapPicker}
                 onRedirectClick={handleRedirectClick}
-                disabled={isSending}
                 copy={uiCopy}
                 mapPickerOpen={isLocationPickerOpen}
                 pendingLocationSelection={pendingLocationSelection}
@@ -1952,15 +1873,6 @@ export default function AssistantChatPage() {
             ) : null}
           </ol>
         </div>
-
-        {showQuickReplies ? (
-          <ChatQuickReplies
-            prompts={quickPrompts}
-            onPromptClick={handleSendMessage}
-            disabled={isSending}
-            copy={uiCopy}
-          />
-        ) : null}
 
         {pendingLocationSelection && !isLocationPickerOpen ? (
           <div className="assistant-location-pending-stack">
@@ -2000,7 +1912,7 @@ export default function AssistantChatPage() {
         <input
           ref={incidentPhotoInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           className="assistant-chat-composer__sr-only"
           aria-hidden="true"
           tabIndex={-1}
@@ -2017,6 +1929,11 @@ export default function AssistantChatPage() {
           characterCount={characterCount}
           inputRef={inputRef}
           copy={uiCopy}
+          onLocationClick={handleComposerLocationIcon}
+          onPhotoClick={handleComposerPhotoIcon}
+          showLocationMenu={isComposerLocationMenuOpen}
+          onUseCurrentLocation={handleUseCurrentLocation}
+          onOpenMapPicker={handleOpenMapPicker}
         />
       </section>
     </main>
