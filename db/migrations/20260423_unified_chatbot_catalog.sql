@@ -122,14 +122,18 @@ BEGIN
     $sql$;
   END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'camunda_case_links'
-      AND column_name = 'catalog_item_id'
-  ) IS FALSE THEN
-    EXECUTE 'ALTER TABLE public.camunda_case_links ADD COLUMN catalog_item_id TEXT';
+  -- En algunos entornos la tabla aún no existe hasta que el runtime ejecute
+  -- `ensureCamundaCaseLinkSchema()` (p.ej. primera sync Camunda). No fallar acá.
+  IF to_regclass('public.camunda_case_links') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'camunda_case_links'
+        AND column_name = 'catalog_item_id'
+    ) IS FALSE THEN
+      EXECUTE 'ALTER TABLE public.camunda_case_links ADD COLUMN catalog_item_id TEXT';
+    END IF;
   END IF;
 
   -- Seed incident catalog item only when missing.
