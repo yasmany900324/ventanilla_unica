@@ -62,6 +62,7 @@ export async function POST(request) {
     const body = await request.json();
     const category = body?.category?.trim() || "";
     const catalogItemId = body?.catalogItemId?.trim() || body?.catalog_item_id?.trim() || null;
+    const catalogCode = body?.catalogCode?.trim() || body?.catalog_code?.trim() || null;
     const description = body?.description?.trim();
     const location = body?.location?.trim();
     const { locationLatitude, locationLongitude } = coerceIncidentGeoCoords(
@@ -89,6 +90,8 @@ export async function POST(request) {
     await syncIncidentToCamundaAfterCreate(incident, {
       channel: "web",
       authenticatedUser,
+      catalogItemId,
+      catalogCode,
     });
     return NextResponse.json({ incident }, { status: 201 });
   } catch (error) {
