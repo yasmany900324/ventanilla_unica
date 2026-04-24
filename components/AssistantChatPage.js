@@ -945,23 +945,6 @@ function ChatErrorMessage({ onRetry, disabled, copy }) {
   );
 }
 
-function ChatInitialGuidance({ prompts, onPromptClick, disabled, copy }) {
-  void prompts;
-  void onPromptClick;
-  void disabled;
-  if (!copy?.initialHelp) {
-    return null;
-  }
-
-  return (
-    <li className="assistant-thread__item assistant-thread__item--bot">
-      <article className="assistant-message assistant-message--bot assistant-message--intro">
-        <p className="assistant-message__intro-copy">{copy.initialHelp}</p>
-      </article>
-    </li>
-  );
-}
-
 function ChatComposer({
   inputValue,
   onInputChange,
@@ -1814,13 +1797,6 @@ export default function AssistantChatPage() {
     setComposerLocationMenuOpen(false);
     incidentPhotoInputRef.current?.click();
   }, [appendControlledComposerMessage, isPhotoActionAvailable, isSending]);
-  const showInitialGuidance =
-    !entryContext &&
-    !serviceError &&
-    !isSending &&
-    messages.length === 1 &&
-    messages[0]?.sender === "bot";
-
   return (
     <main className="page page--assistant" lang={locale}>
       <section className="assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
@@ -1857,15 +1833,6 @@ export default function AssistantChatPage() {
                 pendingLocationSelection={pendingLocationSelection}
               />
             ))}
-            {showInitialGuidance ? (
-              <ChatInitialGuidance
-                prompts={quickPrompts}
-                onPromptClick={handleSendMessage}
-                disabled={isSending}
-                copy={uiCopy}
-              />
-            ) : null}
-
             {isSending ? <TypingIndicator copy={uiCopy} /> : null}
 
             {serviceError ? (
