@@ -136,7 +136,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Seed incident catalog item only when missing.
+  -- Seed canonical procedure row for chatbot reports only when missing.
   INSERT INTO public.chatbot_procedure_catalog (
     id,
     code,
@@ -154,22 +154,22 @@ BEGIN
     updated_at
   )
   VALUES (
-    'catalog-inc-arbol-caido',
-    'inc_arbol_caido',
-    'Árbol caído o ramas peligrosas',
-    'Reporte ciudadano por árbol caído, ramas peligrosas u obstrucción en vía pública',
-    'incidencias',
-    'incident',
-    '["árbol caído","arbol caido","rama caída","ramas peligrosas"]'::jsonb,
-    '["árbol","rama","caído","peligro","calle","vereda"]'::jsonb,
+    'catalog-proc-registrar-incidencia',
+    'registrar_incidencia',
+    'Registrar incidencia',
+    'Permite reportar problemas o incidencias desde web o WhatsApp.',
+    'Incidencia',
+    'procedure',
+    '["registrar incidencia","reportar incidencia","reportar problema","arbol caido"]'::jsonb,
+    '["incidencia","reporte","problema","arbol","caido","whatsapp","web"]'::jsonb,
     TRUE,
     '[
-      {"key":"location","label":"ubicación","prompt":"Indicá la ubicación exacta o referencia del árbol/rama.","type":"text","required":true},
-      {"key":"description","label":"descripción","prompt":"Contame qué está pasando con el árbol o las ramas.","type":"text","required":true},
-      {"key":"risk","label":"riesgo","prompt":"Indicá el nivel de riesgo (alto, medio o bajo).","type":"select","required":true,"options":["alto","medio","bajo"]}
+      {"key":"description","label":"Descripción","prompt":"Contame qué está pasando para registrar la incidencia.","type":"text","required":true},
+      {"key":"photo","label":"Foto","prompt":"Adjuntá una foto para complementar el reporte (si disponés de una).","type":"image","required":true},
+      {"key":"location","label":"Ubicación","prompt":"Indicá la ubicación de la incidencia.","type":"location","required":true}
     ]'::jsonb,
-    '{"completionMessage":"Ya registré la información base de la incidencia. Ahora vamos a confirmar los datos para enviarla."}'::jsonb,
-    'seguimiento_incidencia',
+    '{"completionMessage":"Listo: registré la solicitud de Registrar incidencia."}'::jsonb,
+    'Process_1hvmc45',
     '{}'::jsonb,
     NOW()
   )

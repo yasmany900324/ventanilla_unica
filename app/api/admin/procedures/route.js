@@ -303,6 +303,7 @@ export async function POST(request) {
       SELECT id
       FROM chatbot_procedure_catalog
       WHERE code = ${normalized.value.code}
+        AND case_type = 'procedure'
       LIMIT 1;
     `;
     if (existing) {
@@ -316,6 +317,7 @@ export async function POST(request) {
         name,
         description,
         category,
+        case_type,
         aliases_json,
         keywords_json,
         is_active,
@@ -331,6 +333,7 @@ export async function POST(request) {
         ${normalized.value.name},
         ${normalized.value.description},
         ${normalized.value.category},
+        'procedure',
         ${JSON.stringify(normalized.value.aliases)}::jsonb,
         ${JSON.stringify(normalized.value.keywords)}::jsonb,
         ${normalized.value.isActive},
@@ -407,6 +410,7 @@ export async function PATCH(request) {
           is_active = ${body.isActive},
           updated_at = NOW()
         WHERE code = ${originalCode}
+          AND case_type = 'procedure'
         RETURNING code;
       `;
       if (!updated) {
@@ -441,6 +445,7 @@ export async function PATCH(request) {
         SELECT id
         FROM chatbot_procedure_catalog
         WHERE code = ${code}
+          AND case_type = 'procedure'
           AND code <> ${originalCode}
         LIMIT 1;
       `;
@@ -465,6 +470,7 @@ export async function PATCH(request) {
         flow_definition_json = ${JSON.stringify(normalized.value.flowDefinition)}::jsonb,
         updated_at = NOW()
       WHERE code = ${originalCode}
+        AND case_type = 'procedure'
       RETURNING code;
     `;
     if (!updated) {
@@ -512,6 +518,7 @@ export async function DELETE(request) {
       SELECT code, is_active
       FROM chatbot_procedure_catalog
       WHERE code = ${code}
+        AND case_type = 'procedure'
       LIMIT 1;
     `;
     if (!existing) {
@@ -524,6 +531,7 @@ export async function DELETE(request) {
     const [deleted] = await sql`
       DELETE FROM chatbot_procedure_catalog
       WHERE code = ${code}
+        AND case_type = 'procedure'
       RETURNING code;
     `;
 

@@ -1,5 +1,5 @@
--- Catalog cleanup for incident-only test stage (safe + idempotent).
--- Goal: leave a single active catalog item: INC_ARBOL_CAIDO.
+-- Catalog cleanup (procedure-only safe + idempotent).
+-- Goal: leave a single active catalog item: REGISTRAR_INCIDENCIA (case_type='procedure').
 -- Non-destructive policy: no DELETE, only deactivation + upsert.
 --
 -- Nota:
@@ -10,8 +10,8 @@
 
 DO $$
 DECLARE
-  v_target_code CONSTANT TEXT := 'inc_arbol_caido';
-  v_target_id CONSTANT TEXT := 'catalog-inc-arbol-caido';
+  v_target_code CONSTANT TEXT := 'registrar_incidencia';
+  v_target_id CONSTANT TEXT := 'catalog-proc-registrar-incidencia';
   v_active_before INTEGER := 0;
   v_active_after INTEGER := 0;
   v_incident_refs INTEGER := 0;
@@ -75,7 +75,7 @@ BEGIN
   SET is_active = FALSE,
       updated_at = NOW();
 
-  -- Upsert target incident item as the only active entry.
+  -- Upsert canonical procedure item as the only active entry.
   INSERT INTO public.chatbot_procedure_catalog (
     id,
     code,
@@ -94,16 +94,20 @@ BEGIN
   VALUES (
     v_target_id,
     v_target_code,
-    'Árbol caído o ramas peligrosas',
-    'Reporte ciudadano de árbol caído, ramas peligrosas u obstrucción en vía pública',
-    'incidencias',
-    'incident',
-    '["árbol caído","arbol caido","rama caída","ramas peligrosas","árbol en la calle","arbol en la calle"]'::jsonb,
-    '["árbol","arbol","rama","caído","caido","peligro","calle","vereda"]'::jsonb,
+    'Registrar incidencia',
+    'Permite reportar problemas o incidencias desde web o WhatsApp.',
+    'Incidencia',
+    'procedure',
+    '["registrar incidencia","reportar incidencia","reportar problema","arbol caido"]'::jsonb,
+    '["incidencia","reporte","problema","arbol","caido","whatsapp","web"]'::jsonb,
     TRUE,
-    '{"description": true, "location": true, "evidence": true}'::jsonb,
-    '{}'::jsonb,
-    'seguimiento_incidencia',
+    '[
+      {"key":"description","label":"Descripción","prompt":"Contame qué está pasando para registrar la incidencia.","type":"text","required":true},
+      {"key":"photo","label":"Foto","prompt":"Adjuntá una foto para complementar el reporte (si disponés de una).","type":"image","required":true},
+      {"key":"location","label":"Ubicación","prompt":"Indicá la ubicación de la incidencia.","type":"location","required":true}
+    ]'::jsonb,
+    '{"completionMessage":"Listo: registré la solicitud de Registrar incidencia."}'::jsonb,
+    'Process_1hvmc45',
     NOW()
   )
   ON CONFLICT (code)
