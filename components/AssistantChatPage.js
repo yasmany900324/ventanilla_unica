@@ -303,6 +303,17 @@ function isLocationPromptStep(message) {
   );
 }
 
+function shouldRenderActionOptions(message) {
+  if (!Array.isArray(message?.actionOptions) || message.actionOptions.length === 0) {
+    return false;
+  }
+  const nextStepType = normalizeContextParam(message?.nextStep?.type, 60).toLowerCase();
+  if (nextStepType === "clarify" || nextStepType === "clarify_procedure") {
+    return false;
+  }
+  return true;
+}
+
 function buildFriendlyLocationConfirmation({ copy, referenceLabel }) {
   const locationMapCopy = copy?.locationMap || {};
   const template =
@@ -948,7 +959,7 @@ function ChatMessageBubble({
             </div>
           </div>
         ) : null}
-        {isBot && Array.isArray(message.actionOptions) && message.actionOptions.length > 0 ? (
+        {isBot && shouldRenderActionOptions(message) ? (
           <div className="assistant-chat-quick-replies" aria-label={copy.dynamicSuggestions}>
             <div className="assistant-chat-quick-replies__list">
               {message.actionOptions.map((actionOption) => (
@@ -1124,10 +1135,7 @@ export default function AssistantChatPage() {
   const { locale } = useLocale();
   const uiCopy = getLocaleCopy(locale).chat;
   const entryContext = useMemo(() => getChatEntryContext(searchParams), [searchParams]);
-  const quickPrompts = useMemo(
-    () => (Array.isArray(uiCopy.quickPrompts) ? uiCopy.quickPrompts.slice(0, 3) : []),
-    [uiCopy.quickPrompts]
-  );
+  const quickPrompts = useMemo(() => [], []);
   const contextualWelcomeMessage = useMemo(
     () => buildContextWelcomeMessage({ context: entryContext, copy: uiCopy }),
     [entryContext, uiCopy]
