@@ -615,17 +615,6 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === ADMIN_TABS.CHATBOT}
-            className={`admin-tabs__tab ${
-              activeTab === ADMIN_TABS.CHATBOT ? "admin-tabs__tab--active" : ""
-            }`}
-            onClick={() => setActiveTab(ADMIN_TABS.CHATBOT)}
-          >
-            {copy.admin.tabs.chatbot}
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={activeTab === ADMIN_TABS.PROCEDURES}
             className={`admin-tabs__tab ${
               activeTab === ADMIN_TABS.PROCEDURES ? "admin-tabs__tab--active" : ""
@@ -633,6 +622,17 @@ export default function AdminDashboardPage() {
             onClick={() => setActiveTab(ADMIN_TABS.PROCEDURES)}
           >
             {copy.admin.tabs.procedures}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === ADMIN_TABS.CHATBOT}
+            className={`admin-tabs__tab ${
+              activeTab === ADMIN_TABS.CHATBOT ? "admin-tabs__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab(ADMIN_TABS.CHATBOT)}
+          >
+            {copy.admin.tabs.chatbot}
           </button>
         </div>
       </section>
