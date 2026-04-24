@@ -79,6 +79,30 @@ function getFieldTypeLabel(type, locale) {
   return labels[normalizedType]?.[locale] || labels[normalizedType]?.es || type || "Texto";
 }
 
+function humanizeProcedureType(rawType) {
+  const normalized = normalizeSimpleText(rawType, 80);
+  if (!normalized) {
+    return "Incidencia";
+  }
+  return normalized
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+function resolveProcedureTypeForDisplay(procedure) {
+  const category = normalizeSimpleText(procedure?.category, 80);
+  const processId = normalizeSimpleText(procedure?.camundaProcessId, 160);
+  const categoryLookup = category.toLowerCase();
+  const processLookup = processId.toLowerCase();
+  const looksLikeTechnicalId = /^[a-z0-9_-]+$/u.test(category) && categoryLookup.length <= 40;
+  if (categoryLookup && processLookup && categoryLookup === processLookup && looksLikeTechnicalId) {
+    return "Incidencia";
+  }
+  return humanizeProcedureType(category || "Incidencia");
+}
+
 function ProcedureStatusBadge({ isActive, copy }) {
   return (
     <span className={`badge ${isActive ? "badge--resuelto" : "badge--en-revision"}`}>
@@ -126,7 +150,7 @@ function createProcedureFormState(procedure = null) {
     originalCode: normalizeCode(procedure?.code || ""),
     code: normalizeCode(procedure?.code || ""),
     name: normalizeSimpleText(procedure?.name || "", 160),
-    type: normalizeSimpleText(procedure?.category || "Incidencia", 80),
+    type: resolveProcedureTypeForDisplay(procedure),
     description: normalizeSimpleText(procedure?.description || "", 320),
     isActive: procedure?.isActive !== false,
     camundaProcessId: normalizeSimpleText(procedure?.camundaProcessId || "", 160),
@@ -908,7 +932,7 @@ export default function AdminDashboardPage() {
                               ) : null}
                             </td>
                             <td className="admin-procedure-table__mono">{procedure.code}</td>
-                            <td>{procedure.category || "-"}</td>
+                            <td>{resolveProcedureTypeForDisplay(procedure)}</td>
                             <td>
                               <ProcedureStatusBadge isActive={Boolean(procedure.isActive)} copy={procedureCopy} />
                             </td>
