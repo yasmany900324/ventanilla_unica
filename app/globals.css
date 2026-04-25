@@ -1888,6 +1888,39 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
+.admin-panel-nav {
+  padding: 0.55rem 0.75rem;
+}
+
+.admin-panel-nav__list {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-panel-nav__link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border: 1px solid #c9d8ef;
+  border-radius: 999px;
+  padding: 0.42rem 0.82rem;
+  color: #123878;
+  background: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.admin-panel-nav__link:hover {
+  background: #eef4fb;
+}
+
+.admin-panel-nav__link--active {
+  background: #133e92;
+  border-color: #133e92;
+  color: #ffffff;
+}
+
 /* Admin tab bar: compact segment control; overrides global `button` (full width, blue fill). */
 .page--dashboard .card.dashboard-section.admin-tabs {
   padding: 0.45rem 0.75rem;
@@ -2191,6 +2224,32 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.admin-inbox-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.admin-inbox-filters label {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+}
+
+.admin-inbox-table__row--attention {
+  background: #fffdf6;
+}
+
+.admin-inbox-table__row--selected {
+  background: #f5f9ff;
+}
+
+.admin-inbox-detail {
+  display: grid;
+  gap: 0.75rem;
+}
+
 @media (max-width: 900px) {
   .admin-procedure-toolbar {
     flex-direction: column;
@@ -2202,6 +2261,10 @@ button:disabled {
   }
 
   .admin-procedure-fields__edit {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-inbox-filters {
     grid-template-columns: 1fr;
   }
 }

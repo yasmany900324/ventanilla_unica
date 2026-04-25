@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
+import AdminPanelNav from "./AdminPanelNav";
 
 const WINDOW_DAY_OPTIONS = [7, 14, 30];
 const ADMIN_TABS = {
@@ -53,6 +54,28 @@ const CAMUNDA_MAPPING_EXAMPLE_COMPLETE_TASK = `[
   }
 ]`;
 
+const TASK_UI_DICTIONARY_EXAMPLE = `{
+  "validar_incidencia": {
+    "title": "Revisar reporte ciudadano",
+    "description": "Verificá la descripción, ubicación e imagen enviada por el ciudadano antes de continuar el trámite.",
+    "primaryActionLabel": "Confirmar revisión",
+    "requiredVariables": [
+      {
+        "camundaVariableName": "revisionFuncionario",
+        "label": "Resultado de la revisión",
+        "camundaVariableType": "string",
+        "required": true
+      },
+      {
+        "camundaVariableName": "observacionesInternas",
+        "label": "Observaciones internas",
+        "camundaVariableType": "string",
+        "required": false
+      }
+    ]
+  }
+}`;
+
 function formatPercent(value) {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return "0%";
@@ -90,17 +113,6 @@ function formatProcedureUpdatedAt(updatedAt, locale) {
     return locale === "en" ? "Today" : locale === "pt" ? "Hoje" : "Hoy";
   }
   return date.toLocaleDateString(locale || "es");
-}
-
-function formatDateTime(value, locale) {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleString(locale || "es");
 }
 
 function getFieldTypeLabel(type, locale) {
@@ -189,6 +201,19 @@ function createProcedureFormState(procedure = null) {
   const mappings = Array.isArray(procedure?.camundaVariableMappings)
     ? procedure.camundaVariableMappings
     : [];
+  const flowDefinition =
+    procedure?.flowDefinition && typeof procedure.flowDefinition === "object"
+      ? procedure.flowDefinition
+      : {};
+  const taskUiDictionaryRaw = flowDefinition.taskUiDictionary;
+  const taskUiDictionary = Array.isArray(taskUiDictionaryRaw)
+    ? taskUiDictionaryRaw
+    : taskUiDictionaryRaw && typeof taskUiDictionaryRaw === "object"
+      ? Object.entries(taskUiDictionaryRaw).map(([taskDefinitionKey, config]) => ({
+          taskDefinitionKey,
+          ...(config && typeof config === "object" ? config : {}),
+        }))
+      : [];
   return {
     originalCode: normalizeCode(procedure?.code || ""),
     code: normalizeCode(procedure?.code || ""),
@@ -201,6 +226,11 @@ function createProcedureFormState(procedure = null) {
     requiredFields: normalizedFields,
     camundaVariableMappingsJson:
       mappings.length > 0 ? JSON.stringify(mappings, null, 2) : CAMUNDA_MAPPING_EXAMPLE_START_INSTANCE,
+    taskUiDictionaryJson:
+      taskUiDictionary.length > 0
+        ? JSON.stringify(taskUiDictionary, null, 2)
+        : TASK_UI_DICTIONARY_EXAMPLE,
+    flowDefinitionBase: flowDefinition,
     enabledChannels: Array.from(new Set(channels.filter(Boolean))),
   };
 }
@@ -292,13 +322,6 @@ export default function AdminDashboardPage() {
   const [isSavingProcedure, setIsSavingProcedure] = useState(false);
   const [togglingCode, setTogglingCode] = useState("");
   const [deletingCode, setDeletingCode] = useState("");
-  const [procedureRequests, setProcedureRequests] = useState([]);
-  const [procedureRequestsLoading, setProcedureRequestsLoading] = useState(false);
-  const [procedureRequestsError, setProcedureRequestsError] = useState("");
-  const [selectedProcedureRequest, setSelectedProcedureRequest] = useState(null);
-  const [selectedProcedureRequestLoading, setSelectedProcedureRequestLoading] = useState(false);
-  const [retryingProcedureRequestId, setRetryingProcedureRequestId] = useState("");
-  const [claimingProcedureRequestId, setClaimingProcedureRequestId] = useState("");
 
   const isAdministrator = user?.role === "administrador";
   const funnel = metrics?.funnel || null;
@@ -402,121 +425,14 @@ export default function AdminDashboardPage() {
     }
   }, [locale, procedureCopy.loadError, router]);
 
-  const loadProcedureRequests = useCallback(async (signal = undefined) => {
-    setProcedureRequestsLoading(true);
-    setProcedureRequestsError("");
-    try {
-      const response = await fetch(`/api/admin/procedures/requests?limit=200`, { signal });
-      const data = await response.json();
-      if (!response.ok) {
-        if (response.status === 403) {
-          router.replace("/");
-          return;
-        }
-        throw new Error(data?.error || "No se pudo cargar el listado de expedientes.");
-      }
-      setProcedureRequests(Array.isArray(data?.procedures) ? data.procedures : []);
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        setProcedureRequestsError(error.message || "No se pudo cargar el listado de expedientes.");
-      }
-    } finally {
-      setProcedureRequestsLoading(false);
-    }
-  }, [router]);
-
   useEffect(() => {
     if (!user || !isAdministrator || activeTab !== ADMIN_TABS.PROCEDURES) {
       return;
     }
     const abortController = new AbortController();
     loadProcedures(abortController.signal);
-    loadProcedureRequests(abortController.signal);
     return () => abortController.abort();
-  }, [activeTab, isAdministrator, loadProcedureRequests, loadProcedures, user]);
-
-  const loadProcedureRequestDetail = useCallback(async (requestId) => {
-    if (!requestId) {
-      setSelectedProcedureRequest(null);
-      return;
-    }
-    setSelectedProcedureRequestLoading(true);
-    setProcedureRequestsError("");
-    try {
-      const response = await fetch(`/api/admin/procedures/requests/${encodeURIComponent(requestId)}`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "No se pudo cargar el detalle del expediente.");
-      }
-      setSelectedProcedureRequest(data);
-    } catch (error) {
-      setProcedureRequestsError(error.message || "No se pudo cargar el detalle del expediente.");
-    } finally {
-      setSelectedProcedureRequestLoading(false);
-    }
-  }, []);
-
-  const handleRetryCamundaSync = useCallback(
-    async (requestId) => {
-      if (!requestId) {
-        return;
-      }
-      setRetryingProcedureRequestId(requestId);
-      setProcedureRequestsError("");
-      setProcedureSuccessMessage("");
-      try {
-        const response = await fetch(
-          `/api/admin/procedures/requests/${encodeURIComponent(requestId)}/retry-camunda-sync`,
-          { method: "POST" }
-        );
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error || "No se pudo reintentar la sincronización con Camunda.");
-        }
-        await loadProcedureRequests();
-        if (selectedProcedureRequest?.procedureRequest?.id === requestId) {
-          await loadProcedureRequestDetail(requestId);
-        }
-        setProcedureSuccessMessage("Sincronización con Camunda reintentada correctamente.");
-      } catch (error) {
-        setProcedureRequestsError(error.message || "No se pudo reintentar la sincronización con Camunda.");
-      } finally {
-        setRetryingProcedureRequestId("");
-      }
-    },
-    [loadProcedureRequestDetail, loadProcedureRequests, selectedProcedureRequest?.procedureRequest?.id]
-  );
-
-  const handleClaimTask = useCallback(
-    async (requestId) => {
-      if (!requestId) {
-        return;
-      }
-      setClaimingProcedureRequestId(requestId);
-      setProcedureRequestsError("");
-      setProcedureSuccessMessage("");
-      try {
-        const response = await fetch(
-          `/api/admin/procedures/requests/${encodeURIComponent(requestId)}/claim-task`,
-          { method: "POST" }
-        );
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error || "No se pudo reclamar la tarea.");
-        }
-        await loadProcedureRequests();
-        if (selectedProcedureRequest?.procedureRequest?.id === requestId) {
-          await loadProcedureRequestDetail(requestId);
-        }
-        setProcedureSuccessMessage("Tarea reclamada correctamente.");
-      } catch (error) {
-        setProcedureRequestsError(error.message || "No se pudo reclamar la tarea.");
-      } finally {
-        setClaimingProcedureRequestId("");
-      }
-    },
-    [loadProcedureRequestDetail, loadProcedureRequests, selectedProcedureRequest?.procedureRequest?.id]
-  );
+  }, [activeTab, isAdministrator, loadProcedures, user]);
 
   const openCreateForm = () => {
     setExpandedProcedureCode("__new__");
@@ -636,6 +552,7 @@ export default function AdminDashboardPage() {
       new Set(formState.enabledChannels.map((channel) => normalizeSimpleText(channel, 20).toLowerCase()))
     ).filter(Boolean);
     let camundaVariableMappings = [];
+    let taskUiDictionary = [];
     if (normalizeSimpleText(formState.camundaVariableMappingsJson, 12000)) {
       try {
         const parsed = JSON.parse(formState.camundaVariableMappingsJson);
@@ -649,6 +566,27 @@ export default function AdminDashboardPage() {
         camundaVariableMappings = parsed;
       } catch (_error) {
         return { ok: false, error: "El JSON de mapeo de variables Camunda no es válido." };
+      }
+    }
+    if (normalizeSimpleText(formState.taskUiDictionaryJson, 20000)) {
+      try {
+        const parsed = JSON.parse(formState.taskUiDictionaryJson);
+        if (Array.isArray(parsed)) {
+          taskUiDictionary = parsed;
+        } else if (parsed && typeof parsed === "object") {
+          taskUiDictionary = Object.entries(parsed).map(([taskDefinitionKey, config]) => ({
+            taskDefinitionKey,
+            ...(config && typeof config === "object" ? config : {}),
+          }));
+        } else {
+          return {
+            ok: false,
+            error:
+              "El diccionario de tareas debe ser un objeto o arreglo JSON. Ejemplo: {\"validar\":{\"title\":\"Revisar\"}}",
+          };
+        }
+      } catch (_error) {
+        return { ok: false, error: "El JSON del diccionario de tareas no es válido." };
       }
     }
 
@@ -678,6 +616,16 @@ export default function AdminDashboardPage() {
       return { ok: false, error: procedureCopy.validation.codeUnique };
     }
 
+    const flowDefinition =
+      formState.flowDefinitionBase && typeof formState.flowDefinitionBase === "object"
+        ? { ...formState.flowDefinitionBase }
+        : {};
+    if (taskUiDictionary.length > 0) {
+      flowDefinition.taskUiDictionary = taskUiDictionary;
+    } else {
+      delete flowDefinition.taskUiDictionary;
+    }
+
     return {
       ok: true,
       payload: {
@@ -694,7 +642,7 @@ export default function AdminDashboardPage() {
         enabledChannels,
         requiredFields,
         camundaVariableMappings,
-        flowDefinition: {},
+        flowDefinition,
       },
     };
   };
@@ -812,6 +760,7 @@ export default function AdminDashboardPage() {
           <p className="description">{copy.admin.description}</p>
         </div>
       </section>
+      <AdminPanelNav />
 
       <section className="card dashboard-section admin-tabs">
         <div role="tablist" aria-label={copy.portal.adminDashboard} className="admin-tabs__list">
@@ -1090,6 +1039,25 @@ export default function AdminDashboardPage() {
                   />
                 </section>
 
+                <section className="admin-procedure-fields">
+                  <h4>Diccionario funcional de tareas Camunda</h4>
+                  <p className="small">
+                    Define cómo se muestran en la bandeja los textos por `taskDefinitionKey` (título, descripción,
+                    botón principal y variables con labels amigables).
+                  </p>
+                  <pre className="small">{TASK_UI_DICTIONARY_EXAMPLE}</pre>
+                  <label htmlFor="new-procedure-task-ui-dictionary" className="small">
+                    JSON del diccionario por tarea
+                  </label>
+                  <textarea
+                    id="new-procedure-task-ui-dictionary"
+                    value={formState.taskUiDictionaryJson}
+                    onChange={(event) => updateFormField("taskUiDictionaryJson", event.target.value)}
+                    rows={10}
+                    disabled={isSavingProcedure}
+                  />
+                </section>
+
                 <div className="admin-procedure-form__actions">
                   <button type="button" className="button-inline" onClick={closeExpandedForm} disabled={isSavingProcedure}>
                     {procedureCopy.cancel}
@@ -1298,6 +1266,30 @@ export default function AdminDashboardPage() {
                                   </section>
 
                                   <section className="admin-procedure-fields">
+                                    <h4>Diccionario funcional de tareas Camunda</h4>
+                                    <p className="small">
+                                      Configura textos funcionales por `taskDefinitionKey` para la bandeja de
+                                      expedientes (título, descripción, botón principal y labels de variables).
+                                    </p>
+                                    <pre className="small">{TASK_UI_DICTIONARY_EXAMPLE}</pre>
+                                    <label
+                                      htmlFor={`task-ui-dictionary-${procedure.code}`}
+                                      className="small"
+                                    >
+                                      JSON del diccionario por tarea
+                                    </label>
+                                    <textarea
+                                      id={`task-ui-dictionary-${procedure.code}`}
+                                      value={formState.taskUiDictionaryJson}
+                                      onChange={(event) =>
+                                        updateFormField("taskUiDictionaryJson", event.target.value)
+                                      }
+                                      rows={10}
+                                      disabled={isSavingProcedure}
+                                    />
+                                  </section>
+
+                                  <section className="admin-procedure-fields">
                                     <h4>Campos solicitados</h4>
                                     <p className="small">
                                       Ordena y administra los campos que el chatbot debe solicitar.
@@ -1428,127 +1420,6 @@ export default function AdminDashboardPage() {
             </section>
           ) : null}
 
-          <section className="card dashboard-section">
-            <div className="admin-procedure-table__header">
-              <h3>Expedientes de procedimientos</h3>
-              <p className="small">
-                Estado local, sincronización Camunda, acción pendiente y acceso al detalle completo.
-              </p>
-            </div>
-            {procedureRequestsLoading ? (
-              <p className="info-message">Cargando expedientes...</p>
-            ) : procedureRequests.length === 0 ? (
-              <p className="empty-message">No hay expedientes registrados todavía.</p>
-            ) : (
-              <div className="admin-procedure-table__container">
-                <table className="admin-procedure-table">
-                  <thead>
-                    <tr>
-                      <th>ID / Número</th>
-                      <th>Tipo</th>
-                      <th>Canal</th>
-                      <th>Estado local</th>
-                      <th>Creado</th>
-                      <th>Error Camunda</th>
-                      <th>Acción pendiente</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {procedureRequests.map((requestItem) => (
-                      <tr key={requestItem.id}>
-                        <td className="admin-procedure-table__mono">
-                          {requestItem.requestCode || requestItem.id}
-                        </td>
-                        <td>{requestItem.procedureName || requestItem.procedureCode || "-"}</td>
-                        <td>{requestItem.channel || "-"}</td>
-                        <td>{requestItem.status || "-"}</td>
-                        <td>{formatDateTime(requestItem.createdAt, locale)}</td>
-                        <td>{requestItem.hasCamundaError ? "Sí" : "No"}</td>
-                        <td>{requestItem.pendingAction || "-"}</td>
-                        <td>
-                          <div className="admin-procedure-item__actions">
-                            <button
-                              type="button"
-                              className="button-inline"
-                              onClick={() => loadProcedureRequestDetail(requestItem.id)}
-                            >
-                              Ver detalle
-                            </button>
-                            {requestItem.hasCamundaError ? (
-                              <button
-                                type="button"
-                                className="button-inline"
-                                onClick={() => handleRetryCamundaSync(requestItem.id)}
-                                disabled={retryingProcedureRequestId === requestItem.id}
-                              >
-                                {retryingProcedureRequestId === requestItem.id
-                                  ? "Reintentando..."
-                                  : "Reintentar sync Camunda"}
-                              </button>
-                            ) : null}
-                            {!requestItem.hasCamundaError &&
-                            requestItem.activeTask?.taskDefinitionKey &&
-                            !requestItem.taskAssigneeId ? (
-                              <button
-                                type="button"
-                                className="button-inline"
-                                onClick={() => handleClaimTask(requestItem.id)}
-                                disabled={claimingProcedureRequestId === requestItem.id}
-                              >
-                                {claimingProcedureRequestId === requestItem.id
-                                  ? "Reclamando..."
-                                  : "Reclamar tarea"}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          <section className="card dashboard-section">
-            <h3>Detalle del expediente</h3>
-            {selectedProcedureRequestLoading ? (
-              <p className="info-message">Cargando detalle...</p>
-            ) : selectedProcedureRequest?.procedureRequest ? (
-              <>
-                <p className="small">
-                  Estado actual: {selectedProcedureRequest.procedureRequest.status || "-"} | Instancia Camunda:{" "}
-                  {selectedProcedureRequest.procedureRequest.camundaProcessInstanceKey || "-"}
-                </p>
-                <p className="small">
-                  Tarea activa: {selectedProcedureRequest.activeTask?.taskDefinitionKey || "-"}
-                </p>
-                <p className="small">
-                  Asignado a: {selectedProcedureRequest.procedureRequest.taskAssigneeId || "-"} | Asignado en:{" "}
-                  {formatDateTime(selectedProcedureRequest.procedureRequest.taskClaimedAt, locale)}
-                </p>
-                <label className="small">Datos recolectados (JSON)</label>
-                <textarea
-                  readOnly
-                  rows={8}
-                  value={JSON.stringify(
-                    selectedProcedureRequest.procedureRequest.collectedData || {},
-                    null,
-                    2
-                  )}
-                />
-                <label className="small">Historial básico de cambios</label>
-                <textarea
-                  readOnly
-                  rows={8}
-                  value={JSON.stringify(selectedProcedureRequest.history || [], null, 2)}
-                />
-              </>
-            ) : (
-              <p className="empty-message">Selecciona un expediente para ver su detalle completo.</p>
-            )}
-          </section>
         </>
       )}
     </main>

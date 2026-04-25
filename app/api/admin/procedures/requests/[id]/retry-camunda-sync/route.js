@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdministrator } from "../../../../../../../lib/auth";
 import { retryProcedureCamundaSync } from "../../../../../../../lib/camunda/syncLocalCaseToCamunda";
+import { getProcedureRequestById } from "../../../../../../../lib/procedureRequests";
 
 export async function POST(request, { params }) {
   try {
@@ -10,6 +11,19 @@ export async function POST(request, { params }) {
     }
     if (!administrator?.id) {
       return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
+    }
+    const procedureRequest = await getProcedureRequestById(params?.id);
+    if (!procedureRequest) {
+      return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
+    }
+    if (
+      procedureRequest.taskAssigneeId &&
+      String(procedureRequest.taskAssigneeId).trim() !== String(administrator.id).trim()
+    ) {
+      return NextResponse.json(
+        { error: "El expediente está asignado a otro funcionario." },
+        { status: 403 }
+      );
     }
     let body = {};
     try {
