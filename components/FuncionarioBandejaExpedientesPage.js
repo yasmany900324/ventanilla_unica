@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
-import { TERMINAL_PROCEDURE_STATUSES } from "../lib/procedureRequests";
 
 const LOCAL_STATUS_LABELS = {
   DRAFT: "Borrador",
@@ -26,6 +25,8 @@ const CAMUNDA_STATUS_LABELS = {
   PROCESS_RUNNING: "En proceso",
   NOT_SYNCED: "Sin tarea activa",
 };
+
+const TERMINAL_PROCEDURE_STATUSES = new Set(["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"]);
 
 function formatDateTime(value, locale) {
   if (!value) {
