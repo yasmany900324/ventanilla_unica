@@ -6,6 +6,7 @@ const ALLOWED_ROLES = new Set([ROLES.CITIZEN, ROLES.AGENT, ROLES.ADMIN]);
 
 export async function PATCH(request, { params }) {
   try {
+    const { id: targetUserIdFromRoute } = await params;
     const administrator = await requireAdministrator(request);
     if (!administrator) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
@@ -28,7 +29,7 @@ export async function PATCH(request, { params }) {
 
     const result = await updateUserRolesByAdministrator({
       adminUserId: administrator.id,
-      targetUserId: params?.id,
+      targetUserId: targetUserIdFromRoute,
       roles: incomingRoles,
     });
     if (!result?.ok) {
