@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
-import { requireAdministrator } from "../../../../../lib/auth";
+import { requireFuncionario } from "../../../../../lib/auth";
 import { enrichProcedureRequestsForInbox } from "../../../../../lib/procedureRequestInboxListHelpers";
 import {
-  listProcedureRequestsForAdmin,
+  listProcedureRequestsForAssignee,
   releaseExpiredProcedureTaskClaims,
 } from "../../../../../lib/procedureRequests";
 
 export async function GET(request) {
   try {
-    const administrator = await requireAdministrator(request);
-    if (!administrator) {
+    const funcionario = await requireFuncionario(request);
+    if (!funcionario) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const { searchParams } = new URL(request.url);
     const limit = Number.parseInt(searchParams.get("limit") || "100", 10);
-    const scope = String(searchParams.get("scope") || "all").trim().toLowerCase();
     await releaseExpiredProcedureTaskClaims();
-    const procedures = await listProcedureRequestsForAdmin({
+    const procedures = await listProcedureRequestsForAssignee({
+      assigneeUserId: funcionario.id,
       limit,
-      assignmentScope: scope,
-      requesterUserId: administrator.id,
     });
     const enriched = await enrichProcedureRequestsForInbox(procedures);
     return NextResponse.json({ procedures: enriched });

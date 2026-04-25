@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAdministrator } from "../../../../../../lib/auth";
+import { requireFuncionario } from "../../../../../../lib/auth";
 import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActiveTaskForProcedure";
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
 import {
   buildAvailableActions,
-  canAccessProcedureRequestLax,
+  canAccessProcedureRequestStrict,
   resolveTaskDisplayConfig,
 } from "../../../../../../lib/procedureRequestInboxDetail";
 import {
@@ -14,17 +14,17 @@ import {
 
 export async function GET(request, { params }) {
   try {
-    const administrator = await requireAdministrator(request);
-    if (!administrator) {
+    const funcionario = await requireFuncionario(request);
+    if (!funcionario) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const procedureRequest = await getProcedureRequestById(params?.id);
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }
-    if (!canAccessProcedureRequestLax(administrator.id, procedureRequest)) {
+    if (!canAccessProcedureRequestStrict(funcionario.id, procedureRequest)) {
       return NextResponse.json(
-        { error: "No tienes permisos para ver este expediente asignado a otro funcionario." },
+        { error: "No tienes permisos para ver este expediente." },
         { status: 403 }
       );
     }
@@ -48,9 +48,9 @@ export async function GET(request, { params }) {
         procedureRequest,
         activeTask,
         procedureType,
-        actorId: administrator.id,
-        requestsApiSegment: "admin",
-        includeClaimTask: true,
+        actorId: funcionario.id,
+        requestsApiSegment: "funcionario",
+        includeClaimTask: false,
       }),
     });
   } catch (_error) {

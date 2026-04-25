@@ -5,13 +5,42 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
-import AdminPanelNav from "./AdminPanelNav";
 
 const WINDOW_DAY_OPTIONS = [7, 14, 30];
 const ADMIN_TABS = {
   CHATBOT: "chatbot",
   PROCEDURES: "procedures",
+  USERS_ROLES: "users_roles",
 };
+
+const ADMIN_ROLE_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: "ciudadano", label: "Ciudadano" },
+  { value: "agente", label: "Funcionario" },
+  { value: "administrador", label: "Administrador" },
+];
+
+function getAdminRoleVisualLabel(role) {
+  const normalized = normalizeSimpleText(role, 30).toLowerCase();
+  if (normalized === "administrador") {
+    return "Administrador";
+  }
+  if (normalized === "agente") {
+    return "Funcionario";
+  }
+  return "Ciudadano";
+}
+
+function formatAdminUserCreatedAt(value, locale) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return date.toLocaleDateString(locale || "es");
+}
 
 const DEFAULT_REQUIRED_FIELDS = [
   { key: "description", label: "Descripción", type: "text", required: true, order: 1 },
@@ -322,6 +351,14 @@ export default function AdminDashboardPage() {
   const [isSavingProcedure, setIsSavingProcedure] = useState(false);
   const [togglingCode, setTogglingCode] = useState("");
   const [deletingCode, setDeletingCode] = useState("");
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [usersSuccessMessage, setUsersSuccessMessage] = useState("");
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [userSearchText, setUserSearchText] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [roleDraftByUserId, setRoleDraftByUserId] = useState({});
+  const [savingRoleUserId, setSavingRoleUserId] = useState("");
 
   const isAdministrator = user?.role === "administrador";
   const funnel = metrics?.funnel || null;
@@ -433,6 +470,102 @@ export default function AdminDashboardPage() {
     loadProcedures(abortController.signal);
     return () => abortController.abort();
   }, [activeTab, isAdministrator, loadProcedures, user]);
+
+  const loadUsers = useCallback(async (signal = undefined) => {
+    setIsLoadingUsers(true);
+    setUsersError("");
+    try {
+      const query = new URLSearchParams();
+      if (userSearchText.trim()) {
+        query.set("search", userSearchText.trim());
+      }
+      if (userRoleFilter && userRoleFilter !== "all") {
+        query.set("role", userRoleFilter);
+      }
+      const response = await fetch(`/api/admin/users?${query.toString()}`, { signal });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 403) {
+          router.replace("/");
+          return;
+        }
+        throw new Error(data?.error || "No se pudo cargar la lista de usuarios.");
+      }
+      const incomingUsers = Array.isArray(data?.users) ? data.users : [];
+      setAdminUsers(incomingUsers);
+      setRoleDraftByUserId((previous) => {
+        const next = { ...previous };
+        for (const item of incomingUsers) {
+          const currentRole = normalizeSimpleText(item?.role, 30).toLowerCase() || "ciudadano";
+          if (!next[item.id]) {
+            next[item.id] = currentRole;
+          }
+        }
+        return next;
+      });
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setUsersError(error.message || "No se pudo cargar la lista de usuarios.");
+      }
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, [router, userRoleFilter, userSearchText]);
+
+  useEffect(() => {
+    if (!user || !isAdministrator || activeTab !== ADMIN_TABS.USERS_ROLES) {
+      return;
+    }
+    const abortController = new AbortController();
+    loadUsers(abortController.signal);
+    return () => abortController.abort();
+  }, [activeTab, isAdministrator, loadUsers, user]);
+
+  const handleUpdateRoleDraft = (userId, nextRole) => {
+    setRoleDraftByUserId((previous) => ({
+      ...previous,
+      [userId]: nextRole,
+    }));
+  };
+
+  const handleSaveUserRole = async (targetUser) => {
+    if (!targetUser?.id) {
+      return;
+    }
+    const nextRole = normalizeSimpleText(roleDraftByUserId[targetUser.id], 30).toLowerCase();
+    const currentRole = normalizeSimpleText(targetUser.role, 30).toLowerCase();
+    if (!nextRole || nextRole === currentRole) {
+      setUsersSuccessMessage("El usuario ya tiene ese rol.");
+      return;
+    }
+    const nextRoleLabel = getAdminRoleVisualLabel(nextRole);
+    const shouldContinue = window.confirm(
+      `Vas a cambiar el rol de este usuario a ${nextRoleLabel}. ¿Deseas continuar?`
+    );
+    if (!shouldContinue) {
+      return;
+    }
+    setUsersSuccessMessage("");
+    setUsersError("");
+    setSavingRoleUserId(targetUser.id);
+    try {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(targetUser.id)}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "No se pudo actualizar el rol del usuario.");
+      }
+      setUsersSuccessMessage("Rol actualizado correctamente.");
+      await loadUsers();
+    } catch (error) {
+      setUsersError(error.message || "No se pudo actualizar el rol del usuario.");
+    } finally {
+      setSavingRoleUserId("");
+    }
+  };
 
   const openCreateForm = () => {
     setExpandedProcedureCode("__new__");
@@ -760,10 +893,20 @@ export default function AdminDashboardPage() {
           <p className="description">{copy.admin.description}</p>
         </div>
       </section>
-      <AdminPanelNav />
 
       <section className="card dashboard-section admin-tabs">
         <div role="tablist" aria-label={copy.portal.adminDashboard} className="admin-tabs__list">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === ADMIN_TABS.CHATBOT}
+            className={`admin-tabs__tab ${
+              activeTab === ADMIN_TABS.CHATBOT ? "admin-tabs__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab(ADMIN_TABS.CHATBOT)}
+          >
+            {copy.admin.tabs.chatbot}
+          </button>
           <button
             type="button"
             role="tab"
@@ -778,13 +921,13 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === ADMIN_TABS.CHATBOT}
+            aria-selected={activeTab === ADMIN_TABS.USERS_ROLES}
             className={`admin-tabs__tab ${
-              activeTab === ADMIN_TABS.CHATBOT ? "admin-tabs__tab--active" : ""
+              activeTab === ADMIN_TABS.USERS_ROLES ? "admin-tabs__tab--active" : ""
             }`}
-            onClick={() => setActiveTab(ADMIN_TABS.CHATBOT)}
+            onClick={() => setActiveTab(ADMIN_TABS.USERS_ROLES)}
           >
-            {copy.admin.tabs.chatbot}
+            {copy.admin.tabs.usersRoles || "Usuarios y roles"}
           </button>
         </div>
       </section>
@@ -871,7 +1014,7 @@ export default function AdminDashboardPage() {
             </>
           ) : null}
         </>
-      ) : (
+      ) : activeTab === ADMIN_TABS.PROCEDURES ? (
         <>
           <section className="card dashboard-section">
             <h2>{procedureCopy.contextTitle}</h2>
@@ -1420,6 +1563,123 @@ export default function AdminDashboardPage() {
             </section>
           ) : null}
 
+        </>
+      ) : (
+        <>
+          <section className="card dashboard-section">
+            <h2>{copy.admin.tabs.usersRoles || "Usuarios y roles"}</h2>
+            <p className="small">
+              Consulta usuarios registrados, filtra por rol y actualiza permisos de acceso al panel administrativo y
+              a la bandeja operativa.
+            </p>
+          </section>
+
+          {usersSuccessMessage ? (
+            <section className="card">
+              <p className="info-message">{usersSuccessMessage}</p>
+            </section>
+          ) : null}
+          {usersError ? (
+            <section className="card">
+              <p className="error-message">{usersError}</p>
+            </section>
+          ) : null}
+
+          <section className="card dashboard-section admin-procedure-toolbar">
+            <div className="admin-procedure-toolbar__content admin-procedure-toolbar__content--full">
+              <input
+                type="search"
+                aria-label="Buscar usuarios por nombre o email"
+                placeholder="Buscar por nombre o email"
+                value={userSearchText}
+                onChange={(event) => setUserSearchText(event.target.value)}
+                disabled={isLoadingUsers}
+              />
+              <div className="admin-procedure-toolbar__filters">
+                {ADMIN_ROLE_OPTIONS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={`button-inline ${userRoleFilter === item.value ? "button-inline--selected" : ""}`}
+                    onClick={() => setUserRoleFilter(item.value)}
+                    disabled={isLoadingUsers}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {isLoadingUsers ? (
+            <section className="card">
+              <p className="info-message">Cargando usuarios...</p>
+            </section>
+          ) : (
+            <section className="card dashboard-section">
+              <div className="admin-procedure-table__header">
+                <h3>Usuarios y roles</h3>
+                <p className="small">Total encontrado: {adminUsers.length}</p>
+              </div>
+              <div className="admin-procedure-table__container">
+                <table className="admin-procedure-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Email</th>
+                      <th>Rol actual</th>
+                      <th>Fecha de creación</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminUsers.map((adminUser) => {
+                      const draftRole =
+                        roleDraftByUserId[adminUser.id] || normalizeSimpleText(adminUser.role, 30).toLowerCase();
+                      const isSavingRole = savingRoleUserId === adminUser.id;
+                      const hasRoleChanges =
+                        normalizeSimpleText(draftRole, 30).toLowerCase() !==
+                        normalizeSimpleText(adminUser.role, 30).toLowerCase();
+                      return (
+                        <tr key={adminUser.id}>
+                          <td>{adminUser.fullName || "-"}</td>
+                          <td>{adminUser.email || "-"}</td>
+                          <td>
+                            <span className="badge badge--recibido">{getAdminRoleVisualLabel(adminUser.role)}</span>
+                          </td>
+                          <td>{formatAdminUserCreatedAt(adminUser.createdAt, locale)}</td>
+                          <td>
+                            <div className="admin-procedure-item__actions">
+                              <select
+                                value={draftRole}
+                                onChange={(event) => handleUpdateRoleDraft(adminUser.id, event.target.value)}
+                                disabled={isSavingRole}
+                              >
+                                <option value="ciudadano">Ciudadano</option>
+                                <option value="agente">Funcionario</option>
+                                <option value="administrador">Administrador</option>
+                              </select>
+                              <button
+                                type="button"
+                                className="button-inline"
+                                disabled={isSavingRole || !hasRoleChanges}
+                                onClick={() => handleSaveUserRole(adminUser)}
+                              >
+                                {isSavingRole ? "Guardando..." : "Guardar rol"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {!adminUsers.length ? (
+                <p className="empty-message">No hay usuarios para los filtros seleccionados.</p>
+              ) : null}
+            </section>
+          )}
         </>
       )}
     </main>

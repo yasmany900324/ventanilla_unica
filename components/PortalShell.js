@@ -132,6 +132,7 @@ export default function PortalShell({ children }) {
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
   const isAdministrator = user?.role === "administrador";
+  const isFuncionario = user?.role === "agente";
   const authenticatedUser = user;
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || copy.dashboard.greetingFallback;
   const handleLogout = useCallback(async () => {
@@ -224,13 +225,15 @@ export default function PortalShell({ children }) {
         key: "admin-catalog",
         type: "link",
         href: "/admin/dashboard",
-        label: "Catálogo de procedimientos",
+        label: "Panel administrativo",
         icon: "cases",
       });
+    }
+    if (isFuncionario) {
       authenticatedItems.push({
-        key: "admin-inbox",
+        key: "funcionario-inbox",
         type: "link",
-        href: "/admin/bandeja-expedientes",
+        href: "/funcionario/dashboard",
         label: "Bandeja de expedientes",
         icon: "cases",
       });
@@ -251,6 +254,7 @@ export default function PortalShell({ children }) {
     copy.portal.mobile.mySpace,
     hasActiveSession,
     isAdministrator,
+    isFuncionario,
     isLoadingAuth,
   ]);
   const topbarLinks = useMemo(
@@ -405,14 +409,14 @@ export default function PortalShell({ children }) {
                         {copy.nav.myCases}
                       </Link>
                       {isAdministrator ? (
-                        <>
-                          <Link href="/admin/dashboard" className="portal-user-menu__link">
-                            Catálogo de procedimientos
-                          </Link>
-                          <Link href="/admin/bandeja-expedientes" className="portal-user-menu__link">
-                            Bandeja de expedientes
-                          </Link>
-                        </>
+                        <Link href="/admin/dashboard" className="portal-user-menu__link">
+                          Panel administrativo
+                        </Link>
+                      ) : null}
+                      {isFuncionario ? (
+                        <Link href="/funcionario/dashboard" className="portal-user-menu__link">
+                          Bandeja de expedientes
+                        </Link>
                       ) : null}
                       <button
                         type="button"
