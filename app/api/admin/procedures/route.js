@@ -5,6 +5,8 @@ import {
   ensureProcedureCatalogSchema,
   getProcedureCatalogEntryByCode,
   listProcedureCatalog,
+  replaceProcedureTypeCamundaVariableMappings,
+  replaceProcedureTypeFields,
 } from "../../../../lib/procedureCatalog";
 import { ensureDatabase, hasDatabase } from "../../../../lib/db";
 import {
@@ -194,6 +196,53 @@ function normalizeRequiredFields(value) {
   return output.sort((a, b) => a.order - b.order);
 }
 
+function normalizeCamundaVariableMappings(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set();
+  const mappings = [];
+  value.forEach((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return;
+    }
+    const scope = normalizeLookup(entry.scope || "start_instance").toUpperCase();
+    const normalizedScope = scope === "COMPLETE_TASK" ? "COMPLETE_TASK" : "START_INSTANCE";
+    const taskDefinitionKey =
+      normalizedScope === "COMPLETE_TASK"
+        ? normalizeText(entry.camundaTaskDefinitionKey, 160) || null
+        : null;
+    const procedureFieldKey = normalizeCode(entry.procedureFieldKey).slice(0, 60);
+    const camundaVariableName = normalizeText(entry.camundaVariableName, 160);
+    if (!procedureFieldKey || !camundaVariableName) {
+      return;
+    }
+    const camundaVariableType = normalizeLookup(entry.camundaVariableType || "string");
+    const uniqueKey = [
+      normalizedScope,
+      taskDefinitionKey || "",
+      procedureFieldKey,
+      camundaVariableName.toLowerCase(),
+    ].join("|");
+    if (seen.has(uniqueKey)) {
+      return;
+    }
+    seen.add(uniqueKey);
+    mappings.push({
+      scope: normalizedScope,
+      camundaTaskDefinitionKey: taskDefinitionKey,
+      procedureFieldKey,
+      camundaVariableName,
+      camundaVariableType: ["string", "number", "boolean", "json", "date"].includes(camundaVariableType)
+        ? camundaVariableType
+        : "string",
+      required: entry.required !== false,
+      enabled: entry.enabled !== false,
+    });
+  });
+  return mappings;
+}
+
 function normalizeFlowDefinition(value) {
   if (!value || typeof value !== "object") {
     return {};
@@ -242,8 +291,10 @@ function normalizeProcedurePayload(rawPayload, messages) {
       keywords: normalizeStringArray(payload.keywords || [], 120),
       isActive: payload.isActive !== false,
       camundaProcessId,
+      camundaVersion: normalizeText(payload.camundaVersion, 80),
       enabledChannels,
       requiredFields,
+      camundaVariableMappings: normalizeCamundaVariableMappings(payload.camundaVariableMappings),
       flowDefinition: normalizeFlowDefinition(payload.flowDefinition),
     },
   };
@@ -322,6 +373,7 @@ export async function POST(request) {
         keywords_json,
         is_active,
         camunda_process_id,
+        version,
         enabled_channels_json,
         required_fields_json,
         flow_definition_json,
@@ -338,13 +390,22 @@ export async function POST(request) {
         ${JSON.stringify(normalized.value.keywords)}::jsonb,
         ${normalized.value.isActive},
         ${normalized.value.camundaProcessId},
+        ${normalized.value.camundaVersion || null},
         ${JSON.stringify(normalized.value.enabledChannels)}::jsonb,
         ${JSON.stringify(normalized.value.requiredFields)}::jsonb,
         ${JSON.stringify(normalized.value.flowDefinition)}::jsonb,
         NOW()
       )
-      RETURNING code;
+      RETURNING id, code;
     `;
+
+    if (created?.id) {
+      await replaceProcedureTypeFields(created.id, normalized.value.requiredFields);
+      await replaceProcedureTypeCamundaVariableMappings(
+        created.id,
+        normalized.value.camundaVariableMappings
+      );
+    }
 
     const procedure = await getProcedureCatalogEntryByCode(created?.code || normalized.value.code, {
       includeInactive: true,
@@ -465,17 +526,24 @@ export async function PATCH(request) {
         keywords_json = ${JSON.stringify(normalized.value.keywords)}::jsonb,
         is_active = ${normalized.value.isActive},
         camunda_process_id = ${normalized.value.camundaProcessId},
+        version = ${normalized.value.camundaVersion || null},
         enabled_channels_json = ${JSON.stringify(normalized.value.enabledChannels)}::jsonb,
         required_fields_json = ${JSON.stringify(normalized.value.requiredFields)}::jsonb,
         flow_definition_json = ${JSON.stringify(normalized.value.flowDefinition)}::jsonb,
         updated_at = NOW()
       WHERE code = ${originalCode}
         AND case_type = 'procedure'
-      RETURNING code;
+      RETURNING id, code;
     `;
     if (!updated) {
       return NextResponse.json({ error: messages.notFound }, { status: 404 });
     }
+
+    await replaceProcedureTypeFields(updated.id, normalized.value.requiredFields);
+    await replaceProcedureTypeCamundaVariableMappings(
+      updated.id,
+      normalized.value.camundaVariableMappings
+    );
 
     const procedure = await getProcedureCatalogEntryByCode(updated.code, {
       includeInactive: true,

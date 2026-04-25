@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => {
     ensureProcedureCatalogSchema: vi.fn(),
     listProcedureCatalog: vi.fn(),
     getProcedureCatalogEntryByCode: vi.fn(),
+    replaceProcedureTypeFields: vi.fn(),
+    replaceProcedureTypeCamundaVariableMappings: vi.fn(),
   };
 });
 
@@ -23,6 +25,8 @@ vi.mock("../../../../lib/procedureCatalog", () => ({
   ensureProcedureCatalogSchema: mocks.ensureProcedureCatalogSchema,
   getProcedureCatalogEntryByCode: mocks.getProcedureCatalogEntryByCode,
   listProcedureCatalog: mocks.listProcedureCatalog,
+  replaceProcedureTypeFields: mocks.replaceProcedureTypeFields,
+  replaceProcedureTypeCamundaVariableMappings: mocks.replaceProcedureTypeCamundaVariableMappings,
 }));
 
 vi.mock("../../../../lib/db", () => ({
@@ -62,10 +66,14 @@ describe("api/admin/procedures", () => {
     mocks.ensureProcedureCatalogSchema.mockReset();
     mocks.listProcedureCatalog.mockReset();
     mocks.getProcedureCatalogEntryByCode.mockReset();
+    mocks.replaceProcedureTypeFields.mockReset();
+    mocks.replaceProcedureTypeCamundaVariableMappings.mockReset();
 
     mocks.requireAdministrator.mockResolvedValue({ id: "admin-1", role: "administrador" });
     mocks.hasDatabase.mockReturnValue(true);
     mocks.ensureProcedureCatalogSchema.mockResolvedValue(true);
+    mocks.replaceProcedureTypeFields.mockResolvedValue([]);
+    mocks.replaceProcedureTypeCamundaVariableMappings.mockResolvedValue([]);
   });
 
   it("GET devuelve registrar_incidencia desde el catálogo", async () => {
@@ -96,7 +104,7 @@ describe("api/admin/procedures", () => {
     mocks.getProcedureCatalogEntryByCode
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce(updated);
-    mocks.sqlQueue.push([], [{ code: "registrar_incidencia_v2" }]);
+    mocks.sqlQueue.push([], [{ id: "proc-1", code: "registrar_incidencia_v2" }]);
 
     const request = new Request("http://localhost/api/admin/procedures?locale=es", {
       method: "PATCH",

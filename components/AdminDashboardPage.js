@@ -20,6 +20,9 @@ const DEFAULT_REQUIRED_FIELDS = [
 
 const FIELD_TYPE_OPTIONS = [
   { value: "text", label: "Texto" },
+  { value: "textarea", label: "Texto largo" },
+  { value: "boolean", label: "Booleano" },
+  { value: "date", label: "Fecha" },
   { value: "image", label: "Imagen" },
   { value: "location", label: "Ubicación" },
   { value: "email", label: "Email" },
@@ -70,6 +73,9 @@ function getFieldTypeLabel(type, locale) {
   const normalizedType = normalizeSimpleText(type, 20).toLowerCase();
   const labels = {
     text: { es: "Texto", en: "Text", pt: "Texto" },
+    textarea: { es: "Texto largo", en: "Long text", pt: "Texto longo" },
+    boolean: { es: "Booleano", en: "Boolean", pt: "Booleano" },
+    date: { es: "Fecha", en: "Date", pt: "Data" },
     image: { es: "Imagen", en: "Image", pt: "Imagem" },
     location: { es: "Ubicación", en: "Location", pt: "Localização" },
     email: { es: "Email", en: "Email", pt: "Email" },
@@ -146,6 +152,9 @@ function createProcedureFormState(procedure = null) {
   const channels = Array.isArray(procedure?.enabledChannels)
     ? procedure.enabledChannels.map((channel) => normalizeSimpleText(channel, 20).toLowerCase())
     : ["web", "whatsapp"];
+  const mappings = Array.isArray(procedure?.camundaVariableMappings)
+    ? procedure.camundaVariableMappings
+    : [];
   return {
     originalCode: normalizeCode(procedure?.code || ""),
     code: normalizeCode(procedure?.code || ""),
@@ -154,7 +163,9 @@ function createProcedureFormState(procedure = null) {
     description: normalizeSimpleText(procedure?.description || "", 320),
     isActive: procedure?.isActive !== false,
     camundaProcessId: normalizeSimpleText(procedure?.camundaProcessId || "", 160),
+    camundaVersion: normalizeSimpleText(procedure?.camundaVersion || procedure?.version || "", 80),
     requiredFields: normalizedFields,
+    camundaVariableMappingsJson: JSON.stringify(mappings, null, 2),
     enabledChannels: Array.from(new Set(channels.filter(Boolean))),
   };
 }
@@ -462,6 +473,7 @@ export default function AdminDashboardPage() {
     const name = normalizeSimpleText(formState.name, 160);
     const type = normalizeSimpleText(formState.type, 80);
     const camundaProcessId = normalizeSimpleText(formState.camundaProcessId, 160);
+    const camundaVersion = normalizeSimpleText(formState.camundaVersion, 80);
     const requiredFields = formState.requiredFields
       .map((field, index) => ({
         key: normalizeCode(field.key || field.label || `field_${index + 1}`),
@@ -474,6 +486,22 @@ export default function AdminDashboardPage() {
     const enabledChannels = Array.from(
       new Set(formState.enabledChannels.map((channel) => normalizeSimpleText(channel, 20).toLowerCase()))
     ).filter(Boolean);
+    let camundaVariableMappings = [];
+    if (normalizeSimpleText(formState.camundaVariableMappingsJson, 12000)) {
+      try {
+        const parsed = JSON.parse(formState.camundaVariableMappingsJson);
+        if (!Array.isArray(parsed)) {
+          return {
+            ok: false,
+            error:
+              "El mapeo de variables Camunda debe ser un arreglo JSON. Ejemplo: [{\"scope\":\"START_INSTANCE\",\"procedureFieldKey\":\"description\",\"camundaVariableName\":\"descripcion\"}]",
+          };
+        }
+        camundaVariableMappings = parsed;
+      } catch (_error) {
+        return { ok: false, error: "El JSON de mapeo de variables Camunda no es válido." };
+      }
+    }
 
     if (!name) {
       return { ok: false, error: procedureCopy.validation.nameRequired };
@@ -513,8 +541,10 @@ export default function AdminDashboardPage() {
         keywords: [],
         isActive: Boolean(formState.isActive),
         camundaProcessId,
+        camundaVersion,
         enabledChannels,
         requiredFields,
+        camundaVariableMappings,
         flowDefinition: {},
       },
     };
@@ -879,7 +909,34 @@ export default function AdminDashboardPage() {
                       disabled={isSavingProcedure}
                     />
                   </div>
+                  <div>
+                    <label htmlFor="new-procedure-camunda-version">Versión Camunda (opcional)</label>
+                    <input
+                      id="new-procedure-camunda-version"
+                      type="text"
+                      value={formState.camundaVersion}
+                      onChange={(event) => updateFormField("camundaVersion", event.target.value)}
+                      disabled={isSavingProcedure}
+                    />
+                  </div>
                 </div>
+
+                <section className="admin-procedure-fields">
+                  <h4>Mapeo de variables Camunda</h4>
+                  <p className="small">
+                    Configura un arreglo JSON con mapeos por scope. Usa `START_INSTANCE` o `COMPLETE_TASK` y, para tareas, `camundaTaskDefinitionKey`.
+                  </p>
+                  <label htmlFor="new-procedure-camunda-mappings" className="small">
+                    JSON de mapeo
+                  </label>
+                  <textarea
+                    id="new-procedure-camunda-mappings"
+                    value={formState.camundaVariableMappingsJson}
+                    onChange={(event) => updateFormField("camundaVariableMappingsJson", event.target.value)}
+                    rows={8}
+                    disabled={isSavingProcedure}
+                  />
+                </section>
 
                 <div className="admin-procedure-form__actions">
                   <button type="button" className="button-inline" onClick={closeExpandedForm} disabled={isSavingProcedure}>
@@ -1046,7 +1103,44 @@ export default function AdminDashboardPage() {
                                         disabled={isSavingProcedure}
                                       />
                                     </div>
+                                    <div>
+                                      <label htmlFor={`camunda-version-${procedure.code}`}>
+                                        Versión Camunda (opcional)
+                                      </label>
+                                      <input
+                                        id={`camunda-version-${procedure.code}`}
+                                        type="text"
+                                        value={formState.camundaVersion}
+                                        onChange={(event) =>
+                                          updateFormField("camundaVersion", event.target.value)
+                                        }
+                                        disabled={isSavingProcedure}
+                                      />
+                                    </div>
                                   </div>
+
+                                  <section className="admin-procedure-fields">
+                                    <h4>Mapeo de variables Camunda</h4>
+                                    <p className="small">
+                                      Define variables por scope (`START_INSTANCE`, `COMPLETE_TASK`) y
+                                      `camundaTaskDefinitionKey` cuando corresponda.
+                                    </p>
+                                    <label
+                                      htmlFor={`camunda-mappings-${procedure.code}`}
+                                      className="small"
+                                    >
+                                      JSON de mapeo
+                                    </label>
+                                    <textarea
+                                      id={`camunda-mappings-${procedure.code}`}
+                                      value={formState.camundaVariableMappingsJson}
+                                      onChange={(event) =>
+                                        updateFormField("camundaVariableMappingsJson", event.target.value)
+                                      }
+                                      rows={8}
+                                      disabled={isSavingProcedure}
+                                    />
+                                  </section>
 
                                   <section className="admin-procedure-fields">
                                     <h4>Campos solicitados</h4>
