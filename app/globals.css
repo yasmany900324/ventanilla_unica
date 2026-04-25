@@ -2239,14 +2239,92 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.admin-assignments__agent-row--selected {
+.admin-assignments-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(420px, 1.35fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.admin-assignments-card {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-assignments-card--agents {
+  position: sticky;
+  top: 0.9rem;
+}
+
+.admin-assignments-agent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.52rem;
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.admin-assignments-agent-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d8e2f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 0.6rem 0.72rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.admin-assignments-agent-item:hover:not(:disabled) {
+  border-color: #b5cbe9;
+  background: #f9fbff;
+}
+
+.admin-assignments-agent-item--selected {
+  border-color: #3b82f6;
   background: #f5f9ff;
+  box-shadow: 0 0 0 1px #bfdbfe;
+}
+
+.admin-assignments-agent-item__name {
+  margin: 0;
+  font-weight: 700;
+  color: #11315f;
+}
+
+.admin-assignments-agent-item__email {
+  margin: 0.12rem 0 0;
+  font-size: 0.82rem;
+  color: #4b5f7d;
+}
+
+.admin-assignments-agent-item__meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
 }
 
 .admin-assignments__procedure-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
   gap: 0.55rem;
+  max-height: 58vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.admin-assignments__actions {
+  justify-content: flex-end;
+}
+
+.admin-assignments__save-button {
+  width: auto !important;
+  min-width: 210px;
 }
 
 .admin-procedure-channel--disabled {
@@ -2306,6 +2384,28 @@ button:disabled {
 
   .admin-inbox-filters {
     grid-template-columns: 1fr;
+  }
+
+  .admin-assignments-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-assignments-card--agents {
+    position: static;
+  }
+
+  .admin-assignments-agent-list,
+  .admin-assignments__procedure-list {
+    max-height: none;
+  }
+
+  .admin-assignments__actions {
+    justify-content: stretch;
+  }
+
+  .admin-assignments__save-button {
+    width: 100% !important;
+    min-width: 0;
   }
 }
 

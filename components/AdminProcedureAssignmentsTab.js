@@ -25,17 +25,6 @@ function normalizeIdArray(value) {
   return Array.from(new Set(value.map((item) => normalizeText(item, 80)).filter(Boolean)));
 }
 
-function formatAssignedProcedureNames(ids, proceduresById) {
-  if (!ids?.length) {
-    return "Sin asignaciones";
-  }
-  const labels = ids
-    .map((id) => proceduresById[id])
-    .filter(Boolean)
-    .map((procedure) => `${procedure.name} (${procedure.code})`);
-  return labels.length ? labels.join(", ") : "Sin asignaciones";
-}
-
 export default function AdminProcedureAssignmentsTab({ copy }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -238,27 +227,6 @@ export default function AdminProcedureAssignmentsTab({ copy }) {
         </section>
       ) : null}
 
-      <section className="card dashboard-section admin-procedure-toolbar">
-        <div className="admin-procedure-toolbar__content admin-procedure-toolbar__content--full">
-          <input
-            type="search"
-            aria-label={copy.searchAgentsPlaceholder}
-            placeholder={copy.searchAgentsPlaceholder}
-            value={agentSearch}
-            onChange={(event) => setAgentSearch(event.target.value)}
-            disabled={isLoading}
-          />
-          <input
-            type="search"
-            aria-label={copy.searchProceduresPlaceholder}
-            placeholder={copy.searchProceduresPlaceholder}
-            value={procedureSearch}
-            onChange={(event) => setProcedureSearch(event.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-      </section>
-
       {isLoading ? (
         <section className="card">
           <p className="info-message">{copy.loading}</p>
@@ -278,64 +246,84 @@ export default function AdminProcedureAssignmentsTab({ copy }) {
       ) : null}
 
       {!isLoading && agents.length > 0 ? (
-        <>
-          <section className="card dashboard-section">
+        <section className="admin-assignments-layout">
+          <article className="card dashboard-section admin-assignments-card admin-assignments-card--agents">
             <div className="admin-procedure-table__header">
               <h3>{copy.agentsTableTitle}</h3>
               <p className="small">
                 {copy.agentsFoundLabel}: {filteredAgents.length}
               </p>
             </div>
-            <div className="admin-procedure-table__container">
-              <table className="admin-procedure-table">
-                <thead>
-                  <tr>
-                    <th>{copy.columns.name}</th>
-                    <th>{copy.columns.email}</th>
-                    <th>{copy.columns.assignedProcedures}</th>
-                    <th>{copy.columns.actions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAgents.map((agent) => {
-                    const assignedIds = normalizeIdArray(assignmentsByUserId[agent.id] || []);
-                    const isSelected = selectedAgentId === agent.id;
-                    return (
-                      <tr key={agent.id} className={isSelected ? "admin-assignments__agent-row--selected" : ""}>
-                        <td>{agent.fullName || "—"}</td>
-                        <td>{agent.email || "—"}</td>
-                        <td>{formatAssignedProcedureNames(assignedIds, proceduresById)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className={`button-inline ${isSelected ? "button-inline--selected" : ""}`}
-                            onClick={() => handleSelectAgent(agent.id)}
-                          >
-                            {copy.editAssignments}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+            <input
+              type="search"
+              aria-label={copy.searchAgentsPlaceholder}
+              placeholder={copy.searchAgentsPlaceholder}
+              value={agentSearch}
+              onChange={(event) => setAgentSearch(event.target.value)}
+              disabled={isLoading}
+            />
+
+            <ul className="admin-assignments-agent-list" aria-label={copy.agentsTableTitle}>
+              {filteredAgents.map((agent) => {
+                const assignedCount = normalizeIdArray(assignmentsByUserId[agent.id] || []).length;
+                const isSelected = selectedAgentId === agent.id;
+                return (
+                  <li key={agent.id}>
+                    <button
+                      type="button"
+                      className={`admin-assignments-agent-item ${
+                        isSelected ? "admin-assignments-agent-item--selected" : ""
+                      }`}
+                      onClick={() => handleSelectAgent(agent.id)}
+                    >
+                      <div>
+                        <p className="admin-assignments-agent-item__name">{agent.fullName || "—"}</p>
+                        <p className="admin-assignments-agent-item__email">{agent.email || "—"}</p>
+                      </div>
+                      <div className="admin-assignments-agent-item__meta">
+                        <span className="badge badge--recibido">
+                          {assignedCount} {assignedCount === 1 ? "asignado" : "asignados"}
+                        </span>
+                        {isSelected ? <span className="selected-indicator">Seleccionado</span> : null}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </article>
+
+          <article className="card dashboard-section admin-assignments-card">
+            <div className="admin-procedure-table__header">
+              <h3>{copy.detailTitle}</h3>
+              {selectedAgent ? (
+                <>
+                  <p className="small">
+                    {copy.selectedAgentLabel}: <strong>{selectedAgent.fullName || "—"}</strong>
+                  </p>
+                  <p className="small">{selectedAgent.email || "—"}</p>
+                  <p className="small">
+                    {copy.assignedCountLabel}: {selectedProcedureTypeIds.length}
+                  </p>
+                </>
+              ) : (
+                <p className="small">Selecciona un funcionario para editar sus asignaciones.</p>
+              )}
             </div>
-          </section>
 
-          {selectedAgent ? (
-            <section className="card dashboard-section">
-              <div className="admin-procedure-table__header">
-                <h3>{copy.detailTitle}</h3>
-                <p className="small">
-                  {copy.selectedAgentLabel}: {selectedAgent.fullName || "—"} ({selectedAgent.email || "—"})
-                </p>
-                <p className="small">
-                  {copy.assignedCountLabel}: {selectedProcedureTypeIds.length}
-                </p>
-              </div>
+            <input
+              type="search"
+              aria-label={copy.searchProceduresPlaceholder}
+              placeholder={copy.searchProceduresPlaceholder}
+              value={procedureSearch}
+              onChange={(event) => setProcedureSearch(event.target.value)}
+              disabled={isLoading || !selectedAgent}
+            />
 
-              <div className="admin-assignments__procedure-list">
-                {filteredProcedures.map((procedure) => {
+            <div className="admin-assignments__procedure-list">
+              {selectedAgent ? (
+                filteredProcedures.map((procedure) => {
                   const isChecked = selectedProcedureTypeIds.includes(procedure.id);
                   const isDisabled = procedure.isActive === false;
                   return (
@@ -350,32 +338,35 @@ export default function AdminProcedureAssignmentsTab({ copy }) {
                         disabled={isDisabled || isSaving}
                       />
                       <span>
-                        <strong>{procedure.name}</strong> ({procedure.code})
+                        <strong>{procedure.name}</strong> ({procedure.code || "SIN_CODIGO"})
                         {" · "}
                         {procedure.isActive ? copy.active : copy.inactive}
                         {procedure.category ? ` · ${procedure.category}` : ""}
                       </span>
                     </label>
                   );
-                })}
-              </div>
+                })
+              ) : (
+                <p className="empty-message">Selecciona un funcionario para ver sus procedimientos.</p>
+              )}
+            </div>
 
-              {!filteredProcedures.length ? (
-                <p className="empty-message">{copy.noProcedureResults}</p>
-              ) : null}
+            {selectedAgent && !filteredProcedures.length ? (
+              <p className="empty-message">{copy.noProcedureResults}</p>
+            ) : null}
 
-              <div className="admin-procedure-form__actions">
-                <button
-                  type="button"
-                  onClick={openConfirmDialog}
-                  disabled={isSaving || activeProceduresCount === 0}
-                >
-                  {isSaving ? copy.saving : copy.saveButton}
-                </button>
-              </div>
-            </section>
-          ) : null}
-        </>
+            <div className="admin-procedure-form__actions admin-assignments__actions">
+              <button
+                type="button"
+                className="admin-assignments__save-button"
+                onClick={openConfirmDialog}
+                disabled={isSaving || activeProceduresCount === 0 || !selectedAgent}
+              >
+                {isSaving ? copy.saving : copy.saveButton}
+              </button>
+            </div>
+          </article>
+        </section>
       ) : null}
 
       <ConfirmProcedureAssignmentsModal
