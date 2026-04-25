@@ -82,6 +82,9 @@ function buildPendingLabel(item) {
   if (!item) {
     return "-";
   }
+  if (item.assignmentScope === "available") {
+    return "Tomar expediente";
+  }
   if (item.hasCamundaError || item.camundaStatus === "ERROR_SYNC") {
     return "Error de sincronización";
   }
@@ -99,7 +102,7 @@ function buildActionTitle(action) {
     return action.displayLabel;
   }
   if (action?.actionKey === "claim_task") {
-    return "Reclamar tarea";
+    return "Tomar expediente";
   }
   if (action?.actionKey === "complete_task") {
     return "Completar tarea";
@@ -115,7 +118,7 @@ function buildActionDescription(action) {
     return action.description.trim();
   }
   if (action?.actionKey === "claim_task") {
-    return "Toma la tarea activa para gestionarla desde esta bandeja.";
+    return "Asigna este expediente a tu bandeja para habilitar la gestión y acciones de Camunda.";
   }
   if (action?.actionKey === "retry_camunda_sync") {
     return "Reenvía el expediente a Camunda cuando hubo error de sincronización.";
@@ -130,6 +133,9 @@ function isPendingItem(item) {
   if (!item) {
     return false;
   }
+  if (item.assignmentScope === "available") {
+    return true;
+  }
   return Boolean(
     item.hasCamundaError ||
       item.camundaStatus === "ERROR_SYNC" ||
@@ -141,6 +147,16 @@ function isPendingItem(item) {
 function isTerminalStatus(status) {
   const key = String(status || "").trim().toUpperCase();
   return TERMINAL_PROCEDURE_STATUSES.has(key);
+}
+
+function getAssignmentScopeLabel(item) {
+  if (item?.assignmentScope === "assigned_to_me") {
+    return "Asignado a mí";
+  }
+  if (item?.assignmentScope === "available") {
+    return "Disponible";
+  }
+  return "Sin relación";
 }
 
 function resolveAttachmentValue(collectedData) {
@@ -252,31 +268,39 @@ export default function FuncionarioBandejaExpedientesPage() {
     }
   }, [router]);
 
-  const loadDetail = useCallback(async (requestId) => {
-    if (!requestId) {
-      setDetail(null);
-      return;
-    }
-    setDetailLoading(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`, {
-        cache: "no-store",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "No se pudo cargar el detalle del expediente.");
+  const loadDetail = useCallback(
+    async (requestId) => {
+      if (!requestId) {
+        setDetail(null);
+        return;
       }
-      setDetail(data);
-      setCompleteVariablesJson("{}");
-      setInternalObservation("");
-      setNextStatus("");
-    } catch (requestError) {
-      setError(requestError.message || "No se pudo cargar el detalle del expediente.");
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+      setDetailLoading(true);
+      setError("");
+      try {
+        const response = await fetch(`/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`, {
+          cache: "no-store",
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          if (response.status === 403 || response.status === 409) {
+            await loadList();
+            setDetail(null);
+            setSelectedId("");
+          }
+          throw new Error(data?.error || "No se pudo cargar el detalle del expediente.");
+        }
+        setDetail(data);
+        setCompleteVariablesJson("{}");
+        setInternalObservation("");
+        setNextStatus("");
+      } catch (requestError) {
+        setError(requestError.message || "No se pudo cargar el detalle del expediente.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [loadList]
+  );
 
   useEffect(() => {
     if (isLoadingAuth || !user || !isFuncionario) {
@@ -315,6 +339,12 @@ export default function FuncionarioBandejaExpedientesPage() {
       const matchesCamundaStatus = camundaStatusFilter === "all" || item.camundaStatus === camundaStatusFilter;
       if (!matchesChannel || !matchesLocalStatus || !matchesCamundaStatus) {
         return false;
+      }
+      if (workFilter === "assigned_to_me") {
+        return item.assignmentScope === "assigned_to_me";
+      }
+      if (workFilter === "available") {
+        return item.assignmentScope === "available";
       }
       if (workFilter === "pending") {
         return isPendingItem(item);
@@ -370,14 +400,26 @@ export default function FuncionarioBandejaExpedientesPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "No se pudo ejecutar la acción.");
+        const actionError = new Error(data?.error || "No se pudo ejecutar la acción.");
+        actionError.status = response.status;
+        throw actionError;
       }
-      setSuccessMessage("Acción ejecutada correctamente.");
+      if (action.actionKey === "claim_task") {
+        setSuccessMessage("Expediente tomado correctamente.");
+      } else {
+        setSuccessMessage("Acción ejecutada correctamente.");
+      }
       await loadList();
       if (selectedId) {
         await loadDetail(selectedId);
       }
     } catch (requestError) {
+      if (action.actionKey === "claim_task" && (requestError.status === 403 || requestError.status === 409)) {
+        await loadList();
+        if (selectedId) {
+          await loadDetail(selectedId);
+        }
+      }
       setError(requestError.message || "No se pudo ejecutar la acción.");
     } finally {
       setActionLoadingKey("");
@@ -431,6 +473,20 @@ export default function FuncionarioBandejaExpedientesPage() {
           </button>
           <button
             type="button"
+            className={`button-inline ${workFilter === "assigned_to_me" ? "button-inline--selected" : ""}`}
+            onClick={() => setWorkFilter("assigned_to_me")}
+          >
+            Asignados a mí
+          </button>
+          <button
+            type="button"
+            className={`button-inline ${workFilter === "available" ? "button-inline--selected" : ""}`}
+            onClick={() => setWorkFilter("available")}
+          >
+            Disponibles
+          </button>
+          <button
+            type="button"
             className={`button-inline ${workFilter === "pending" ? "button-inline--selected" : ""}`}
             onClick={() => setWorkFilter("pending")}
           >
@@ -451,7 +507,7 @@ export default function FuncionarioBandejaExpedientesPage() {
             Finalizados
           </button>
         </div>
-        <p className="small">Mostrando expedientes asignados a tu usuario.</p>
+        <p className="small">Mostrando expedientes asignados a ti y expedientes disponibles para tomar.</p>
       </section>
 
       {successMessage ? (
@@ -530,6 +586,7 @@ export default function FuncionarioBandejaExpedientesPage() {
                 <tr>
                   <th>ID / número de expediente</th>
                   <th>Tipo de procedimiento</th>
+                  <th>Relación</th>
                   <th>Canal</th>
                   <th>Estado local</th>
                   <th>Estado Camunda</th>
@@ -551,6 +608,15 @@ export default function FuncionarioBandejaExpedientesPage() {
                     >
                       <td className="admin-procedure-table__mono">{item.requestCode || item.id}</td>
                       <td>{item.procedureName || item.procedureCode || "-"}</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            item.assignmentScope === "assigned_to_me" ? "badge--en-revision" : "badge--recibido"
+                          }`}
+                        >
+                          {getAssignmentScopeLabel(item)}
+                        </span>
+                      </td>
                       <td>{item.channel || "-"}</td>
                       <td>
                         <span className="badge badge--en-revision">{getLocalStatusLabel(item.status)}</span>
@@ -612,6 +678,9 @@ export default function FuncionarioBandejaExpedientesPage() {
               <p className="small">
                 <strong>Responsable actual:</strong> {procedureRequest.assignedToUserId || "Sin asignar"}
               </p>
+              <p className="small">
+                <strong>Relación en bandeja:</strong> {getAssignmentScopeLabel(procedureRequest)}
+              </p>
             </section>
 
             <section className="admin-procedure-fields">
@@ -665,9 +734,16 @@ export default function FuncionarioBandejaExpedientesPage() {
 
             <section className="admin-procedure-fields">
               <h4>Acciones del funcionario</h4>
-              <p className="small">
-                Las acciones visibles se calculan por tarea activa y configuración del procedimiento.
-              </p>
+              {procedureRequest.assignmentScope === "available" ? (
+                <p className="small">
+                  Este expediente está disponible para ser tomado. Debes tomarlo antes de completar tareas o ejecutar
+                  acciones de gestión.
+                </p>
+              ) : (
+                <p className="small">
+                  Las acciones visibles se calculan por tarea activa y configuración del procedimiento.
+                </p>
+              )}
               {availableActions.length ? (
                 availableActions.map((action) => {
                   const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;

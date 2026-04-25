@@ -4,12 +4,12 @@ import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActi
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
 import {
   buildAvailableActions,
-  canAccessProcedureRequestStrict,
   resolveTaskDisplayConfig,
 } from "../../../../../../lib/procedureRequestInboxDetail";
 import {
   getProcedureRequestById,
   listProcedureRequestEvents,
+  resolveFuncionarioAssignmentScopeForProcedureRequest,
 } from "../../../../../../lib/procedureRequests";
 
 export async function GET(request, { params }) {
@@ -22,7 +22,11 @@ export async function GET(request, { params }) {
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }
-    if (!canAccessProcedureRequestStrict(funcionario.id, procedureRequest)) {
+    const assignmentScope = await resolveFuncionarioAssignmentScopeForProcedureRequest({
+      funcionarioUserId: funcionario.id,
+      procedureRequestId: procedureRequest.id,
+    });
+    if (!assignmentScope) {
       return NextResponse.json(
         { error: "No tienes permisos para ver este expediente." },
         { status: 403 }
@@ -39,18 +43,27 @@ export async function GET(request, { params }) {
       procedureRequest: {
         ...procedureRequest,
         assignedToUserId: procedureRequest.assignedToUserId || null,
+        assignmentScope,
+        isAssignedToMe: assignmentScope === "assigned_to_me",
+        isAvailableToClaim: assignmentScope === "available",
       },
       activeTask,
       activeTaskDisplay: resolveTaskDisplayConfig({ activeTask, procedureType }),
       history: events,
       procedureType,
       availableActions: buildAvailableActions({
-        procedureRequest,
+        procedureRequest: {
+          ...procedureRequest,
+          assignmentScope,
+          isAssignedToMe: assignmentScope === "assigned_to_me",
+          isAvailableToClaim: assignmentScope === "available",
+        },
         activeTask,
         procedureType,
         actorId: funcionario.id,
         requestsApiSegment: "funcionario",
         includeClaimTask: false,
+        assignmentScope,
       }),
     });
   } catch (_error) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireFuncionario } from "../../../../../lib/auth";
 import { enrichProcedureRequestsForInbox } from "../../../../../lib/procedureRequestInboxListHelpers";
 import {
-  listProcedureRequestsForAssignee,
+  listProcedureRequestsForFuncionarioInbox,
   releaseExpiredProcedureTaskClaims,
 } from "../../../../../lib/procedureRequests";
 
@@ -15,8 +15,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const limit = Number.parseInt(searchParams.get("limit") || "100", 10);
     await releaseExpiredProcedureTaskClaims();
-    const procedures = await listProcedureRequestsForAssignee({
-      assigneeUserId: funcionario.id,
+    const procedures = await listProcedureRequestsForFuncionarioInbox({
+      funcionarioUserId: funcionario.id,
       limit,
     });
     const enriched = await enrichProcedureRequestsForInbox(procedures);
