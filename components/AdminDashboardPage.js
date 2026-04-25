@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import ConfirmUpdateRolesModal from "./ConfirmUpdateRolesModal";
+import AdminProcedureAssignmentsTab from "./AdminProcedureAssignmentsTab";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
@@ -12,6 +13,7 @@ const ADMIN_TABS = {
   CHATBOT: "chatbot",
   PROCEDURES: "procedures",
   USERS_ROLES: "users_roles",
+  PROCEDURE_ASSIGNMENTS: "procedure_assignments",
 };
 
 const ADMIN_ROLE_OPTIONS = [
@@ -982,6 +984,17 @@ export default function AdminDashboardPage() {
           >
             {copy.admin.tabs.usersRoles || "Usuarios y roles"}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === ADMIN_TABS.PROCEDURE_ASSIGNMENTS}
+            className={`admin-tabs__tab ${
+              activeTab === ADMIN_TABS.PROCEDURE_ASSIGNMENTS ? "admin-tabs__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab(ADMIN_TABS.PROCEDURE_ASSIGNMENTS)}
+          >
+            {copy.admin.tabs.procedureAssignments || "Asignación de procedimientos"}
+          </button>
         </div>
       </section>
 
@@ -1617,6 +1630,58 @@ export default function AdminDashboardPage() {
           ) : null}
 
         </>
+      ) : activeTab === ADMIN_TABS.PROCEDURE_ASSIGNMENTS ? (
+        <AdminProcedureAssignmentsTab
+          copy={{
+            title: copy.admin.procedureAssignments?.title || "Asignación de procedimientos",
+            description:
+              copy.admin.procedureAssignments?.description ||
+              "Define qué tipos de procedimientos puede atender cada funcionario.",
+            searchAgentsPlaceholder:
+              copy.admin.procedureAssignments?.searchAgentsPlaceholder ||
+              "Buscar funcionarios por nombre o email",
+            searchProceduresPlaceholder:
+              copy.admin.procedureAssignments?.searchProceduresPlaceholder ||
+              "Buscar procedimientos por nombre, código o categoría",
+            loading:
+              copy.admin.procedureAssignments?.loading ||
+              "Cargando asignaciones de procedimientos...",
+            emptyAgents:
+              copy.admin.procedureAssignments?.emptyAgents ||
+              "No hay funcionarios registrados. Asigna el rol Funcionario desde el tab Usuarios y roles.",
+            emptyActiveProcedures:
+              copy.admin.procedureAssignments?.emptyActiveProcedures ||
+              "No hay procedimientos activos disponibles para asignar.",
+            agentsTableTitle:
+              copy.admin.procedureAssignments?.agentsTableTitle ||
+              "Funcionarios con rol Funcionario",
+            agentsFoundLabel: copy.admin.procedureAssignments?.agentsFoundLabel || "Total encontrado",
+            columns: {
+              name: copy.admin.procedureAssignments?.columns?.name || "Nombre",
+              email: copy.admin.procedureAssignments?.columns?.email || "Email",
+              assignedProcedures:
+                copy.admin.procedureAssignments?.columns?.assignedProcedures ||
+                "Procedimientos asignados",
+              actions: copy.admin.procedureAssignments?.columns?.actions || "Acciones",
+            },
+            editAssignments:
+              copy.admin.procedureAssignments?.editAssignments || "Editar asignaciones",
+            detailTitle:
+              copy.admin.procedureAssignments?.detailTitle || "Detalle de asignación",
+            selectedAgentLabel:
+              copy.admin.procedureAssignments?.selectedAgentLabel || "Funcionario seleccionado",
+            assignedCountLabel:
+              copy.admin.procedureAssignments?.assignedCountLabel || "Procedimientos asignados",
+            active: copy.admin.procedureAssignments?.active || "Activo",
+            inactive: copy.admin.procedureAssignments?.inactive || "Inactivo",
+            noProcedureResults:
+              copy.admin.procedureAssignments?.noProcedureResults ||
+              "No hay procedimientos para la búsqueda ingresada.",
+            saveButton:
+              copy.admin.procedureAssignments?.saveButton || "Guardar asignaciones",
+            saving: copy.admin.procedureAssignments?.saving || "Guardando...",
+          }}
+        />
       ) : (
         <>
           <section className="card dashboard-section">

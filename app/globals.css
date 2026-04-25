@@ -2239,6 +2239,31 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.admin-assignments__agent-row--selected {
+  background: #f5f9ff;
+}
+
+.admin-assignments__procedure-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.55rem;
+}
+
+.admin-procedure-channel--disabled {
+  opacity: 0.62;
+  background: #f8fafc;
+}
+
+.admin-procedure-channel--disabled strong {
+  color: #4b5563;
+}
+
+.admin-assignment-confirm-dialog__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .admin-inbox-filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
