@@ -1758,6 +1758,19 @@ button:hover:not(:disabled) {
   background: #1e40af;
 }
 
+/* Portal header user menu: global button:hover only changes background, leaving portal text color on dark blue. */
+.portal-user-menu__trigger:hover:not(:disabled),
+.portal-user-menu__trigger:focus-visible:not(:disabled) {
+  background: #ecf2ff;
+  color: #0f2a5c;
+  border-color: #b8c9e8;
+}
+
+.portal-user-menu__trigger:hover:not(:disabled) .portal-user-menu__chevron,
+.portal-user-menu__trigger:focus-visible:not(:disabled) .portal-user-menu__chevron {
+  color: #1d4a8c;
+}
+
 button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
