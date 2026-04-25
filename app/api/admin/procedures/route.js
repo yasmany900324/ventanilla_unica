@@ -304,11 +304,65 @@ function normalizeFlowDefinition(value) {
     }
     citizenInfoTasks[normalizedTaskKey] = { fieldKey, prompt };
   });
+  const taskUiDictionaryRaw = value.taskUiDictionary;
+  const taskUiDictionaryInput = Array.isArray(taskUiDictionaryRaw)
+    ? taskUiDictionaryRaw
+    : taskUiDictionaryRaw && typeof taskUiDictionaryRaw === "object"
+      ? Object.entries(taskUiDictionaryRaw).map(([taskDefinitionKey, config]) => ({
+          taskDefinitionKey,
+          ...(config && typeof config === "object" ? config : {}),
+        }))
+      : [];
+  const taskUiDictionary = [];
+  taskUiDictionaryInput.forEach((rawTaskConfig) => {
+    if (!rawTaskConfig || typeof rawTaskConfig !== "object") {
+      return;
+    }
+    const taskDefinitionKey = normalizeText(rawTaskConfig.taskDefinitionKey, 160);
+    if (!taskDefinitionKey) {
+      return;
+    }
+    const title = normalizeText(rawTaskConfig.title, 180);
+    const description = normalizeText(rawTaskConfig.description, 320);
+    const primaryActionLabel = normalizeText(rawTaskConfig.primaryActionLabel, 120);
+    const requiredVariablesInput = Array.isArray(rawTaskConfig.requiredVariables)
+      ? rawTaskConfig.requiredVariables
+      : [];
+    const requiredVariables = [];
+    requiredVariablesInput.forEach((rawVariable) => {
+      if (!rawVariable || typeof rawVariable !== "object") {
+        return;
+      }
+      const camundaVariableName = normalizeText(rawVariable.camundaVariableName, 160);
+      const procedureFieldKey = normalizeCode(rawVariable.procedureFieldKey).slice(0, 60);
+      if (!camundaVariableName && !procedureFieldKey) {
+        return;
+      }
+      const camundaVariableType = normalizeLookup(rawVariable.camundaVariableType || "string");
+      requiredVariables.push({
+        ...(camundaVariableName ? { camundaVariableName } : {}),
+        ...(procedureFieldKey ? { procedureFieldKey } : {}),
+        label: normalizeText(rawVariable.label, 120),
+        camundaVariableType: ["string", "number", "boolean", "json", "date"].includes(camundaVariableType)
+          ? camundaVariableType
+          : "string",
+        required: rawVariable.required !== false,
+      });
+    });
+    taskUiDictionary.push({
+      taskDefinitionKey,
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      ...(primaryActionLabel ? { primaryActionLabel } : {}),
+      ...(requiredVariables.length ? { requiredVariables } : {}),
+    });
+  });
   return {
     ...(completionMessage ? { completionMessage } : {}),
     ...(completionOutcomeVariable ? { completionOutcomeVariable } : {}),
     ...(completionOutcomeResolvedValue ? { completionOutcomeResolvedValue } : {}),
     ...(Object.keys(citizenInfoTasks).length > 0 ? { citizenInfoTasks } : {}),
+    ...(taskUiDictionary.length > 0 ? { taskUiDictionary } : {}),
   };
 }
 

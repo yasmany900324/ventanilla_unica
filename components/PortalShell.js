@@ -221,10 +221,17 @@ export default function PortalShell({ children }) {
     ];
     if (isAdministrator) {
       authenticatedItems.push({
-        key: "admin",
+        key: "admin-catalog",
         type: "link",
         href: "/admin/dashboard",
-        label: copy.portal.adminDashboard,
+        label: "Catálogo de procedimientos",
+        icon: "cases",
+      });
+      authenticatedItems.push({
+        key: "admin-inbox",
+        type: "link",
+        href: "/admin/bandeja-expedientes",
+        label: "Bandeja de expedientes",
         icon: "cases",
       });
     }
@@ -237,7 +244,6 @@ export default function PortalShell({ children }) {
     });
     return authenticatedItems;
   }, [
-    copy.portal.adminDashboard,
     copy.portal.logout,
     copy.portal.mobile.account,
     copy.portal.mobile.exiting,
@@ -399,9 +405,14 @@ export default function PortalShell({ children }) {
                         {copy.nav.myCases}
                       </Link>
                       {isAdministrator ? (
-                        <Link href="/admin/dashboard" className="portal-user-menu__link">
-                          {copy.portal.adminDashboard}
-                        </Link>
+                        <>
+                          <Link href="/admin/dashboard" className="portal-user-menu__link">
+                            Catálogo de procedimientos
+                          </Link>
+                          <Link href="/admin/bandeja-expedientes" className="portal-user-menu__link">
+                            Bandeja de expedientes
+                          </Link>
+                        </>
                       ) : null}
                       <button
                         type="button"
