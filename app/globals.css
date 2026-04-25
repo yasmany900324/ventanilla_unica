@@ -3545,6 +3545,158 @@ button:disabled {
   cursor: default;
 }
 
+.admin-roles-confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 12500;
+  background: rgba(8, 18, 37, 0.58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.admin-roles-confirm-dialog__panel {
+  width: min(100%, 480px);
+  max-height: min(92vh, 640px);
+  min-height: 0;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid #cedcf1;
+  background: #ffffff;
+  box-shadow: 0 24px 38px rgba(13, 26, 53, 0.24);
+  padding: 1rem 1.1rem 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-roles-confirm-dialog__header {
+  margin: 0;
+}
+
+.admin-roles-confirm-dialog__title {
+  margin: 0;
+  color: #1d3f78;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.admin-roles-confirm-dialog__lead {
+  margin: 0;
+  color: #4c5a70;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.admin-roles-confirm-dialog__details {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.admin-roles-confirm-dialog__detail-row {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-roles-confirm-dialog__detail-row dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #5b6f8f;
+}
+
+.admin-roles-confirm-dialog__detail-row dd {
+  margin: 0;
+  color: #1f3559;
+  font-size: 0.86rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.admin-roles-confirm-dialog__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-roles-confirm-dialog__muted {
+  color: #7a8aa3;
+  font-weight: 500;
+}
+
+.admin-roles-confirm-dialog__error {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e8b4b4;
+  background: #fff5f5;
+  color: #8b1e1e;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.admin-roles-confirm-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+}
+
+.admin-roles-confirm-dialog__button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #123f8d;
+  background: #123f8d;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.42rem 0.88rem;
+  cursor: pointer;
+}
+
+.admin-roles-confirm-dialog__button:hover:not(:disabled) {
+  background: #0f3372;
+  border-color: #0f3372;
+}
+
+.admin-roles-confirm-dialog__button--ghost {
+  border-color: #acc1e2;
+  background: #ffffff;
+  color: #1f4f95;
+}
+
+.admin-roles-confirm-dialog__button--ghost:hover:not(:disabled) {
+  background: #edf4ff;
+  border-color: #8eaed8;
+}
+
+.admin-roles-confirm-dialog__button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+@media (max-width: 520px) {
+  .admin-roles-confirm-dialog__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .admin-roles-confirm-dialog__button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .assistant-message--user .assistant-status-card {
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.36);

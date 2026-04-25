@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import ConfirmUpdateRolesModal from "./ConfirmUpdateRolesModal";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
@@ -379,6 +380,8 @@ export default function AdminDashboardPage() {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [roleDraftsByUserId, setRoleDraftsByUserId] = useState({});
   const [savingRoleUserId, setSavingRoleUserId] = useState("");
+  const [roleConfirmDialog, setRoleConfirmDialog] = useState(null);
+  const [roleConfirmModalError, setRoleConfirmModalError] = useState("");
 
   const isAdministrator = userHasRoleClient(user, "administrador");
   const funnel = metrics?.funnel || null;
@@ -548,7 +551,18 @@ export default function AdminDashboardPage() {
     }));
   };
 
-  const handleSaveUserRole = async (targetUser) => {
+  const discardRoleConfirmDialog = useCallback((dialogSnapshot, shouldRestoreDraft) => {
+    if (shouldRestoreDraft && dialogSnapshot?.userId && dialogSnapshot.draftSnapshotAtOpen) {
+      setRoleDraftsByUserId((previous) => ({
+        ...previous,
+        [dialogSnapshot.userId]: normalizeUserRolesForUi(dialogSnapshot.draftSnapshotAtOpen),
+      }));
+    }
+    setRoleConfirmDialog(null);
+    setRoleConfirmModalError("");
+  }, []);
+
+  const handleRequestSaveUserRoles = (targetUser) => {
     if (!targetUser?.id) {
       return;
     }
@@ -558,15 +572,31 @@ export default function AdminDashboardPage() {
       setUsersSuccessMessage("El usuario ya tiene esos roles.");
       return;
     }
-    const shouldContinue = window.confirm("Vas a actualizar los roles de este usuario. ¿Deseas continuar?");
-    if (!shouldContinue) {
-      return;
-    }
     setUsersSuccessMessage("");
     setUsersError("");
-    setSavingRoleUserId(targetUser.id);
+    setRoleConfirmModalError("");
+    const draftSnapshotAtOpen = [...nextRoles];
+    setRoleConfirmDialog({
+      userId: targetUser.id,
+      fullName: normalizeSimpleText(targetUser.fullName || "", 200) || "—",
+      email: normalizeSimpleText(targetUser.email || "", 240) || "—",
+      currentRoles: [...currentRoles],
+      nextRoles: [...nextRoles],
+      draftSnapshotAtOpen,
+    });
+  };
+
+  const handleRoleConfirmSubmit = useCallback(async () => {
+    if (!roleConfirmDialog?.userId) {
+      return;
+    }
+    const { userId, nextRoles } = roleConfirmDialog;
+    setUsersSuccessMessage("");
+    setUsersError("");
+    setRoleConfirmModalError("");
+    setSavingRoleUserId(userId);
     try {
-      const response = await fetch(`/api/admin/users/${encodeURIComponent(targetUser.id)}/roles`, {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/roles`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roles: nextRoles }),
@@ -575,14 +605,20 @@ export default function AdminDashboardPage() {
       if (!response.ok) {
         throw new Error(data?.error || "No se pudo actualizar el rol del usuario.");
       }
-      setUsersSuccessMessage("Roles actualizados correctamente.");
       await loadUsers();
+      setRoleDraftsByUserId((previous) => ({
+        ...previous,
+        [userId]: normalizeUserRolesForUi(nextRoles),
+      }));
+      setUsersSuccessMessage("Roles actualizados correctamente.");
+      setRoleConfirmDialog(null);
+      setRoleConfirmModalError("");
     } catch (error) {
-      setUsersError(error.message || "No se pudo actualizar el rol del usuario.");
+      setRoleConfirmModalError(error.message || "No se pudo actualizar el rol del usuario.");
     } finally {
       setSavingRoleUserId("");
     }
-  };
+  }, [loadUsers, roleConfirmDialog]);
 
   const openCreateForm = () => {
     setExpandedProcedureCode("__new__");
@@ -1718,7 +1754,7 @@ export default function AdminDashboardPage() {
                                 type="button"
                                 className="button-inline"
                                 disabled={isSavingRole || !hasRoleChanges}
-                                onClick={() => handleSaveUserRole(adminUser)}
+                                onClick={() => handleRequestSaveUserRoles(adminUser)}
                               >
                                 {isSavingRole ? "Guardando..." : "Guardar roles"}
                               </button>
@@ -1737,6 +1773,20 @@ export default function AdminDashboardPage() {
           )}
         </>
       )}
+
+      <ConfirmUpdateRolesModal
+        isOpen={Boolean(roleConfirmDialog)}
+        userDisplayName={roleConfirmDialog?.fullName}
+        userEmail={roleConfirmDialog?.email}
+        currentRoles={roleConfirmDialog?.currentRoles || []}
+        nextRoles={roleConfirmDialog?.nextRoles || []}
+        errorMessage={roleConfirmModalError}
+        isSubmitting={Boolean(
+          roleConfirmDialog && savingRoleUserId && savingRoleUserId === roleConfirmDialog.userId
+        )}
+        onCancel={() => discardRoleConfirmDialog(roleConfirmDialog, true)}
+        onConfirm={handleRoleConfirmSubmit}
+      />
     </main>
   );
 }
