@@ -3,10 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
-  { href: "/admin/dashboard", label: "Catálogo de procedimientos" },
-  { href: "/admin/bandeja-expedientes", label: "Bandeja de expedientes" },
-];
+const LINKS = [{ href: "/admin/dashboard", label: "Catálogo de procedimientos" }];
 
 export default function AdminPanelNav() {
   const pathname = usePathname();
