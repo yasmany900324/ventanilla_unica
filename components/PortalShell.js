@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import InstitutionalLogo from "./InstitutionalLogo";
@@ -141,6 +141,18 @@ export default function PortalShell({ children }) {
   const isFuncionario = hasRole(user, "agente");
   const authenticatedUser = user;
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || copy.dashboard.greetingFallback;
+  const userMenuBaseId = useId();
+  const userMenuButtonId = `${userMenuBaseId}-user-menu-button`;
+  const userMenuPanelId = `${userMenuBaseId}-user-menu-panel`;
+  const userMenuTriggerRef = useRef(null);
+  const userMenuPanelRef = useRef(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const closeUserMenu = useCallback(() => {
+    setIsUserMenuOpen(false);
+  }, []);
+  const toggleUserMenu = useCallback(() => {
+    setIsUserMenuOpen((previous) => !previous);
+  }, []);
   const handleLogout = useCallback(async () => {
     try {
       await logout({ redirectTo: "/" });
@@ -148,6 +160,10 @@ export default function PortalShell({ children }) {
       console.error("[auth] Header logout failed.", error);
     }
   }, [logout]);
+  const handleUserMenuLogout = useCallback(async () => {
+    closeUserMenu();
+    await handleLogout();
+  }, [closeUserMenu, handleLogout]);
   const assistantHref = "/asistente";
   const mainNav = useMemo(
     () => [
@@ -317,6 +333,53 @@ export default function PortalShell({ children }) {
     observer.observe(footerNode);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setIsUserMenuOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      const node = event.target;
+      if (!(node instanceof Node)) {
+        return;
+      }
+      const triggerEl = userMenuTriggerRef.current;
+      const panelEl = userMenuPanelRef.current;
+      if (triggerEl?.contains(node) || panelEl?.contains(node)) {
+        return;
+      }
+      setIsUserMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isUserMenuOpen]);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      setIsUserMenuOpen(false);
+      userMenuTriggerRef.current?.focus();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isUserMenuOpen]);
   const handleFloatingChatClick = useCallback(
     (event) => {
       if (pathname !== "/asistente") {
@@ -398,42 +461,79 @@ export default function PortalShell({ children }) {
             <div className="portal-header__actions">
               {hasActiveSession ? (
                 <>
-                  <details className="portal-user-menu">
-                    <summary className="portal-user-menu__trigger">
+                  <div className={`portal-user-menu${isUserMenuOpen ? " portal-user-menu--open" : ""}`}>
+                    <button
+                      type="button"
+                      id={userMenuButtonId}
+                      ref={userMenuTriggerRef}
+                      className="portal-user-menu__trigger"
+                      aria-haspopup="menu"
+                      aria-expanded={isUserMenuOpen}
+                      aria-controls={userMenuPanelId}
+                      onClick={toggleUserMenu}
+                    >
                       <span className="portal-user-menu__name">
                         {copy.portal.greeting}, {shortName}
                       </span>
                       <span className="portal-user-menu__chevron" aria-hidden="true">
                         ▾
                       </span>
-                    </summary>
-                    <div className="portal-user-menu__panel">
-                      <Link href="/ciudadano/dashboard" className="portal-user-menu__link">
+                    </button>
+                    <div
+                      id={userMenuPanelId}
+                      ref={userMenuPanelRef}
+                      className="portal-user-menu__panel"
+                      role="menu"
+                      aria-labelledby={userMenuButtonId}
+                      hidden={!isUserMenuOpen}
+                    >
+                      <Link
+                        href="/ciudadano/dashboard"
+                        className="portal-user-menu__link"
+                        role="menuitem"
+                        onClick={closeUserMenu}
+                      >
                         {copy.portal.mySpace}
                       </Link>
-                      <Link href="/mis-incidencias" className="portal-user-menu__link">
+                      <Link
+                        href="/mis-incidencias"
+                        className="portal-user-menu__link"
+                        role="menuitem"
+                        onClick={closeUserMenu}
+                      >
                         {copy.nav.myCases}
                       </Link>
                       {isAdministrator ? (
-                        <Link href="/admin/dashboard" className="portal-user-menu__link">
+                        <Link
+                          href="/admin/dashboard"
+                          className="portal-user-menu__link"
+                          role="menuitem"
+                          onClick={closeUserMenu}
+                        >
                           Panel administrativo
                         </Link>
                       ) : null}
                       {isFuncionario ? (
-                        <Link href="/funcionario/dashboard" className="portal-user-menu__link">
+                        <Link
+                          href="/funcionario/dashboard"
+                          className="portal-user-menu__link"
+                          role="menuitem"
+                          onClick={closeUserMenu}
+                        >
                           Bandeja de expedientes
                         </Link>
                       ) : null}
                       <button
                         type="button"
                         className="portal-user-menu__logout"
-                        onClick={handleLogout}
+                        role="menuitem"
+                        onClick={handleUserMenuLogout}
                         disabled={isLoadingAuth}
                       >
                         {isLoadingAuth ? copy.portal.loggingOut : copy.portal.logout}
                       </button>
                     </div>
-                  </details>
+                  </div>
                 </>
               ) : (
                 <>

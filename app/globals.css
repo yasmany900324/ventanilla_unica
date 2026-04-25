@@ -259,13 +259,10 @@ body {
   background: #f9fbff;
   color: #1f3f7c;
   padding: 0.4rem 0.76rem;
+  font-family: inherit;
   font-size: 0.79rem;
   font-weight: 700;
   cursor: pointer;
-}
-
-.portal-user-menu__trigger::-webkit-details-marker {
-  display: none;
 }
 
 .portal-user-menu__name {
@@ -278,7 +275,7 @@ body {
   transition: transform 0.18s ease;
 }
 
-.portal-user-menu[open] .portal-user-menu__chevron {
+.portal-user-menu--open .portal-user-menu__chevron {
   transform: rotate(180deg);
 }
 
@@ -286,6 +283,7 @@ body {
   position: absolute;
   right: 0;
   top: calc(100% + 0.35rem);
+  z-index: 50;
   min-width: 220px;
   border-radius: 12px;
   border: 1px solid #d4dfef;
@@ -294,6 +292,10 @@ body {
   padding: 0.4rem;
   display: grid;
   gap: 0.12rem;
+}
+
+.portal-user-menu__panel[hidden] {
+  display: none !important;
 }
 
 .portal-user-menu__link,
