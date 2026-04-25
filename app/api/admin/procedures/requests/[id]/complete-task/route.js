@@ -11,6 +11,9 @@ export async function POST(request, { params }) {
     if (!administrator) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
+    if (!administrator?.id) {
+      return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
+    }
     let body = {};
     try {
       body = await request.json();
@@ -24,6 +27,15 @@ export async function POST(request, { params }) {
         typeof body?.nextStatus === "string" && body.nextStatus.trim()
           ? body.nextStatus.trim().slice(0, 80)
           : null,
+      expectedTaskDefinitionKey:
+        typeof body?.expectedTaskDefinitionKey === "string" && body.expectedTaskDefinitionKey.trim()
+          ? body.expectedTaskDefinitionKey.trim().slice(0, 160)
+          : null,
+      idempotencyKey:
+        typeof body?.idempotencyKey === "string" && body.idempotencyKey.trim()
+          ? body.idempotencyKey.trim().slice(0, 240)
+          : null,
+      actorId: administrator?.id || null,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

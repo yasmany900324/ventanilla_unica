@@ -200,7 +200,6 @@ function normalizeCamundaVariableMappings(value) {
   if (!Array.isArray(value)) {
     return [];
   }
-  const seen = new Set();
   const mappings = [];
   value.forEach((entry) => {
     if (!entry || typeof entry !== "object") {
@@ -218,16 +217,6 @@ function normalizeCamundaVariableMappings(value) {
       return;
     }
     const camundaVariableType = normalizeLookup(entry.camundaVariableType || "string");
-    const uniqueKey = [
-      normalizedScope,
-      taskDefinitionKey || "",
-      procedureFieldKey,
-      camundaVariableName.toLowerCase(),
-    ].join("|");
-    if (seen.has(uniqueKey)) {
-      return;
-    }
-    seen.add(uniqueKey);
     mappings.push({
       scope: normalizedScope,
       camundaTaskDefinitionKey: taskDefinitionKey,
@@ -243,13 +232,84 @@ function normalizeCamundaVariableMappings(value) {
   return mappings;
 }
 
+function validateCamundaVariableMappings(mappings, requiredFields) {
+  const fieldKeys = new Set(
+    (Array.isArray(requiredFields) ? requiredFields : [])
+      .map((field) => normalizeCode(field?.key || ""))
+      .filter(Boolean)
+  );
+  const seenVariableNames = new Set();
+  for (const mapping of mappings) {
+    if (!fieldKeys.has(mapping.procedureFieldKey)) {
+      return {
+        ok: false,
+        error: `El campo "${mapping.procedureFieldKey}" no existe en los campos solicitados del procedimiento.`,
+      };
+    }
+    if (!normalizeText(mapping.camundaVariableName, 160)) {
+      return {
+        ok: false,
+        error: "camundaVariableName es obligatorio en todos los mappings.",
+      };
+    }
+    const dedupeKey = [
+      mapping.scope,
+      mapping.camundaTaskDefinitionKey || "",
+      normalizeText(mapping.camundaVariableName, 160).toLowerCase(),
+    ].join("|");
+    if (seenVariableNames.has(dedupeKey)) {
+      return {
+        ok: false,
+        error:
+          "No se permiten mappings duplicados para la misma combinación de scope, camundaTaskDefinitionKey y camundaVariableName.",
+      };
+    }
+    seenVariableNames.add(dedupeKey);
+    if (mapping.scope === "COMPLETE_TASK" && !normalizeText(mapping.camundaTaskDefinitionKey, 160)) {
+      return {
+        ok: false,
+        error: "Los mappings COMPLETE_TASK requieren camundaTaskDefinitionKey.",
+      };
+    }
+    if (mapping.scope === "START_INSTANCE" && mapping.camundaTaskDefinitionKey) {
+      return {
+        ok: false,
+        error: "Los mappings START_INSTANCE no deben incluir camundaTaskDefinitionKey.",
+      };
+    }
+  }
+  return { ok: true };
+}
+
 function normalizeFlowDefinition(value) {
   if (!value || typeof value !== "object") {
     return {};
   }
 
   const completionMessage = normalizeText(value.completionMessage, 260);
-  return completionMessage ? { completionMessage } : {};
+  const completionOutcomeVariable = normalizeText(value.completionOutcomeVariable, 120);
+  const completionOutcomeResolvedValue = normalizeText(value.completionOutcomeResolvedValue, 80);
+  const citizenInfoTasksInput =
+    value.citizenInfoTasks && typeof value.citizenInfoTasks === "object" ? value.citizenInfoTasks : {};
+  const citizenInfoTasks = {};
+  Object.entries(citizenInfoTasksInput).forEach(([taskKey, rawConfig]) => {
+    const normalizedTaskKey = normalizeText(taskKey, 160);
+    if (!normalizedTaskKey || !rawConfig || typeof rawConfig !== "object") {
+      return;
+    }
+    const fieldKey = normalizeCode(rawConfig.fieldKey).slice(0, 60);
+    const prompt = normalizeText(rawConfig.prompt, 280);
+    if (!fieldKey || !prompt) {
+      return;
+    }
+    citizenInfoTasks[normalizedTaskKey] = { fieldKey, prompt };
+  });
+  return {
+    ...(completionMessage ? { completionMessage } : {}),
+    ...(completionOutcomeVariable ? { completionOutcomeVariable } : {}),
+    ...(completionOutcomeResolvedValue ? { completionOutcomeResolvedValue } : {}),
+    ...(Object.keys(citizenInfoTasks).length > 0 ? { citizenInfoTasks } : {}),
+  };
 }
 
 function normalizeProcedurePayload(rawPayload, messages) {
@@ -280,6 +340,12 @@ function normalizeProcedurePayload(rawPayload, messages) {
     return { ok: false, error: messages.missingChannels };
   }
 
+  const camundaVariableMappings = normalizeCamundaVariableMappings(payload.camundaVariableMappings);
+  const mappingsValidation = validateCamundaVariableMappings(camundaVariableMappings, requiredFields);
+  if (!mappingsValidation.ok) {
+    return { ok: false, error: mappingsValidation.error };
+  }
+
   return {
     ok: true,
     value: {
@@ -294,7 +360,7 @@ function normalizeProcedurePayload(rawPayload, messages) {
       camundaVersion: normalizeText(payload.camundaVersion, 80),
       enabledChannels,
       requiredFields,
-      camundaVariableMappings: normalizeCamundaVariableMappings(payload.camundaVariableMappings),
+      camundaVariableMappings,
       flowDefinition: normalizeFlowDefinition(payload.flowDefinition),
     },
   };

@@ -221,6 +221,46 @@ describe("api/admin/procedures", () => {
     expect(body.error).toMatch(/existe|code/i);
   });
 
+  it("PATCH valida mappings Camunda duplicados", async () => {
+    mocks.getProcedureCatalogEntryByCode.mockResolvedValue(createProcedure());
+    const request = new Request("http://localhost/api/admin/procedures?locale=es", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalCode: "registrar_incidencia",
+        code: "registrar_incidencia",
+        name: "Registrar incidencia",
+        category: "Incidencia",
+        camundaProcessId: "proceso_incidencia_v1",
+        enabledChannels: ["web"],
+        requiredFields: [{ key: "description", label: "Descripción", type: "text", required: true }],
+        camundaVariableMappings: [
+          {
+            scope: "START_INSTANCE",
+            procedureFieldKey: "description",
+            camundaVariableName: "descripcion",
+            camundaVariableType: "string",
+            required: true,
+            enabled: true,
+          },
+          {
+            scope: "START_INSTANCE",
+            procedureFieldKey: "description",
+            camundaVariableName: "descripcion",
+            camundaVariableType: "string",
+            required: true,
+            enabled: true,
+          },
+        ],
+      }),
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/duplicados|scope/i);
+  });
+
   it("DELETE bloquea eliminación de procedimientos activos", async () => {
     mocks.sqlQueue.push([{ code: "registrar_incidencia", is_active: true }]);
     const request = new Request("http://localhost/api/admin/procedures?locale=es", {
