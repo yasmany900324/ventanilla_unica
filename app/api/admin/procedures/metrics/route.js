@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdministrator } from "../../../../../../lib/auth";
-import { getProcedureMetricsSummary } from "../../../../../../lib/procedureRequests";
+import { requireAdministrator } from "../../../../../lib/auth";
+import { getProcedureMetricsSummary } from "../../../../../lib/procedureRequests";
 
 export async function GET(request) {
   try {
