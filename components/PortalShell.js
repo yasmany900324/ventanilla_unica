@@ -124,6 +124,12 @@ function getIsMobileItemActive(pathname, href) {
   return pathname === href || pathname?.startsWith(`${href}/`);
 }
 
+function hasRole(user, targetRole) {
+  const normalizedTarget = String(targetRole || "").trim().toLowerCase();
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role];
+  return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
+}
+
 export default function PortalShell({ children }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const { locale, setLocale } = useLocale();
@@ -131,8 +137,8 @@ export default function PortalShell({ children }) {
   const router = useRouter();
   const copy = getLocaleCopy(locale);
   const hasActiveSession = isAuthenticated;
-  const isAdministrator = user?.role === "administrador";
-  const isFuncionario = user?.role === "agente";
+  const isAdministrator = hasRole(user, "administrador");
+  const isFuncionario = hasRole(user, "agente");
   const authenticatedUser = user;
   const shortName = authenticatedUser?.fullName?.split(" ")?.[0] || copy.dashboard.greetingFallback;
   const handleLogout = useCallback(async () => {

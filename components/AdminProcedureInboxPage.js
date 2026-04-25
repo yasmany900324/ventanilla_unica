@@ -175,6 +175,12 @@ function filterOptionsFromList(list, selector) {
   return values.sort((a, b) => String(a).localeCompare(String(b), "es"));
 }
 
+function hasRole(user, targetRole) {
+  const normalizedTarget = String(targetRole || "").trim().toLowerCase();
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role];
+  return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
+}
+
 function ProcedureFieldVariables({ requiredVariables }) {
   if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
     return null;
@@ -220,7 +226,7 @@ export default function AdminProcedureInboxPage() {
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
 
-  const isAdministrator = user?.role === "administrador";
+  const isAdministrator = hasRole(user, "administrador");
 
   useEffect(() => {
     if (user && !isAdministrator) {

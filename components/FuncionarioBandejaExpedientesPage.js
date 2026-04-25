@@ -28,6 +28,12 @@ const CAMUNDA_STATUS_LABELS = {
 
 const TERMINAL_PROCEDURE_STATUSES = new Set(["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"]);
 
+function hasRole(user, targetRole) {
+  const normalizedTarget = String(targetRole || "").trim().toLowerCase();
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role];
+  return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
+}
+
 function formatDateTime(value, locale) {
   if (!value) {
     return "-";
@@ -214,7 +220,7 @@ export default function FuncionarioBandejaExpedientesPage() {
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
 
-  const isFuncionario = user?.role === "agente";
+  const isFuncionario = hasRole(user, "agente");
 
   useEffect(() => {
     if (isLoadingAuth) {

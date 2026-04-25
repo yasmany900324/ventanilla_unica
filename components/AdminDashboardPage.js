@@ -31,6 +31,26 @@ function getAdminRoleVisualLabel(role) {
   return "Ciudadano";
 }
 
+function normalizeUserRolesForUi(rolesOrRole) {
+  const raw = Array.isArray(rolesOrRole) ? rolesOrRole : [rolesOrRole];
+  const normalized = Array.from(
+    new Set(
+      raw
+        .map((role) => normalizeSimpleText(role, 30).toLowerCase())
+        .filter((role) => ["ciudadano", "agente", "administrador"].includes(role))
+    )
+  );
+  if (!normalized.includes("ciudadano")) {
+    normalized.unshift("ciudadano");
+  }
+  return normalized;
+}
+
+function userHasRoleClient(user, role) {
+  const normalizedTarget = normalizeSimpleText(role, 30).toLowerCase();
+  return normalizeUserRolesForUi(user?.roles || user?.role).includes(normalizedTarget);
+}
+
 function formatAdminUserCreatedAt(value, locale) {
   if (!value) {
     return "-";
@@ -357,10 +377,10 @@ export default function AdminDashboardPage() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [userSearchText, setUserSearchText] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
-  const [roleDraftByUserId, setRoleDraftByUserId] = useState({});
+  const [roleDraftsByUserId, setRoleDraftsByUserId] = useState({});
   const [savingRoleUserId, setSavingRoleUserId] = useState("");
 
-  const isAdministrator = user?.role === "administrador";
+  const isAdministrator = userHasRoleClient(user, "administrador");
   const funnel = metrics?.funnel || null;
 
   const orderedEventCounts = useMemo(() => {
@@ -493,12 +513,12 @@ export default function AdminDashboardPage() {
       }
       const incomingUsers = Array.isArray(data?.users) ? data.users : [];
       setAdminUsers(incomingUsers);
-      setRoleDraftByUserId((previous) => {
+      setRoleDraftsByUserId((previous) => {
         const next = { ...previous };
         for (const item of incomingUsers) {
-          const currentRole = normalizeSimpleText(item?.role, 30).toLowerCase() || "ciudadano";
+          const currentRoles = normalizeUserRolesForUi(item?.roles || item?.role);
           if (!next[item.id]) {
-            next[item.id] = currentRole;
+            next[item.id] = currentRoles;
           }
         }
         return next;
@@ -521,10 +541,10 @@ export default function AdminDashboardPage() {
     return () => abortController.abort();
   }, [activeTab, isAdministrator, loadUsers, user]);
 
-  const handleUpdateRoleDraft = (userId, nextRole) => {
-    setRoleDraftByUserId((previous) => ({
+  const handleUpdateRoleDraft = (userId, nextRoles) => {
+    setRoleDraftsByUserId((previous) => ({
       ...previous,
-      [userId]: nextRole,
+      [userId]: normalizeUserRolesForUi(nextRoles),
     }));
   };
 
@@ -532,16 +552,13 @@ export default function AdminDashboardPage() {
     if (!targetUser?.id) {
       return;
     }
-    const nextRole = normalizeSimpleText(roleDraftByUserId[targetUser.id], 30).toLowerCase();
-    const currentRole = normalizeSimpleText(targetUser.role, 30).toLowerCase();
-    if (!nextRole || nextRole === currentRole) {
-      setUsersSuccessMessage("El usuario ya tiene ese rol.");
+    const nextRoles = normalizeUserRolesForUi(roleDraftsByUserId[targetUser.id] || []);
+    const currentRoles = normalizeUserRolesForUi(targetUser.roles || targetUser.role);
+    if (nextRoles.join("|") === currentRoles.join("|")) {
+      setUsersSuccessMessage("El usuario ya tiene esos roles.");
       return;
     }
-    const nextRoleLabel = getAdminRoleVisualLabel(nextRole);
-    const shouldContinue = window.confirm(
-      `Vas a cambiar el rol de este usuario a ${nextRoleLabel}. ¿Deseas continuar?`
-    );
+    const shouldContinue = window.confirm("Vas a actualizar los roles de este usuario. ¿Deseas continuar?");
     if (!shouldContinue) {
       return;
     }
@@ -549,16 +566,16 @@ export default function AdminDashboardPage() {
     setUsersError("");
     setSavingRoleUserId(targetUser.id);
     try {
-      const response = await fetch(`/api/admin/users/${encodeURIComponent(targetUser.id)}/role`, {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(targetUser.id)}/roles`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: nextRole }),
+        body: JSON.stringify({ roles: nextRoles }),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data?.error || "No se pudo actualizar el rol del usuario.");
       }
-      setUsersSuccessMessage("Rol actualizado correctamente.");
+      setUsersSuccessMessage("Roles actualizados correctamente.");
       await loadUsers();
     } catch (error) {
       setUsersError(error.message || "No se pudo actualizar el rol del usuario.");
@@ -1627,45 +1644,83 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th>Nombre</th>
                       <th>Email</th>
-                      <th>Rol actual</th>
+                      <th>Roles actuales</th>
                       <th>Fecha de creación</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {adminUsers.map((adminUser) => {
-                      const draftRole =
-                        roleDraftByUserId[adminUser.id] || normalizeSimpleText(adminUser.role, 30).toLowerCase();
+                      const draftRoles = normalizeUserRolesForUi(
+                        roleDraftsByUserId[adminUser.id] || adminUser.roles || adminUser.role
+                      );
+                      const currentRoles = normalizeUserRolesForUi(adminUser.roles || adminUser.role);
                       const isSavingRole = savingRoleUserId === adminUser.id;
-                      const hasRoleChanges =
-                        normalizeSimpleText(draftRole, 30).toLowerCase() !==
-                        normalizeSimpleText(adminUser.role, 30).toLowerCase();
+                      const hasRoleChanges = draftRoles.join("|") !== currentRoles.join("|");
                       return (
                         <tr key={adminUser.id}>
                           <td>{adminUser.fullName || "-"}</td>
                           <td>{adminUser.email || "-"}</td>
                           <td>
-                            <span className="badge badge--recibido">{getAdminRoleVisualLabel(adminUser.role)}</span>
+                            <div className="admin-procedure-item__actions">
+                              {currentRoles.map((role) => (
+                                <span key={`${adminUser.id}-current-${role}`} className="badge badge--recibido">
+                                  {getAdminRoleVisualLabel(role)}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td>{formatAdminUserCreatedAt(adminUser.createdAt, locale)}</td>
                           <td>
                             <div className="admin-procedure-item__actions">
-                              <select
-                                value={draftRole}
-                                onChange={(event) => handleUpdateRoleDraft(adminUser.id, event.target.value)}
-                                disabled={isSavingRole}
-                              >
-                                <option value="ciudadano">Ciudadano</option>
-                                <option value="agente">Funcionario</option>
-                                <option value="administrador">Administrador</option>
-                              </select>
+                              <label className="admin-procedure-channel">
+                                <input
+                                  type="checkbox"
+                                  checked={draftRoles.includes("ciudadano")}
+                                  disabled
+                                  readOnly
+                                />
+                                <span>Ciudadano</span>
+                              </label>
+                              <label className="admin-procedure-channel">
+                                <input
+                                  type="checkbox"
+                                  checked={draftRoles.includes("agente")}
+                                  onChange={(event) =>
+                                    handleUpdateRoleDraft(
+                                      adminUser.id,
+                                      event.target.checked
+                                        ? [...draftRoles, "agente"]
+                                        : draftRoles.filter((role) => role !== "agente")
+                                    )
+                                  }
+                                  disabled={isSavingRole}
+                                />
+                                <span>Funcionario</span>
+                              </label>
+                              <label className="admin-procedure-channel">
+                                <input
+                                  type="checkbox"
+                                  checked={draftRoles.includes("administrador")}
+                                  onChange={(event) =>
+                                    handleUpdateRoleDraft(
+                                      adminUser.id,
+                                      event.target.checked
+                                        ? [...draftRoles, "administrador"]
+                                        : draftRoles.filter((role) => role !== "administrador")
+                                    )
+                                  }
+                                  disabled={isSavingRole}
+                                />
+                                <span>Administrador</span>
+                              </label>
                               <button
                                 type="button"
                                 className="button-inline"
                                 disabled={isSavingRole || !hasRoleChanges}
                                 onClick={() => handleSaveUserRole(adminUser)}
                               >
-                                {isSavingRole ? "Guardando..." : "Guardar rol"}
+                                {isSavingRole ? "Guardando..." : "Guardar roles"}
                               </button>
                             </div>
                           </td>

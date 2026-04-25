@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../components/AuthProvider";
 
+function hasRole(user, targetRole) {
+  const normalizedTarget = String(targetRole || "").trim().toLowerCase();
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role];
+  return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
+}
+
 export default function LegacyAdminBandejaExpedientesPage() {
   const { user, isLoadingAuth } = useAuth();
   const router = useRouter();
@@ -13,7 +19,7 @@ export default function LegacyAdminBandejaExpedientesPage() {
     if (isLoadingAuth) {
       return;
     }
-    if (user?.role === "agente") {
+    if (hasRole(user, "agente")) {
       router.replace("/funcionario/dashboard");
     }
   }, [isLoadingAuth, router, user]);
@@ -28,7 +34,7 @@ export default function LegacyAdminBandejaExpedientesPage() {
     );
   }
 
-  if (user?.role === "agente") {
+  if (hasRole(user, "agente")) {
     return null;
   }
 
