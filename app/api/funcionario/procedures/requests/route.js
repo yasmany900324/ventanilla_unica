@@ -20,7 +20,12 @@ export async function GET(request) {
       limit,
     });
     const enriched = await enrichProcedureRequestsForInbox(procedures);
-    return NextResponse.json({ procedures: enriched });
+    const proceduresForClient = enriched.map((item) => ({
+      ...item,
+      procedureRequestId: item.id,
+      trackingNumber: item.requestCode || null,
+    }));
+    return NextResponse.json({ procedures: proceduresForClient });
   } catch (_error) {
     return NextResponse.json(
       { error: "No se pudo cargar el listado de expedientes de procedimientos." },

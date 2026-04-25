@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdministrator } from "../../../../../../../lib/auth";
+import { getAppRouteParamString } from "../../../../../../../lib/nextAppRouteParams";
 import { claimProcedureTask, getProcedureRequestById } from "../../../../../../../lib/procedureRequests";
 import { getActiveTaskForProcedure } from "../../../../../../../lib/camunda/getActiveTaskForProcedure";
 import { claimCamundaUserTask } from "../../../../../../../lib/camunda/client";
@@ -13,7 +14,7 @@ export async function POST(request, { params }) {
     if (!administrator?.id) {
       return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
     }
-    const procedureRequestId = params?.id;
+    const procedureRequestId = await getAppRouteParamString(params, "id");
     const procedureRequest = await getProcedureRequestById(procedureRequestId);
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });

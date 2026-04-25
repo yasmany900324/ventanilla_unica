@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdministrator } from "../../../../../../lib/auth";
+import { getAppRouteParamString } from "../../../../../../lib/nextAppRouteParams";
 import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActiveTaskForProcedure";
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
 import {
@@ -18,7 +19,8 @@ export async function GET(request, { params }) {
     if (!administrator) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
-    const procedureRequest = await getProcedureRequestById(params?.id);
+    const procedureRequestId = await getAppRouteParamString(params, "id");
+    const procedureRequest = await getProcedureRequestById(procedureRequestId);
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }

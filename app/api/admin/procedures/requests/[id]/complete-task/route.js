@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdministrator } from "../../../../../../../lib/auth";
+import { getAppRouteParamString } from "../../../../../../../lib/nextAppRouteParams";
 import {
   CompleteProcedureTaskError,
   completeProcedureTaskFromBackoffice,
@@ -15,7 +16,8 @@ export async function POST(request, { params }) {
     if (!administrator?.id) {
       return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
     }
-    const procedureRequest = await getProcedureRequestById(params?.id);
+    const procedureRequestId = await getAppRouteParamString(params, "id");
+    const procedureRequest = await getProcedureRequestById(procedureRequestId);
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }
@@ -35,7 +37,7 @@ export async function POST(request, { params }) {
       body = {};
     }
     const result = await completeProcedureTaskFromBackoffice({
-      procedureRequestId: params?.id,
+      procedureRequestId,
       collectedData: body?.collectedData && typeof body.collectedData === "object" ? body.collectedData : {},
       nextLocalStatus:
         typeof body?.nextStatus === "string" && body.nextStatus.trim()

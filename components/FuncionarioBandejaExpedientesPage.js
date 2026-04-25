@@ -287,7 +287,14 @@ export default function FuncionarioBandejaExpedientesPage() {
             setDetail(null);
             setSelectedId("");
           }
-          throw new Error(data?.error || "No se pudo cargar el detalle del expediente.");
+          let message = data?.error || "No se pudo cargar el detalle del expediente.";
+          if (response.status === 404) {
+            message = "No se encontró el expediente solicitado.";
+          } else if (response.status === 403) {
+            message =
+              "No tienes permisos para ver este expediente o ya fue tomado por otro funcionario.";
+          }
+          throw new Error(message);
         }
         setDetail(data);
         setCompleteVariablesJson("{}");
@@ -400,7 +407,11 @@ export default function FuncionarioBandejaExpedientesPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        const actionError = new Error(data?.error || "No se pudo ejecutar la acción.");
+        let message = data?.error || "No se pudo ejecutar la acción.";
+        if (action.actionKey === "claim_task" && response.status === 409) {
+          message = "Este expediente ya fue tomado por otro funcionario.";
+        }
+        const actionError = new Error(message);
         actionError.status = response.status;
         throw actionError;
       }
@@ -606,7 +617,10 @@ export default function FuncionarioBandejaExpedientesPage() {
                         selectedId === item.id ? "admin-inbox-table__row--selected" : ""
                       }`}
                     >
-                      <td className="admin-procedure-table__mono">{item.requestCode || item.id}</td>
+                      <td className="admin-procedure-table__mono">
+                        <span className="admin-procedure-table__primary">{item.requestCode || "—"}</span>
+                        <p className="admin-procedure-table__secondary">ID interno: {item.id}</p>
+                      </td>
                       <td>{item.procedureName || item.procedureCode || "-"}</td>
                       <td>
                         <span
@@ -635,7 +649,7 @@ export default function FuncionarioBandejaExpedientesPage() {
                         <button
                           type="button"
                           className="button-inline"
-                          onClick={() => handleSelectDetail(item.id)}
+                          onClick={() => handleSelectDetail(item.procedureRequestId || item.id)}
                         >
                           Ver detalle
                         </button>
@@ -735,10 +749,13 @@ export default function FuncionarioBandejaExpedientesPage() {
             <section className="admin-procedure-fields">
               <h4>Acciones del funcionario</h4>
               {procedureRequest.assignmentScope === "available" ? (
-                <p className="small">
-                  Este expediente está disponible para ser tomado. Debes tomarlo antes de completar tareas o ejecutar
-                  acciones de gestión.
-                </p>
+                <>
+                  <p className="small">Este expediente está disponible para ser tomado.</p>
+                  <p className="small">
+                    Debes usar <strong>Tomar expediente</strong> antes de completar tareas o ejecutar acciones de
+                    gestión.
+                  </p>
+                </>
               ) : (
                 <p className="small">
                   Las acciones visibles se calculan por tarea activa y configuración del procedimiento.

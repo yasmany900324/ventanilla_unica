@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireFuncionario } from "../../../../../../../lib/auth";
+import { getAppRouteParamString } from "../../../../../../../lib/nextAppRouteParams";
 import { retryProcedureCamundaSync } from "../../../../../../../lib/camunda/syncLocalCaseToCamunda";
 import { canAccessProcedureRequestStrict } from "../../../../../../../lib/procedureRequestInboxDetail";
 import { getProcedureRequestById } from "../../../../../../../lib/procedureRequests";
@@ -13,7 +14,8 @@ export async function POST(request, { params }) {
     if (!funcionario?.id) {
       return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
     }
-    const procedureRequest = await getProcedureRequestById(params?.id);
+    const procedureRequestId = await getAppRouteParamString(params, "id");
+    const procedureRequest = await getProcedureRequestById(procedureRequestId);
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }
@@ -30,7 +32,7 @@ export async function POST(request, { params }) {
       body = {};
     }
     const result = await retryProcedureCamundaSync({
-      procedureRequestId: params?.id,
+      procedureRequestId,
       actorId: funcionario?.id || null,
       idempotencyKey:
         typeof body?.idempotencyKey === "string" && body.idempotencyKey.trim()
