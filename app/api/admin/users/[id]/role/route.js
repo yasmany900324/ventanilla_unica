@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdministrator, updateUserRoleByAdministrator } from "../../../../../../../lib/auth";
-import { ROLES } from "../../../../../../../lib/roles";
+import { requireAdministrator, updateUserRoleByAdministrator } from "../../../../../../lib/auth";
+import { ROLES } from "../../../../../../lib/roles";
 
 const ALLOWED_ROLES = new Set([ROLES.CITIZEN, ROLES.AGENT, ROLES.ADMIN]);
 
