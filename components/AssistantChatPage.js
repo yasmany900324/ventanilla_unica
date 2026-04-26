@@ -60,12 +60,8 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
-function buildUserPhotoAttachedLine(_fileName, copy) {
-  const fallback = "Listo, adjunte tu foto.";
-  const rawTemplate =
-    normalizeContextParam(copy?.incidentPhoto?.userAttachedLine, MAX_MESSAGE_LENGTH) || fallback;
-  const merged = rawTemplate.includes("{name}") ? rawTemplate.replace("{name}", "foto") : rawTemplate;
-  return normalizeChipLabel(merged) || fallback;
+function buildUserPhotoSentCaption(copy) {
+  return normalizeContextParam(copy?.incidentPhoto?.userSentCaption, 60) || "Foto enviada";
 }
 
 function formatMessageTime(dateInput) {
@@ -879,6 +875,10 @@ function ChatMessageBubble({
   const timeLabel = formatMessageTime(message.createdAt);
   const suggestedReplies = Array.isArray(message.suggestedReplies) ? message.suggestedReplies : [];
   const actionOptions = Array.isArray(message.actionOptions) ? message.actionOptions : [];
+  const messageText = normalizeChipLabel(message.text);
+  const shouldRenderText =
+    !(isBot && message.statusSummary) &&
+    (message.type !== MESSAGE_TYPE_IMAGE || isBot || Boolean(messageText));
   const interactiveItems = [];
   const seenOptionLabels = new Set();
   suggestedReplies.forEach((reply) => {
@@ -927,7 +927,7 @@ function ChatMessageBubble({
         {!isBot && message.type === MESSAGE_TYPE_LOCATION ? (
           <UserLocationMessageCard message={message} copy={copy} />
         ) : null}
-        {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
+        {shouldRenderText ? <p>{messageText}</p> : null}
         {isBot && message.incidentDraftPreview ? (
           <IncidentDraftPreviewCard preview={message.incidentDraftPreview} copy={copy} />
         ) : null}
@@ -1562,9 +1562,21 @@ export default function AssistantChatPage() {
       }
 
       const photoCopy = uiCopy.incidentPhoto || {};
+      const localPreviewUrl =
+        typeof window !== "undefined" && typeof window.URL?.createObjectURL === "function"
+          ? window.URL.createObjectURL(file)
+          : null;
+      const userPhotoMessage = createLocalMessage({
+        sender: "user",
+        type: MESSAGE_TYPE_IMAGE,
+        text: buildUserPhotoSentCaption(uiCopy),
+        attachmentImageUrl: localPreviewUrl,
+      });
       if (!sessionId) {
+        shouldAutoScrollRef.current = true;
         setMessages((previousMessages) => [
           ...previousMessages,
+          userPhotoMessage,
           createLocalMessage({
             sender: "bot",
             text: photoCopy.needSession || "Todavía no está lista la sesión del chat.",
@@ -1576,6 +1588,8 @@ export default function AssistantChatPage() {
       const clientDebugEnabled =
         typeof window !== "undefined" && window.localStorage.getItem("chatbot_debug") === "1";
 
+      shouldAutoScrollRef.current = true;
+      setMessages((previousMessages) => [...previousMessages, userPhotoMessage]);
       setIsSending(true);
       try {
         const formData = new FormData();
@@ -1624,19 +1638,19 @@ export default function AssistantChatPage() {
           setSessionLocale(data.locale);
         }
 
-        const userLine = buildUserPhotoAttachedLine(file.name, uiCopy);
         const rawPreview = typeof data.photoPreviewUrl === "string" ? data.photoPreviewUrl.trim() : "";
         const previewUrl =
           rawPreview.startsWith("http") || rawPreview.startsWith("/") ? rawPreview : null;
 
         setMessages((previousMessages) => [
-          ...previousMessages,
-          createLocalMessage({
-            sender: "user",
-            type: MESSAGE_TYPE_IMAGE,
-            text: userLine,
-            attachmentImageUrl: previewUrl,
-          }),
+          ...previousMessages.map((message) =>
+            message.id === userPhotoMessage.id
+              ? {
+                  ...message,
+                  attachmentImageUrl: previewUrl || message.attachmentImageUrl || null,
+                }
+              : message
+          ),
           createLocalMessage({
             sender: "bot",
             text: data?.replyText || uiCopy.fallbackReply,
@@ -1656,6 +1670,9 @@ export default function AssistantChatPage() {
             incidentDraftPreview,
           }),
         ]);
+        if (localPreviewUrl && previewUrl && typeof window !== "undefined") {
+          window.URL.revokeObjectURL(localPreviewUrl);
+        }
         lastFailedInputRef.current = {
           rawValue: "",
           command: DEFAULT_CHAT_COMMAND,
