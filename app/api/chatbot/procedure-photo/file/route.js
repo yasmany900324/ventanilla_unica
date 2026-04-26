@@ -9,26 +9,14 @@ import {
 } from "../../../../../lib/attachments/incidentAttachmentTypes";
 import path from "path";
 import { isSafeStoredPhotoBasename } from "../../../../../lib/incidentAttachmentFsStorage";
+import { getImageMimeFromExtensionOrDefault } from "../../../../../lib/imageReference";
 
 export const runtime = "nodejs";
 
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{6,80}$/;
 
 function mimeForBasename(name) {
-  const lower = name.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-    return "image/jpeg";
-  }
-  if (lower.endsWith(".png")) {
-    return "image/png";
-  }
-  if (lower.endsWith(".webp")) {
-    return "image/webp";
-  }
-  if (lower.endsWith(".gif")) {
-    return "image/gif";
-  }
-  return "application/octet-stream";
+  return getImageMimeFromExtensionOrDefault(name, "application/octet-stream");
 }
 
 export async function GET(request) {

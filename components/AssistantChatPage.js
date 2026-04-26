@@ -2107,7 +2107,7 @@ export default function AssistantChatPage() {
         <input
           ref={incidentPhotoInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/svg+xml,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.avif,.heic,.heif"
           className="assistant-chat-composer__sr-only"
           aria-hidden="true"
           tabIndex={-1}

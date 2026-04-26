@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
+import { normalizeImageReference } from "../lib/imageReference";
 
 const LOCAL_STATUS_LABELS = {
   DRAFT: "Borrador",
@@ -151,10 +152,6 @@ function getProcedureFieldDefinitions(detail) {
   return fromType.filter((field) => field && typeof field === "object");
 }
 
-function looksLikeUrl(value) {
-  return typeof value === "string" && /^https?:\/\//i.test(value.trim());
-}
-
 function resolveTypedFieldValue(collectedData, fieldDefinitions, expectedType) {
   const candidate = fieldDefinitions.find(
     (field) => String(field?.type || "").trim().toLowerCase() === expectedType
@@ -202,20 +199,12 @@ function formatLocationForDisplay(rawLocation) {
 }
 
 function formatAttachmentForDisplay(rawAttachment) {
-  if (!rawAttachment) {
-    return null;
-  }
-  if (typeof rawAttachment === "string") {
-    return looksLikeUrl(rawAttachment) ? rawAttachment.trim() : "Formato inválido";
-  }
-  if (rawAttachment && typeof rawAttachment === "object") {
-    const url = String(rawAttachment.url || rawAttachment.publicUrl || "").trim();
-    if (looksLikeUrl(url)) {
-      return url;
-    }
-    return "Formato inválido";
-  }
-  return "Formato inválido";
+  const normalized = normalizeImageReference(rawAttachment);
+  return {
+    isValid: normalized.isValid,
+    url: normalized.url,
+    label: normalized.displayName || "",
+  };
 }
 
 function deriveCamundaStatus(procedureRequest, detail) {
@@ -573,7 +562,21 @@ export default function FuncionarioExpedienteDetailPage() {
   const typedAttachment =
     resolveTypedFieldValue(collectedData, fieldDefinitions, "image") ||
     resolveTypedFieldValue(collectedData, fieldDefinitions, "file");
-  const attachmentValue = formatAttachmentForDisplay(typedAttachment ?? resolveAttachmentValue(collectedData));
+  const rawAttachment = typedAttachment ?? resolveAttachmentValue(collectedData);
+  const attachmentDisplay = formatAttachmentForDisplay(rawAttachment);
+  const hasPhotoProvided = String(collectedData?.photoStatus || "").trim().toLowerCase() === "provided";
+  const hasPhotoSkipped = ["skipped", "not_requested"].includes(
+    String(collectedData?.photoStatus || "").trim().toLowerCase()
+  );
+  const attachmentSummaryText = hasPhotoSkipped
+    ? "No se adjuntó imagen"
+    : attachmentDisplay.isValid
+      ? attachmentDisplay.label || "Sí"
+      : hasPhotoProvided && rawAttachment
+        ? attachmentDisplay.label || String(rawAttachment || "").trim() || "Imagen adjunta registrada"
+        : rawAttachment
+          ? "Formato inválido"
+          : "No se adjuntó imagen";
   const locationValue = formatLocationForDisplay(typedLocation ?? resolveLocationValue(collectedData));
   const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
   const contactEmail = resolveContactEmail(procedureRequest, collectedData);
@@ -780,7 +783,17 @@ export default function FuncionarioExpedienteDetailPage() {
               <strong>Ubicación:</strong> {locationValue || "No informada"}
             </p>
             <p className="small">
-              <strong>Imagen adjunta:</strong> {attachmentValue || "No adjunta"}
+              <strong>Imagen adjunta:</strong>{" "}
+              {attachmentDisplay.url && attachmentDisplay.isValid ? (
+                <>
+                  {attachmentSummaryText} ·{" "}
+                  <a href={attachmentDisplay.url} target="_blank" rel="noopener noreferrer">
+                    Ver imagen
+                  </a>
+                </>
+              ) : (
+                attachmentSummaryText
+              )}
             </p>
             <p className="small">
               <strong>Canal de origen:</strong> {procedureRequest.channel || "-"}
