@@ -1009,6 +1009,11 @@ body {
   flex-direction: column;
 }
 
+.app-shell--assistant-view {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .app-shell--assistant-view .portal-topbar__inner {
   min-height: 30px;
 }
@@ -1424,6 +1429,23 @@ body {
 .app-shell--assistant-view .app-shell__content {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--assistant-view .page--assistant {
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--assistant-view .assistant-chat-card {
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
 .page {
@@ -3932,6 +3954,7 @@ button:disabled {
     0 20px 44px rgba(15, 23, 42, 0.09),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   overflow: hidden;
+  min-height: 0;
 }
 
 .assistant-chat-header {
