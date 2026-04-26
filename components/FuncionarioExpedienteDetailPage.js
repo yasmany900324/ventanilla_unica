@@ -269,6 +269,22 @@ function isFailedCamundaSyncStatus(status) {
   return key === "ERROR_CAMUNDA_SYNC" || key === "CAMUNDA_SYNC_FAILED";
 }
 
+function buildOperationalSituation({ procedureRequest, camundaStatusKey, hasActiveTask, requiresSyncReview }) {
+  if (requiresSyncReview) {
+    return "El expediente fue creado en el sistema, pero no tiene una tarea activa asociada en Camunda.";
+  }
+  if (hasActiveTask) {
+    return "El expediente está sincronizado y cuenta con una tarea operativa activa.";
+  }
+  if (String(camundaStatusKey || "").trim().toUpperCase() === "PROCESS_RUNNING") {
+    return "La instancia de Camunda está activa, pero todavía no se generó una tarea operativa.";
+  }
+  if (isPendingCamundaSyncStatus(procedureRequest?.status)) {
+    return "El expediente está pendiente de sincronización inicial con Camunda.";
+  }
+  return "Estado operativo estable sin alertas de sincronización.";
+}
+
 function ProcedureFieldVariables({ requiredVariables }) {
   if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
     return null;
@@ -542,6 +558,34 @@ export default function FuncionarioExpedienteDetailPage() {
     }
   };
 
+  const retrySyncLoadingKey = retrySyncAction
+    ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
+    : "";
+  const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
+  const requiresSyncReview = Boolean(retrySyncAction && (shouldShowPendingSyncAction || shouldShowFailedSyncAction));
+  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
+  const operationalSituation = buildOperationalSituation({
+    procedureRequest,
+    camundaStatusKey,
+    hasActiveTask,
+    requiresSyncReview,
+  });
+  const responsibleLabel = procedureRequest?.assignedToUserId
+    ? "Funcionario asignado"
+    : "Sin funcionario asignado";
+  const relationLabel =
+    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
+      ? "No asignado a mi bandeja"
+      : getAssignmentScopeLabel(procedureRequest);
+  const activeTaskOperationalLabel =
+    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+  const handleRetryCamundaSync = () => {
+    if (!retrySyncAction || isRetrySyncLoading) {
+      return;
+    }
+    void runAction(retrySyncAction);
+  };
+
   if (isLoadingAuth) {
     return (
       <main className="page page--dashboard" lang={locale}>
@@ -731,45 +775,6 @@ export default function FuncionarioExpedienteDetailPage() {
             </section>
           ) : null}
 
-          {!isAvailable && retrySyncAction && shouldShowPendingSyncAction ? (
-            <section className="card dashboard-section admin-procedure-fields">
-              <h3>Sincronización pendiente</h3>
-              <p className="small">
-                Este expediente todavía no está sincronizado con Camunda. Puedes intentar sincronizarlo para habilitar
-                las tareas del proceso.
-              </p>
-              <button
-                type="button"
-                className="button-inline"
-                onClick={() => runAction(retrySyncAction)}
-                disabled={actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`}
-              >
-                {actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`
-                  ? "Sincronizando..."
-                  : "Sincronizar con Camunda"}
-              </button>
-            </section>
-          ) : null}
-
-          {!isAvailable && retrySyncAction && shouldShowFailedSyncAction ? (
-            <section className="card dashboard-section admin-procedure-fields">
-              <h3>Error de sincronización</h3>
-              <p className="small">
-                Ocurrió un problema al sincronizar el expediente con Camunda.
-              </p>
-              <button
-                type="button"
-                className="button-inline"
-                onClick={() => runAction(retrySyncAction)}
-                disabled={actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`}
-              >
-                {actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`
-                  ? "Sincronizando..."
-                  : "Reintentar sincronización"}
-              </button>
-            </section>
-          ) : null}
-
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Resumen del caso</h3>
             <p className="small">
@@ -818,27 +823,56 @@ export default function FuncionarioExpedienteDetailPage() {
 
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Estado operativo</h3>
-            <p className="small">
-              <strong>Estado local:</strong> {getLocalStatusLabel(procedureRequest.status)}
-            </p>
-            <p className="small">
-              <strong>Estado Camunda:</strong>{" "}
-              {getCamundaStatusLabel(camundaStatusKey)}
-            </p>
-            <p className="small">
-              <strong>Tarea activa:</strong> {activeTaskLabel}
-            </p>
+            {requiresSyncReview ? (
+              <div
+                className="admin-roles-confirm-dialog__lead"
+                style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "0.75rem" }}
+              >
+                <p className="small" style={{ margin: 0 }}>
+                  Este expediente requiere revisión de sincronización con Camunda.
+                </p>
+                <button
+                  type="button"
+                  className="button-inline"
+                  onClick={handleRetryCamundaSync}
+                  disabled={isRetrySyncLoading}
+                  style={{ marginTop: "0.65rem" }}
+                >
+                  {isRetrySyncLoading ? "Sincronizando..." : "Reintentar sincronización con Camunda"}
+                </button>
+              </div>
+            ) : null}
+            <dl className="admin-roles-confirm-dialog__details" style={{ marginTop: "0.85rem" }}>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Estado del expediente</dt>
+                <dd>
+                  <span className={`badge ${requiresSyncReview ? "badge--en-revision" : "badge--recibido"}`}>
+                    {getLocalStatusLabel(procedureRequest.status)}
+                  </span>
+                </dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Situación</dt>
+                <dd>{operationalSituation}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Tarea activa</dt>
+                <dd>{activeTaskOperationalLabel}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Responsable</dt>
+                <dd>{responsibleLabel}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Relación con mi bandeja</dt>
+                <dd>{relationLabel}</dd>
+              </div>
+            </dl>
             {activeTaskDescription ? (
               <p className="small">
                 <strong>Detalle de tarea:</strong> {activeTaskDescription}
               </p>
             ) : null}
-            <p className="small">
-              <strong>Responsable actual:</strong> {procedureRequest.assignedToUserId || "Sin asignar"}
-            </p>
-            <p className="small">
-              <strong>Relación con mi bandeja:</strong> {getAssignmentScopeLabel(procedureRequest)}
-            </p>
           </section>
 
           <section className="card dashboard-section admin-procedure-fields">
@@ -863,22 +897,19 @@ export default function FuncionarioExpedienteDetailPage() {
               nextStatus={nextStatus}
               setNextStatus={setNextStatus}
             />
-            {!isAvailable && !retrySyncAction && operationalActions.length === 0 ? (
-              detail?.activeTask?.taskDefinitionKey ? (
-                <p className="empty-message">No hay acciones operativas pendientes para este expediente.</p>
-              ) : (
-                <p className="small">
-                  No hay una tarea activa disponible todavía. Cuando el proceso habilite una tarea, aparecerá aquí.
-                </p>
-              )
+            {requiresSyncReview ? (
+              <button
+                type="button"
+                className="button-inline"
+                onClick={handleRetryCamundaSync}
+                disabled={isRetrySyncLoading}
+                style={{ marginTop: "0.4rem" }}
+              >
+                {isRetrySyncLoading ? "Sincronizando..." : "Reintentar sincronización"}
+              </button>
             ) : null}
-            {!isAvailable &&
-            !retrySyncAction &&
-            operationalActions.length === 0 &&
-            !detail?.activeTask?.taskDefinitionKey ? (
-              <p className="small">
-                No hay una tarea activa disponible todavía. Cuando el proceso habilite una tarea, aparecerá aquí.
-              </p>
+            {!isAvailable && !requiresSyncReview && operationalActions.length === 0 ? (
+              <p className="empty-message">No hay acciones operativas disponibles para este expediente.</p>
             ) : null}
           </section>
 
@@ -890,6 +921,10 @@ export default function FuncionarioExpedienteDetailPage() {
               <p className="small">
                 <strong>ID interno:</strong>{" "}
                 <span className="admin-procedure-table__mono">{procedureRequest.id}</span>
+              </p>
+              <p className="small">
+                <strong>UUID responsable:</strong>{" "}
+                <span className="admin-procedure-table__mono">{procedureRequest.assignedToUserId || "-"}</span>
               </p>
               <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
                 {stringifyJson(collectedData)}
