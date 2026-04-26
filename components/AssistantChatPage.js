@@ -84,6 +84,20 @@ function normalizeChipLabel(value) {
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_MESSAGE_LENGTH);
 }
 
+/** Preserva saltos de línea; solo colapsa espacios/tabs horizontales (no convierte \\n en espacio). */
+function normalizeMessageText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const withUnixNewlines = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return withUnixNewlines
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trim()
+    .slice(0, MAX_MESSAGE_LENGTH);
+}
+
 function normalizeLocationPayload(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -246,7 +260,7 @@ function normalizePersistedMessage(rawMessage, index) {
 
   const messageType = normalizeContextParam(rawMessage.type, 40) || MESSAGE_TYPE_TEXT;
   const location = normalizeLocationPayload(rawMessage.location);
-  const text = normalizeChipLabel(rawMessage.text);
+  const text = normalizeMessageText(rawMessage.text);
   if (!text && !location && !rawMessage.attachmentImageUrl) {
     return null;
   }
@@ -875,7 +889,7 @@ function ChatMessageBubble({
   const timeLabel = formatMessageTime(message.createdAt);
   const suggestedReplies = Array.isArray(message.suggestedReplies) ? message.suggestedReplies : [];
   const actionOptions = Array.isArray(message.actionOptions) ? message.actionOptions : [];
-  const messageText = normalizeChipLabel(message.text);
+  const messageText = normalizeMessageText(message.text);
   const shouldRenderText =
     !(isBot && message.statusSummary) &&
     (message.type !== MESSAGE_TYPE_IMAGE || isBot || Boolean(messageText));
