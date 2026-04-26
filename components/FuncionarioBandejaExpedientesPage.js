@@ -245,6 +245,7 @@ function IconInfo() {
 }
 
 const ACTIONS_MENU_PANEL_ID = "funcionario-bandeja-actions-menu";
+const DELETE_MODAL_TITLE_ID = "funcionario-bandeja-delete-modal-title";
 
 function computeActionsMenuPlacement(anchorEl) {
   if (!anchorEl || typeof window === "undefined") {
@@ -272,9 +273,12 @@ export default function FuncionarioBandejaExpedientesPage() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [openActionsMenuId, setOpenActionsMenuId] = useState(null);
   const [actionsMenuPlacement, setActionsMenuPlacement] = useState({ top: 0, right: 0 });
   const actionsMenuAnchorRef = useRef(null);
+  const deleteRequestInFlightRef = useRef(false);
   const [channelFilter, setChannelFilter] = useState("all");
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
@@ -421,6 +425,52 @@ export default function FuncionarioBandejaExpedientesPage() {
     };
   }, [openActionsMenuId]);
 
+  useEffect(() => {
+    if (!deleteCandidate || !isDeleteModalOpen) {
+      return undefined;
+    }
+    const id = getRowActionsMenuId(deleteCandidate);
+    const stillInView = filteredList.some((row) => getRowActionsMenuId(row) === id);
+    if (!stillInView) {
+      setDeleteCandidate(null);
+      setIsDeleteModalOpen(false);
+    }
+  }, [deleteCandidate, filteredList, isDeleteModalOpen]);
+
+  useEffect(() => {
+    if (!isDeleteModalOpen || typeof document === "undefined") {
+      return undefined;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isDeleteModalOpen]);
+
+  useEffect(() => {
+    if (!isDeleteModalOpen || deletingId) {
+      return undefined;
+    }
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDeleteCandidate(null);
+        setIsDeleteModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deletingId, isDeleteModalOpen]);
+
+  const closeDeleteModal = useCallback(() => {
+    if (deletingId) {
+      return;
+    }
+    setDeleteCandidate(null);
+    setIsDeleteModalOpen(false);
+  }, [deletingId]);
+
   const pendingCount = useMemo(() => filteredList.filter((item) => isPendingItem(item)).length, [filteredList]);
 
   const workMetrics = useMemo(() => {
@@ -442,18 +492,12 @@ export default function FuncionarioBandejaExpedientesPage() {
     router.push(`/funcionario/expedientes/${encodeURIComponent(internalId)}`);
   };
 
-  const handleDeleteExpediente = async (item) => {
+  const executeDeleteExpediente = useCallback(async (item) => {
     const internalId = item?.procedureRequestId || item?.id;
-    if (!internalId || deletingId) {
+    if (!internalId || deleteRequestInFlightRef.current) {
       return;
     }
-    const tracking = item?.requestCode || internalId;
-    const confirmed = window.confirm(
-      `¿Seguro que deseas eliminar el expediente ${tracking}?\n\nSi está sincronizado en Camunda, se eliminará primero allí y luego en la base de datos.`
-    );
-    if (!confirmed) {
-      return;
-    }
+    deleteRequestInFlightRef.current = true;
     setDeletingId(String(internalId));
     setError("");
     setSuccessMessage("");
@@ -468,16 +512,23 @@ export default function FuncionarioBandejaExpedientesPage() {
             ? "No se pudo eliminar la instancia en Camunda. El expediente no fue eliminado."
             : data?.error || "No se pudo eliminar el expediente.";
         setError(message);
+        setDeleteCandidate(null);
+        setIsDeleteModalOpen(false);
         return;
       }
       setSuccessMessage(data?.message || "Expediente eliminado correctamente.");
+      setDeleteCandidate(null);
+      setIsDeleteModalOpen(false);
       await loadList();
     } catch (_error) {
       setError("No se pudo eliminar el expediente.");
+      setDeleteCandidate(null);
+      setIsDeleteModalOpen(false);
     } finally {
       setDeletingId("");
+      deleteRequestInFlightRef.current = false;
     }
-  };
+  }, [loadList]);
 
   if (isLoadingAuth) {
     return (
@@ -805,17 +856,69 @@ export default function FuncionarioBandejaExpedientesPage() {
                 type="button"
                 role="menuitem"
                 className="funcionario-bandeja__menu-item funcionario-bandeja__menu-item--danger"
-                disabled={deletingId === String(openActionsItem.procedureRequestId || openActionsItem.id)}
                 onClick={() => {
                   const row = openActionsItem;
                   setOpenActionsMenuId(null);
-                  void handleDeleteExpediente(row);
+                  setDeleteCandidate(row);
+                  setIsDeleteModalOpen(true);
                 }}
               >
-                {deletingId === String(openActionsItem.procedureRequestId || openActionsItem.id)
-                  ? "Eliminando..."
-                  : "Eliminar"}
+                Eliminar
               </button>
+            </div>,
+            document.body
+          )
+        : null}
+
+      {isDeleteModalOpen && deleteCandidate && typeof document !== "undefined"
+        ? createPortal(
+            <div className="funcionario-bandeja-delete-modal" role="presentation" onClick={closeDeleteModal}>
+              <div
+                className="funcionario-bandeja-delete-modal__panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={DELETE_MODAL_TITLE_ID}
+                data-funcionario-delete-modal
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id={DELETE_MODAL_TITLE_ID} className="funcionario-bandeja-delete-modal__title">
+                  Eliminar expediente
+                </h2>
+                <p className="funcionario-bandeja-delete-modal__lead">
+                  ¿Confirma que desea eliminar el expediente{" "}
+                  <strong className="funcionario-bandeja-delete-modal__strong">
+                    {deleteCandidate.requestCode ||
+                      deleteCandidate.procedureRequestId ||
+                      deleteCandidate.id ||
+                      "—"}
+                  </strong>
+                  ? Esta acción no se puede deshacer.
+                </p>
+                <p className="funcionario-bandeja-delete-modal__hint">
+                  Si el trámite está sincronizado en Camunda, se eliminará primero en esa plataforma y luego en la base
+                  de datos del sistema.
+                </p>
+                <div className="funcionario-bandeja-delete-modal__actions">
+                  <button
+                    type="button"
+                    className="funcionario-bandeja-delete-modal__btn funcionario-bandeja-delete-modal__btn--ghost"
+                    disabled={Boolean(deletingId)}
+                    onClick={closeDeleteModal}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="funcionario-bandeja-delete-modal__btn funcionario-bandeja-delete-modal__btn--danger"
+                    disabled={Boolean(deletingId)}
+                    onClick={() => {
+                      void executeDeleteExpediente(deleteCandidate);
+                    }}
+                  >
+                    {deletingId ? "Eliminando..." : "Eliminar expediente"}
+                  </button>
+                </div>
+              </div>
             </div>,
             document.body
           )

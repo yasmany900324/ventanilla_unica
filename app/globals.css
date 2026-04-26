@@ -7819,6 +7819,109 @@ a.dashboard-onify-detail-btn {
   font-weight: 800;
 }
 
+.funcionario-bandeja-delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 12600;
+  background: rgba(8, 18, 37, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.funcionario-bandeja-delete-modal__panel {
+  width: min(100%, 440px);
+  border-radius: 16px;
+  border: 1px solid #cedcf1;
+  background: #ffffff;
+  box-shadow: 0 24px 38px rgba(13, 26, 53, 0.22);
+  padding: 1.15rem 1.2rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.funcionario-bandeja-delete-modal__title {
+  margin: 0;
+  color: #1d3f78;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.funcionario-bandeja-delete-modal__lead {
+  margin: 0;
+  color: #4c5a70;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.funcionario-bandeja-delete-modal__strong {
+  color: #0f2744;
+  font-weight: 800;
+}
+
+.funcionario-bandeja-delete-modal__hint {
+  margin: 0;
+  padding: 0.65rem 0.72rem;
+  border-radius: 12px;
+  border: 1px solid rgba(147, 180, 235, 0.45);
+  background: linear-gradient(180deg, #f7f9fd 0%, #eef3fb 100%);
+  color: #4a5d78;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.funcionario-bandeja-delete-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+}
+
+.funcionario-bandeja-delete-modal__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.42rem 0.92rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.funcionario-bandeja-delete-modal__btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.funcionario-bandeja-delete-modal__btn--ghost {
+  border-color: #acc1e2;
+  background: #ffffff;
+  color: #1f4f95;
+}
+
+.funcionario-bandeja-delete-modal__btn--ghost:hover:not(:disabled) {
+  background: #edf4ff;
+  border-color: #8eaed8;
+}
+
+.funcionario-bandeja-delete-modal__btn--danger {
+  border-color: #b42318;
+  background: #b42318;
+  color: #ffffff;
+}
+
+.funcionario-bandeja-delete-modal__btn--danger:hover:not(:disabled) {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
 @media (max-width: 1366px) {
   .funcionario-bandeja__inner {
     width: min(calc(100% - 28px), 1220px);
