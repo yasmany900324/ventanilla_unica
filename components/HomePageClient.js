@@ -881,7 +881,7 @@ export default function HomePageClient() {
                 const status = normalizeStatus(procedure.status);
                 return (
                   <li key={procedure.id}>
-                    <Link href={`/ciudadano/dashboard?incidentId=${procedure.id}`} className="home-onify-recent__row">
+                    <Link href={`/ciudadano/dashboard/${procedure.id}`} className="home-onify-recent__row">
                       <div className="home-onify-recent__main-group">
                         <span className="home-onify-recent__avatar" aria-hidden="true">
                           ●
