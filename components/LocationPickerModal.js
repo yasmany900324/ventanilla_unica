@@ -7,9 +7,8 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 
 const DEFAULT_CENTER = {
   lat: -34.9011,
@@ -40,60 +39,7 @@ function normalizeCenter(center) {
   return DEFAULT_CENTER;
 }
 
-function MapResizeController() {
-  const map = useMap();
-
-  useEffect(() => {
-    const container = map.getContainer();
-    if (!container) {
-      return undefined;
-    }
-
-    const invalidate = () => {
-      map.invalidateSize({ animate: false });
-    };
-
-    invalidate();
-    const timeouts = [0, 50, 150, 320, 600].map((ms) => window.setTimeout(invalidate, ms));
-
-    let resizeObserver;
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => {
-        invalidate();
-      });
-      resizeObserver.observe(container);
-      if (container.parentElement) {
-        resizeObserver.observe(container.parentElement);
-      }
-    }
-
-    window.addEventListener("resize", invalidate);
-
-    return () => {
-      timeouts.forEach((id) => window.clearTimeout(id));
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", invalidate);
-    };
-  }, [map]);
-
-  return null;
-}
-
-function MapCenterTracker({ onCenterChange }) {
-  useMapEvents({
-    load(event) {
-      const map = event.target;
-      const c = map.getCenter();
-      onCenterChange({ lat: c.lat, lng: c.lng });
-    },
-    moveend(event) {
-      const map = event.target;
-      const c = map.getCenter();
-      onCenterChange({ lat: c.lat, lng: c.lng });
-    },
-  });
-  return null;
-}
+const LocationPickerMapClient = dynamic(() => import("./LocationPickerMapClient"), { ssr: false });
 
 function LocationPickerModalDialog({
   initialCenter,
@@ -162,21 +108,7 @@ function LocationPickerModalDialog({
         <p className="assistant-location-dialog__hint">{hint}</p>
 
         <div className="assistant-location-dialog__map-shell">
-          <MapContainer
-            key={`${normalizedInitialCenter.lat}-${normalizedInitialCenter.lng}`}
-            center={[normalizedInitialCenter.lat, normalizedInitialCenter.lng]}
-            zoom={16}
-            scrollWheelZoom
-            className="assistant-location-dialog__leaflet-root"
-            style={{ width: "100%", height: "100%", minHeight: "inherit" }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapResizeController />
-            <MapCenterTracker onCenterChange={syncCenter} />
-          </MapContainer>
+          <LocationPickerMapClient initialCenter={normalizedInitialCenter} onCenterChange={syncCenter} />
           <div className="assistant-location-dialog__pin" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M12 2c-4.06 0-7.35 3.2-7.35 7.15 0 5.7 7.35 12.7 7.35 12.7s7.35-7 7.35-12.7C19.35 5.2 16.06 2 12 2Z" />

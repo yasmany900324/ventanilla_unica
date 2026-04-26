@@ -1369,10 +1369,6 @@ export default function AssistantChatPage() {
     router.replace(pathname || "/asistente");
   }, [contextualWelcomeMessage, pathname, restartKey, router]);
 
-  const canSend = useMemo(() => {
-    return Boolean(normalizeInput(inputValue)) && !isSending && !isLocationPickResolving;
-  }, [inputValue, isLocationPickResolving, isSending]);
-
   const submitMessage = useCallback(async ({
     rawValue,
     command = DEFAULT_CHAT_COMMAND,
@@ -1691,6 +1687,9 @@ export default function AssistantChatPage() {
   const [isLocationPickResolving, setIsLocationPickResolving] = useState(false);
   const [isComposerLocationMenuOpen, setComposerLocationMenuOpen] = useState(false);
   const [lastSharedLocation, setLastSharedLocation] = useState(null);
+  const canSend = useMemo(() => {
+    return Boolean(normalizeInput(inputValue)) && !isSending && !isLocationPickResolving;
+  }, [inputValue, isLocationPickResolving, isSending]);
 
   const resolveLocationSelection = useCallback(
     async ({ source, latitude, longitude, priorReference = null }) => {
