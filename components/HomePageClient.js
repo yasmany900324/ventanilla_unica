@@ -1,494 +1,343 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
-function normalizeCardId(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .slice(0, 64);
-}
-
-function resolveCardType(item) {
-  if (item?.badgeType === "anonymous") {
-    return "incidencia";
-  }
-
-  return "tramite";
-}
-
-function resolveServiceKind(item) {
-  if (item?.badgeType === "ticket") {
-    return "estado";
-  }
-  if (item?.badgeType === "anonymous") {
-    return "incidencia";
-  }
-  return "tramite";
-}
-
-function resolveServiceIcon(item) {
-  const kind = resolveServiceKind(item);
-  if (kind === "incidencia") {
-    return "!";
-  }
-  if (kind === "estado") {
-    return "?";
-  }
-  return "+";
-}
-
-function resolveIncidentCategory(item) {
-  const icon = typeof item?.icon === "string" ? item.icon.toUpperCase().trim() : "";
-  if (icon === "AP") {
-    return "alumbrado";
-  }
-  if (icon === "CD") {
-    return "limpieza";
-  }
-  if (icon === "AR") {
-    return "infraestructura";
-  }
-  return "otro";
-}
-
-function buildAssistantCardHref(item) {
-  const cardType = resolveCardType(item);
-  const params = new URLSearchParams();
-  params.set("type", cardType);
-  params.set("id", normalizeCardId(item?.title || "") || "item");
-  params.set("title", item?.title || "");
-
-  if (item?.description) {
-    params.set("description", item.description);
-  }
-  if (cardType === "incidencia") {
-    params.set("category", resolveIncidentCategory(item));
-  }
-
-  return `/asistente?${params.toString()}`;
-}
-
-function resolveFrequentServiceCta(item, copy) {
-  const kind = resolveServiceKind(item);
-  const frequentCtas = copy?.home?.frequentCtas || {};
-  if (kind === "incidencia") {
-    return frequentCtas.incidencia || "Reportar";
-  }
-  if (kind === "estado") {
-    return frequentCtas.estado || "Ver más";
-  }
-  return frequentCtas.tramite || "Iniciar trámite";
-}
-
-function CarouselChevronIcon({ direction = "next" }) {
-  const rotation = direction === "prev" ? "180" : "0";
-  return (
-    <svg
-      className="home-frequent-carousel__nav-icon"
-      viewBox="0 0 20 20"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <g transform={`rotate(${rotation} 10 10)`}>
-        <path
-          d="M7.25 4.75 12.5 10l-5.25 5.25"
-          stroke="currentColor"
-          strokeWidth="2.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-    </svg>
-  );
-}
-
-function FrequentCardCtaChevronIcon() {
-  return (
-    <svg
-      className="home-frequent-card__cta-icon"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M5.25 3.5 9.75 8l-4.5 4.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function FrequentItemCard({ item, href, serviceKind, ctaLabel, typeLabel, openItemAriaPrefix }) {
-  return (
-    <li className="home-frequent-carousel__slide">
-      <Link
-        href={href}
-        className={`home-frequent-card home-frequent-card--${serviceKind}`}
-        aria-label={`${openItemAriaPrefix} ${item.title}`}
-      >
-        <div className="home-frequent-card__top">
-          <span
-            className={`home-frequent-card__icon-shell home-frequent-card__icon-shell--${serviceKind}`}
-            aria-hidden="true"
-          >
-            <span className="home-frequent-card__icon" aria-hidden="true">
-              {resolveServiceIcon(item)}
-            </span>
-          </span>
-          {item.badge ? (
-            <span className={`home-frequent-card__badge home-frequent-card__badge--${item.badgeType}`}>
-              {item.badge}
-            </span>
-          ) : null}
-        </div>
-        <div className="home-frequent-card__content">
-          <p className="home-frequent-card__type">{typeLabel}</p>
-          <h3 className="home-frequent-card__title">{item.title}</h3>
-          <p className="home-frequent-card__description">{item.description}</p>
-        </div>
-        <span className="home-frequent-card__cta">
-          {ctaLabel}
-          <FrequentCardCtaChevronIcon />
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-function FrequentServicesCarousel({ services, copy, hasActiveSession }) {
-  const viewportRef = useRef(null);
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
-  const hasMeasuredScrollRef = useRef(false);
-
-  const updateScrollState = useCallback(() => {
-    const viewportNode = viewportRef.current;
-    if (!viewportNode) {
-      setCanScrollPrev(false);
-      setCanScrollNext(false);
-      return;
-    }
-
-    const tolerance = 4;
-    const maxScrollLeft = viewportNode.scrollWidth - viewportNode.clientWidth;
-    setCanScrollPrev(viewportNode.scrollLeft > tolerance);
-    setCanScrollNext(viewportNode.scrollLeft < maxScrollLeft - tolerance);
-  }, []);
-
-  useEffect(() => {
-    const viewportNode = viewportRef.current;
-    if (!viewportNode) {
-      return undefined;
-    }
-
-    const handleScroll = () => updateScrollState();
-    const handleResize = () => updateScrollState();
-    viewportNode.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleResize);
-    return () => {
-      viewportNode.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [updateScrollState]);
-
-  useEffect(() => {
-    if (hasMeasuredScrollRef.current) {
-      return;
-    }
-    hasMeasuredScrollRef.current = true;
-    const viewportNode = viewportRef.current;
-    if (!viewportNode) {
-      return;
-    }
-    const tolerance = 4;
-    const maxScrollLeft = viewportNode.scrollWidth - viewportNode.clientWidth;
-    setCanScrollPrev(viewportNode.scrollLeft > tolerance);
-    setCanScrollNext(viewportNode.scrollLeft < maxScrollLeft - tolerance);
-  }, [services.length]);
-
-  const scrollByStep = useCallback((direction) => {
-    const viewportNode = viewportRef.current;
-    if (!viewportNode) {
-      return;
-    }
-
-    const firstCard = viewportNode.querySelector(".home-frequent-card");
-    if (!firstCard) {
-      return;
-    }
-
-    const computedStyles = window.getComputedStyle(viewportNode);
-    const gapValue = Number.parseFloat(computedStyles.getPropertyValue("--frequent-carousel-gap")) || 0;
-    const step = firstCard.getBoundingClientRect().width + gapValue;
-    viewportNode.scrollBy({
-      left: direction * step,
-      behavior: "smooth",
-    });
-  }, []);
-
-  const handleViewportKeyDown = useCallback(
-    (event) => {
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        scrollByStep(1);
-      } else if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        scrollByStep(-1);
-      }
+function getHomeContent(locale = "es") {
+  const contentByLocale = {
+    en: {
+      heroTitle:
+        "Start managements, report situations and track the status of your requests in one place",
+      heroDescription:
+        "Our assistant guides you to find the right option and start your management in just a few minutes.",
+      searchPlaceholder: "What do you need to do today?",
+      startManagement: "Start management",
+      checkStatus: "Check status",
+      quickAccessLabel: "Quick access",
+      quickAccess: [
+        {
+          id: "new",
+          title: "New management",
+          description: "Start a procedure or report a situation in a few steps.",
+          href: "/asistente",
+          icon: "+",
+        },
+        {
+          id: "my",
+          title: "My managements",
+          description: "Check and track your managements.",
+          href: "/mis-incidencias",
+          icon: "▦",
+        },
+        {
+          id: "file",
+          title: "Check file",
+          description: "Check the status of an existing file.",
+          href: "/mis-incidencias",
+          icon: "⌕",
+        },
+        {
+          id: "assistant",
+          title: "Talk to assistant",
+          description: "Get help and find the right option for you.",
+          href: "/asistente",
+          icon: "◔",
+        },
+      ],
+      frequentTitle: "Frequent managements",
+      viewAllManagements: "View all managements →",
+      frequent: [
+        {
+          title: "Public space report",
+          type: "REPORT",
+          description: "Report issues in public space.",
+          href: "/asistente",
+          icon: "◉",
+        },
+        {
+          title: "Public lighting",
+          type: "REPORT",
+          description: "Report failures or lights off in your area.",
+          href: "/asistente",
+          icon: "✦",
+        },
+        {
+          title: "Overflowing container",
+          type: "REPORT",
+          description: "Report containers needing urgent emptying.",
+          href: "/asistente",
+          icon: "▣",
+        },
+        {
+          title: "Business registration",
+          type: "PROCEDURE",
+          description: "Commercial permit for new businesses.",
+          href: "/asistente",
+          icon: "▤",
+        },
+      ],
+      recentTitle: "My recent managements",
+      viewAllMine: "View all my managements →",
+      loadingRecent: "Loading recent managements...",
+      emptyRecent: "You still have no managements started.",
+      helpTitle: "Need help?",
+      helpSubtitle: "We are here to support you at every step.",
+      faqTitle: "Frequently asked questions",
+      faqDescription: "Answers to the most common questions.",
+      channelsTitle: "Contact channels",
+      channelsDescription: "Phone, email and offices.",
+      helpLine: "Citizen support line",
+      flowTitle: "Simple tracking",
+      flowSubtitle: "Managing your request is this easy.",
+      flow: [
+        { title: "Start your management", description: "Choose the management type and complete the details." },
+        { title: "We receive your request", description: "We register it and send you a file number." },
+        { title: "We follow up", description: "Our team works on the resolution." },
+        { title: "We notify you", description: "We inform you about each progress and solution." },
+      ],
     },
-    [scrollByStep]
-  );
-
-  return (
-    <div className="home-frequent-carousel">
-      <button
-        type="button"
-        className="home-frequent-carousel__nav home-frequent-carousel__nav--prev"
-        aria-label={copy.home.frequentCarouselPrev}
-        onClick={() => scrollByStep(-1)}
-        disabled={!canScrollPrev}
-      >
-        <CarouselChevronIcon direction="prev" />
-      </button>
-
-      <div
-        ref={viewportRef}
-        className="home-frequent-carousel__viewport"
-        role="region"
-        tabIndex={0}
-        aria-label={copy.home.frequentCarouselAria}
-        onKeyDown={handleViewportKeyDown}
-      >
-        <ul className="home-frequent-carousel__track">
-          {services.map((item) => {
-            const href =
-              item.badgeType === "identity" && !hasActiveSession
-                ? "/login"
-                : buildAssistantCardHref(item);
-            const serviceKind = resolveServiceKind(item);
-            const ctaLabel = resolveFrequentServiceCta(item, copy);
-            const typeLabel = copy.home.frequentTypeLabels[serviceKind] || "";
-
-            return (
-              <FrequentItemCard
-                key={item.title}
-                item={item}
-                href={href}
-                serviceKind={serviceKind}
-                ctaLabel={ctaLabel}
-                typeLabel={typeLabel}
-                openItemAriaPrefix={copy.home.openItemAriaPrefix}
-              />
-            );
-          })}
-        </ul>
-      </div>
-
-      <button
-        type="button"
-        className="home-frequent-carousel__nav home-frequent-carousel__nav--next"
-        aria-label={copy.home.frequentCarouselNext}
-        onClick={() => scrollByStep(1)}
-        disabled={!canScrollNext}
-      >
-        <CarouselChevronIcon direction="next" />
-      </button>
-    </div>
-  );
+    pt: {
+      heroTitle:
+        "Inicie gestões, reporte situações e acompanhe o estado das suas solicitações em um só lugar",
+      heroDescription:
+        "Nosso assistente orienta você para encontrar a opção correta e iniciar sua gestão em poucos minutos.",
+      searchPlaceholder: "O que você precisa fazer hoje?",
+      startManagement: "Iniciar gestão",
+      checkStatus: "Consultar estado",
+      quickAccessLabel: "Acessos rápidos",
+      quickAccess: [
+        {
+          id: "new",
+          title: "Nova gestão",
+          description: "Inicie um trâmite ou reporte uma situação em poucos passos.",
+          href: "/asistente",
+          icon: "+",
+        },
+        {
+          id: "my",
+          title: "Minhas gestões",
+          description: "Consulte e acompanhe suas gestões.",
+          href: "/mis-incidencias",
+          icon: "▦",
+        },
+        {
+          id: "file",
+          title: "Consultar expediente",
+          description: "Consulte o estado de um expediente existente.",
+          href: "/mis-incidencias",
+          icon: "⌕",
+        },
+        {
+          id: "assistant",
+          title: "Falar com o assistente",
+          description: "Obtenha ajuda e encontre a opção correta para você.",
+          href: "/asistente",
+          icon: "◔",
+        },
+      ],
+      frequentTitle: "Gestões frequentes",
+      viewAllManagements: "Ver todas as gestões →",
+      frequent: [
+        {
+          title: "Reporte em via pública",
+          type: "REPORTE",
+          description: "Reporte problemas no espaço público.",
+          href: "/asistente",
+          icon: "◉",
+        },
+        {
+          title: "Iluminação pública",
+          type: "REPORTE",
+          description: "Reporte falhas ou luzes apagadas na sua zona.",
+          href: "/asistente",
+          icon: "✦",
+        },
+        {
+          title: "Contêiner transbordando",
+          type: "REPORTE",
+          description: "Informe contêineres que precisam de esvaziamento urgente.",
+          href: "/asistente",
+          icon: "▣",
+        },
+        {
+          title: "Registro de empresa",
+          type: "TRÂMITE",
+          description: "Habilitação comercial para novos empreendimentos.",
+          href: "/asistente",
+          icon: "▤",
+        },
+      ],
+      recentTitle: "Minhas gestões recentes",
+      viewAllMine: "Ver todas as minhas gestões →",
+      loadingRecent: "Carregando gestões recentes...",
+      emptyRecent: "Você ainda não tem gestões iniciadas.",
+      helpTitle: "Precisa de ajuda?",
+      helpSubtitle: "Estamos para acompanhar você em cada passo.",
+      faqTitle: "Perguntas frequentes",
+      faqDescription: "Respondemos as dúvidas mais comuns.",
+      channelsTitle: "Canais de contato",
+      channelsDescription: "Telefone, correio e escritórios.",
+      helpLine: "Linha de atenção cidadã",
+      flowTitle: "Acompanhamento simples",
+      flowSubtitle: "Assim é fácil fazer sua gestão.",
+      flow: [
+        { title: "Inicie sua gestão", description: "Escolha o tipo de gestão e complete os dados." },
+        { title: "Recebemos sua solicitação", description: "Registramos e enviamos um número de expediente." },
+        { title: "Fazemos acompanhamento", description: "Nossa equipe trabalha na resolução." },
+        { title: "Notificamos você", description: "Informamos cada avanço e a solução." },
+      ],
+    },
+    es: {
+      heroTitle:
+        "Iniciá gestiones, reportá situaciones y seguí el estado de tus solicitudes en un solo lugar",
+      heroDescription:
+        "Nuestro asistente te guía para encontrar la opción correcta y comenzar tu gestión en pocos minutos.",
+      searchPlaceholder: "¿Qué necesitás hacer hoy?",
+      startManagement: "Iniciar gestión",
+      checkStatus: "Consultar estado",
+      quickAccessLabel: "Accesos rápidos",
+      quickAccess: [
+        {
+          id: "new",
+          title: "Nueva gestión",
+          description: "Iniciá un trámite o reportá una situación en pocos pasos.",
+          href: "/asistente",
+          icon: "+",
+        },
+        {
+          id: "my",
+          title: "Mis gestiones",
+          description: "Consultá y hacé seguimiento de tus gestiones.",
+          href: "/mis-incidencias",
+          icon: "▦",
+        },
+        {
+          id: "file",
+          title: "Consultar expediente",
+          description: "Consultá el estado de un expediente existente.",
+          href: "/mis-incidencias",
+          icon: "⌕",
+        },
+        {
+          id: "assistant",
+          title: "Hablar con el asistente",
+          description: "Obtené ayuda y encontrá la opción correcta para vos.",
+          href: "/asistente",
+          icon: "◔",
+        },
+      ],
+      frequentTitle: "Gestiones frecuentes",
+      viewAllManagements: "Ver todas las gestiones →",
+      frequent: [
+        {
+          title: "Reporte en vía pública",
+          type: "REPORTE",
+          description: "Reportá problemas en el espacio público.",
+          href: "/asistente",
+          icon: "◉",
+        },
+        {
+          title: "Alumbrado público",
+          type: "REPORTE",
+          description: "Reportá fallas o luces apagadas en tu zona.",
+          href: "/asistente",
+          icon: "✦",
+        },
+        {
+          title: "Contenedor desbordado",
+          type: "REPORTE",
+          description: "Informá sobre contenedores que necesitan vaciado urgente.",
+          href: "/asistente",
+          icon: "▣",
+        },
+        {
+          title: "Registro de empresa",
+          type: "TRÁMITE",
+          description: "Habilitación comercial para nuevos emprendimientos.",
+          href: "/asistente",
+          icon: "▤",
+        },
+      ],
+      recentTitle: "Mis gestiones recientes",
+      viewAllMine: "Ver todas mis gestiones →",
+      loadingRecent: "Cargando gestiones recientes...",
+      emptyRecent: "Todavía no tenés gestiones iniciadas.",
+      helpTitle: "¿Necesitás ayuda?",
+      helpSubtitle: "Estamos para acompañarte en cada paso.",
+      faqTitle: "Preguntas frecuentes",
+      faqDescription: "Respondemos las dudas más comunes.",
+      channelsTitle: "Canales de contacto",
+      channelsDescription: "Teléfono, correo y oficinas.",
+      helpLine: "Línea de atención ciudadana",
+      flowTitle: "Seguimiento simple",
+      flowSubtitle: "Así de fácil es hacer tu gestión.",
+      flow: [
+        { title: "Iniciá tu gestión", description: "Elegí el tipo de gestión y completá los datos." },
+        { title: "Recibimos tu solicitud", description: "La registramos y te enviamos un número de expediente." },
+        { title: "Hacemos seguimiento", description: "Nuestro equipo trabaja en la resolución." },
+        { title: "Te notificamos", description: "Te informamos cada avance y la solución." },
+      ],
+    },
+  };
+  return contentByLocale[locale] || contentByLocale.es;
 }
 
-function HeroAssistantArtwork() {
+function formatDate(value, locale = "es") {
+  if (!value) return "Sin fecha";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  const localeMap = { es: "es-UY", en: "en-US", pt: "pt-BR" };
+  return new Intl.DateTimeFormat(localeMap[locale] || "es-UY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function normalizeStatus(status) {
+  const value = String(status || "").trim().toUpperCase();
+  const statusMap = {
+    DRAFT: { label: "Recibido", tone: "received" },
+    PENDING_CONFIRMATION: { label: "Recibido", tone: "received" },
+    PENDING_CAMUNDA_SYNC: { label: "Recibido", tone: "received" },
+    WAITING_CITIZEN_INFO: { label: "En revisión", tone: "review" },
+    PENDING_BACKOFFICE_ACTION: { label: "En proceso", tone: "progress" },
+    IN_PROGRESS: { label: "En proceso", tone: "progress" },
+    RESOLVED: { label: "Resuelto", tone: "resolved" },
+    CLOSED: { label: "Resuelto", tone: "resolved" },
+    ARCHIVED: { label: "Resuelto", tone: "resolved" },
+    REJECTED: { label: "Resuelto", tone: "resolved" },
+  };
+  return statusMap[value] || { label: "En revisión", tone: "review" };
+}
+
+function HeroLineArt() {
   return (
-    <svg
-      width="720"
-      height="420"
-      viewBox="0 0 720 420"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label="Ilustración de asistente virtual para atención ciudadana"
-      className="home-hero-illustration"
-    >
-      <defs>
-        <linearGradient id="bgGlow" x1="0" y1="0" x2="720" y2="420" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3E67C7" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="#8ED8F8" stopOpacity="0.12" />
-        </linearGradient>
+    <svg viewBox="0 0 560 360" className="home-onify-hero__art" aria-hidden="true">
+      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="96" y="102" width="246" height="172" rx="22" stroke="#BCD0EE" strokeWidth="2.4" />
+        <rect x="124" y="132" width="192" height="18" rx="9" stroke="#CAD9F1" strokeWidth="2" />
+        <rect x="124" y="164" width="96" height="84" rx="14" stroke="#D1DEF4" strokeWidth="2" />
+        <rect x="234" y="164" width="82" height="38" rx="12" stroke="#D1DEF4" strokeWidth="2" />
+        <path d="M236 218h78" stroke="#D1DEF4" strokeWidth="2" />
+        <path d="M236 234h60" stroke="#D1DEF4" strokeWidth="2" />
+        <path d="M160 194l16 14 25-28" stroke="#84A9DC" strokeWidth="4" />
 
-        <linearGradient
-          id="botStroke"
-          x1="430"
-          y1="40"
-          x2="640"
-          y2="240"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop offset="0%" stopColor="#8A97E8" />
-          <stop offset="100%" stopColor="#1E4BA8" />
-        </linearGradient>
+        <path d="M60 270h440" stroke="#D6E3F7" strokeWidth="3" />
+        <path d="M72 270v-56h46v56" stroke="#C7D8F3" strokeWidth="2.2" />
+        <path d="M84 214v-28h22v28" stroke="#C7D8F3" strokeWidth="2.2" />
+        <path d="M368 270v-82h58v82" stroke="#C7D8F3" strokeWidth="2.2" />
+        <path d="M390 188v-38h16v38" stroke="#C7D8F3" strokeWidth="2.2" />
+        <path d="M444 270v-44h36v44" stroke="#C7D8F3" strokeWidth="2.2" />
 
-        <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7FD6F4" />
-          <stop offset="100%" stopColor="#4BBDEB" />
-        </linearGradient>
+        <path d="M414 94c0-16 13-29 29-29s29 13 29 29c0 18-29 39-29 39s-29-21-29-39Z" stroke="#B8D0F0" strokeWidth="2.2" />
+        <circle cx="443" cy="94" r="9" stroke="#B8D0F0" strokeWidth="2.2" />
 
-        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#163F8C" floodOpacity="0.10" />
-        </filter>
-      </defs>
-
-      <rect x="0" y="0" width="720" height="420" fill="url(#bgGlow)" />
-
-      <g
-        opacity="0.16"
-        stroke="#DCE7FF"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M18 88H244" />
-        <path d="M18 184H312" />
-        <path d="M30 286H242" />
-        <path d="M258 286H386" />
-        <path d="M102 24V354" />
-        <path d="M234 24V354" />
-        <path d="M356 44V336" />
-        <path d="M506 66V320" />
-
-        <rect x="230" y="120" rx="16" ry="16" width="120" height="138" />
-        <path d="M256 152L263 159L276 144" />
-        <rect x="286" y="145" width="34" height="4" rx="2" />
-        <path d="M256 187L263 194L276 179" />
-        <rect x="286" y="180" width="34" height="4" rx="2" />
-        <path d="M256 222L263 229L276 214" />
-        <rect x="286" y="215" width="34" height="4" rx="2" />
-
-        <path d="M126 214V144C126 137.373 131.373 132 138 132H192L224 164V214C224 220.627 218.627 226 212 226H138C131.373 226 126 220.627 126 214Z" />
-        <path d="M192 132V157C192 160.866 195.134 164 199 164H224" />
-        <path d="M148 182H198" />
-        <path d="M148 197H184" />
-
-        <path d="M58 257C58 236.565 74.5655 220 95 220C115.435 220 132 236.565 132 257C132 282 95 314 95 314C95 314 58 282 58 257Z" />
-        <circle cx="95" cy="257" r="11" />
-
-        <path d="M406 260V180L454 150L502 180V260" />
-        <path d="M418 260V210H442V260" />
-        <path d="M466 260V210H490V260" />
-        <path d="M396 260H512" />
-
-        <path d="M540 248V204L572 180L604 204V248" />
-        <path d="M552 248V222H566V248" />
-        <path d="M530 248H614" />
-
-        <path d="M40 112C40 100.954 48.9543 92 60 92H116C127.046 92 136 100.954 136 112V132C136 143.046 127.046 152 116 152H78L58 168V152C48.9543 152 40 143.046 40 132V112Z" />
-        <path d="M64 122H112" />
-        <path d="M64 136H98" />
-
-        <circle cx="52" cy="54" r="10" />
-        <circle cx="84" cy="54" r="10" />
-        <circle cx="116" cy="54" r="10" />
-      </g>
-
-      <g
-        opacity="0.14"
-        stroke="#DCE7FF"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="640" cy="100" r="26" />
-        <path d="M640 82V100L652 112" />
-        <circle cx="612" cy="292" r="20" />
-        <path d="M612 278V292L621 300" />
-        <path d="M565 86H588" />
-        <path d="M576 74V98" />
-      </g>
-
-      <g filter="url(#softShadow)">
-        <circle cx="514" cy="165" r="72" fill="#7ED6F4" fillOpacity="0.22" />
-        <path
-          d="M472 134C472 97 502 67 539 67H552C583 67 609 93 609 124V144"
-          stroke="#7ED6F4"
-          strokeWidth="14"
-          strokeLinecap="round"
-          opacity="0.55"
-        />
-
-        <path
-          d="M451 140C451 81.458 498.458 34 557 34C615.542 34 663 81.458 663 140V182C663 240.542 615.542 288 557 288C498.458 288 451 240.542 451 182V140Z"
-          fill="#F9FBFF"
-          stroke="url(#botStroke)"
-          strokeWidth="12"
-        />
-
-        <path
-          d="M495 82C521 48 572 38 617 56C600 76 589 97 576 111C556 132 526 135 495 118C485 112 486 95 495 82Z"
-          fill="#EAF1FF"
-          stroke="#7D8FE0"
-          strokeWidth="8"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M456 150C456 92 503 45 561 45C619 45 666 92 666 150"
-          stroke="#304FAF"
-          strokeWidth="14"
-          strokeLinecap="round"
-        />
-
-        <rect x="437" y="142" width="22" height="56" rx="11" fill="#2747A5" />
-        <rect x="662" y="142" width="22" height="56" rx="11" fill="#2747A5" />
-
-        <ellipse cx="523" cy="168" rx="7" ry="12" fill="#6EBDEA" />
-        <ellipse cx="593" cy="168" rx="7" ry="12" fill="#6EBDEA" />
-
-        <path
-          d="M523 216C534 228 552 235 570 235C587 235 602 229 613 218"
-          stroke="#465CB6"
-          strokeWidth="8"
-          strokeLinecap="round"
-        />
-
-        <path d="M470 206C470 206 483 223 501 232" stroke="url(#accent)" strokeWidth="8" strokeLinecap="round" />
-        <circle cx="506" cy="234" r="6" fill="url(#accent)" />
-
-        <rect x="500" y="286" width="12" height="52" rx="6" fill="#2747A5" />
-        <rect x="602" y="286" width="12" height="52" rx="6" fill="#2747A5" />
-      </g>
-
-      <g
-        opacity="0.22"
-        stroke="#D8E6FF"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="560" y="236" width="58" height="72" rx="12" />
-        <path d="M575 258L580 263L589 252" />
-        <rect x="595" y="253" width="12" height="3" rx="1.5" />
-        <path d="M575 279L580 284L589 273" />
-        <rect x="595" y="274" width="12" height="3" rx="1.5" />
-
-        <path d="M648 236C648 224.402 657.402 215 669 215C680.598 215 690 224.402 690 236C690 250 669 268 669 268C669 268 648 250 648 236Z" />
-        <circle cx="669" cy="236" r="6" />
+        <rect x="352" y="104" width="88" height="62" rx="14" stroke="#C2D6F2" strokeWidth="2.2" />
+        <path d="M370 127h52M370 143h34" stroke="#C2D6F2" strokeWidth="2.2" />
       </g>
     </svg>
   );
@@ -498,88 +347,219 @@ export default function HomePageClient() {
   const { isAuthenticated } = useAuth();
   const { locale } = useLocale();
   const copy = getLocaleCopy(locale);
-  const hasActiveSession = isAuthenticated;
-  const startProcedureHref = "/asistente";
-  const primaryHelpItem = copy.home.helpItems[0] || null;
-  const secondaryHelpItems = copy.home.helpItems.slice(1);
+  const content = getHomeContent(locale);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [recentProcedures, setRecentProcedures] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadRecent = async () => {
+      setIsLoadingRecent(true);
+      try {
+        const response = await fetch("/api/ciudadano/procedures/requests?limit=5");
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (!isMounted) return;
+        setRecentProcedures(Array.isArray(data?.procedures) ? data.procedures.slice(0, 5) : []);
+      } catch {
+        if (!isMounted) return;
+        setRecentProcedures([]);
+      } finally {
+        if (isMounted) setIsLoadingRecent(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      loadRecent();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  const greetingName = useMemo(() => copy.dashboard.greetingFallback || "ciudadano", [copy.dashboard.greetingFallback]);
 
   return (
-    <main className="page page--home">
-      <nav className="home-breadcrumb" aria-label={copy.home.breadcrumbAriaLabel}>
-        <ol>
-          <li>
-            <Link href="/">{copy.nav.home}</Link>
-          </li>
-          <li aria-current="page">{copy.home.breadcrumbCurrent}</li>
-        </ol>
-      </nav>
+    <main className="page page--home home-onify">
+      <section className="home-onify-hero" aria-labelledby="home-main-title">
+        <div className="home-onify-hero__content">
+          <h1 id="home-main-title">
+            {content.heroTitle}
+          </h1>
+          <p>{content.heroDescription}</p>
 
-      <section className="home-hero" aria-labelledby="titulo-home">
-        <div className="home-hero__illustration" aria-hidden="true">
-          <HeroAssistantArtwork />
-        </div>
-        <div className="home-hero__content">
-          <span className="home-hero__kicker">{copy.home.kicker}</span>
-          <h1 id="titulo-home">{copy.home.title}</h1>
-          <p>{copy.home.description}</p>
-          <div className="home-hero__actions">
-            <Link href={startProcedureHref} className="home-cta home-cta--primary">
-              {copy.home.ctaStartProcedure}
+          <label className="home-onify-hero__search" htmlFor="home-search-input">
+            <span className="home-onify-hero__search-icon" aria-hidden="true">
+              ⌕
+            </span>
+            <input
+              id="home-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={content.searchPlaceholder}
+              aria-label="Buscar gestión"
+            />
+            <span className="home-onify-hero__search-arrow" aria-hidden="true">
+              →
+            </span>
+          </label>
+
+          <div className="home-onify-hero__actions">
+            <Link href="/asistente" className="home-onify-btn home-onify-btn--primary">
+              <span aria-hidden="true">+</span>
+              {content.startManagement}
+            </Link>
+            <Link href="/mis-incidencias" className="home-onify-btn home-onify-btn--secondary">
+              <span aria-hidden="true">▤</span>
+              {content.checkStatus}
             </Link>
           </div>
         </div>
+
+        <div className="home-onify-hero__visual">
+          <HeroLineArt />
+        </div>
       </section>
 
-      <section id="tramites" className="home-frequent card" aria-labelledby="frequent-title">
-        <header className="home-frequent__head">
-          <div>
-            <h2 id="frequent-title">{copy.home.frequentTitle}</h2>
-            <p>{copy.home.frequentDescription}</p>
-          </div>
-          <Link href="/login" className="home-frequent__all-link">
-            {copy.home.viewAllProcedures}
+      <section className="home-onify-access" aria-label={content.quickAccessLabel}>
+        {content.quickAccess.map((item) => (
+          <Link key={item.id} href={item.href} className="home-onify-access__card" aria-label={item.title}>
+            <span className="home-onify-access__icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <div>
+              <h2>{item.title}</h2>
+              <p>{item.description}</p>
+            </div>
+            <span className="home-onify-access__arrow" aria-hidden="true">
+              →
+            </span>
           </Link>
-        </header>
-        <FrequentServicesCarousel
-          services={copy.home.frequentServices}
-          copy={copy}
-          hasActiveSession={hasActiveSession}
-        />
+        ))}
       </section>
 
-      <section className="home-bottom-grid">
-        <article className="card home-flow-card">
-          <h2>{copy.home.flowTitle}</h2>
-          <p>{copy.home.flowDescription}</p>
-          <ol className="home-flow-card__steps" aria-label={copy.home.flowStepsAria}>
-            {copy.home.attentionFlow.map((step, index) => (
-              <li key={step.title} className="home-flow-step">
-                <span className="home-flow-step__icon" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <h3>{step.title}</h3>
-                <p>{step.description}</p>
-              </li>
-            ))}
-          </ol>
+      <section id="tramites" className="home-onify-frequent" aria-labelledby="frequent-managements-title">
+        <header className="home-onify-section-head">
+          <h2 id="frequent-managements-title">{content.frequentTitle}</h2>
+          <Link href="/asistente">{content.viewAllManagements}</Link>
+        </header>
+        <div className="home-onify-frequent__grid">
+          {content.frequent.map((item) => (
+            <Link href={item.href} key={item.title} className="home-onify-frequent__card">
+              <span className="home-onify-frequent__icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span
+                className={`home-onify-frequent__pill ${
+                  item.type === "REPORTE" ? "home-onify-frequent__pill--report" : "home-onify-frequent__pill--procedure"
+                }`}
+              >
+                {item.type}
+              </span>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <span className="home-onify-frequent__arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-onify-dashboard">
+        <article className="home-onify-recent" aria-labelledby="recent-managements-title">
+          <header className="home-onify-section-head">
+            <h2 id="recent-managements-title">Mis gestiones recientes</h2>
+            <Link href="/mis-incidencias">{content.viewAllMine}</Link>
+          </header>
+
+          {isLoadingRecent ? <p className="home-onify-empty">{content.loadingRecent}</p> : null}
+
+          {!isLoadingRecent && recentProcedures.length === 0 ? (
+            <div className="home-onify-empty-state">
+              <p>{content.emptyRecent}</p>
+              <Link href="/asistente" className="home-onify-btn home-onify-btn--primary">
+                <span aria-hidden="true">+</span>
+                {content.startManagement}
+              </Link>
+            </div>
+          ) : null}
+
+          {recentProcedures.length > 0 ? (
+            <ul className="home-onify-recent__list">
+              {recentProcedures.map((procedure) => {
+                const status = normalizeStatus(procedure.status);
+                return (
+                  <li key={procedure.id}>
+                    <Link href={`/mis-incidencias?incidentId=${procedure.id}`} className="home-onify-recent__row">
+                      <span className="home-onify-recent__avatar" aria-hidden="true">
+                        ●
+                      </span>
+                      <div className="home-onify-recent__main">
+                        <strong>{procedure.procedureName || "Gestión ciudadana"}</strong>
+                        <p>Expediente {procedure.requestCode || procedure.id}</p>
+                      </div>
+                      <p className="home-onify-recent__date">{formatDate(procedure.createdAt, locale)}</p>
+                      <span className={`home-onify-status home-onify-status--${status.tone}`}>{status.label}</span>
+                      <span className="home-onify-recent__chevron" aria-hidden="true">
+                        →
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </article>
 
-        <article id="ayuda-soporte" className="card home-help-card">
-          <h2>{copy.home.helpTitle}</h2>
-          <p>{copy.home.helpDescription}</p>
-          {primaryHelpItem ? (
-            <Link href={primaryHelpItem.href} className="home-help-card__assistant-link">
-              {primaryHelpItem.label}
-            </Link>
-          ) : null}
-          <ul className="home-help-card__secondary-links">
-            {secondaryHelpItems.map((item) => (
-              <li key={item.label}>
-                <Link href={item.href}>{item.label}</Link>
-              </li>
-            ))}
+        <aside id="ayuda-soporte" className="home-onify-help" aria-labelledby="help-panel-title">
+          <h2 id="help-panel-title">{content.helpTitle}</h2>
+          <p>{content.helpSubtitle}</p>
+          <ul>
+            <li>
+              <Link href="/#ayuda-soporte">
+                <span>{content.faqTitle}</span>
+                <small>{content.faqDescription}</small>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/#ayuda-soporte">
+                <span>{content.channelsTitle}</span>
+                <small>{content.channelsDescription}</small>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </li>
           </ul>
-        </article>
+          <div className="home-onify-help__line">
+            <strong>{content.helpLine}</strong>
+            <p>0800 4200</p>
+            <small>Lunes a viernes de 8 a 18 h</small>
+          </div>
+          <p className="home-onify-help__hello">
+            {copy.portal.greeting}, {greetingName}
+          </p>
+        </aside>
+      </section>
+
+      <section className="home-onify-flow" aria-labelledby="simple-tracking-title">
+        <header>
+          <h2 id="simple-tracking-title">{content.flowTitle}</h2>
+          <p>{content.flowSubtitle}</p>
+        </header>
+        <ol>
+          {content.flow.map((step, index) => (
+            <li key={step.title}>
+              <span aria-hidden="true">{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+            </li>
+          ))}
+        </ol>
       </section>
     </main>
   );

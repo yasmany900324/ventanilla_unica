@@ -18,23 +18,31 @@ const LANGUAGE_LINKS = ["es", "pt", "en"];
 
 const FOOTER_LINK_GROUPS = [
   {
-    titleKey: "onlineServices",
+    titleKey: "managements",
     links: [
-      { href: "/#tramites", labelKey: "taxPortal" },
-      { href: "/#tramites", labelKey: "proceduresGuide" },
-      { href: "/mis-incidencias", labelKey: "fileStatus" },
+      { href: "/asistente", labelKey: "allManagements" },
+      { href: "/asistente", labelKey: "reportsAndRequests" },
+      { href: "/asistente", labelKey: "proceduresAndPermits" },
+    ],
+  },
+  {
+    titleKey: "myManagements",
+    links: [
+      { href: "/mis-incidencias", labelKey: "myRequests" },
+      { href: "/mis-incidencias", labelKey: "myFiles" },
+      { href: "/ciudadano/dashboard", labelKey: "notifications" },
     ],
   },
   {
     titleKey: "helpSupport",
     links: [
-      { href: "/#ayuda-soporte", labelKey: "helpCenter" },
       { href: "/#ayuda-soporte", labelKey: "faq" },
       { href: "/#ayuda-soporte", labelKey: "contactChannels" },
+      { href: "/#ayuda-soporte", labelKey: "helpCenter" },
     ],
   },
   {
-    titleKey: "institutionalInfo",
+    titleKey: "information",
     links: [
       { href: "/#informacion-institucional", labelKey: "privacy" },
       { href: "/#accesibilidad", labelKey: "accessibility" },
@@ -130,6 +138,16 @@ function hasRole(user, targetRole) {
   return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
 }
 
+function isMainNavItemActive(pathname, href) {
+  if (!href || href.startsWith("/#")) {
+    return false;
+  }
+  if (href === "/") {
+    return pathname === "/";
+  }
+  return pathname === href || pathname?.startsWith(`${href}/`);
+}
+
 export default function PortalShell({ children }) {
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const { locale, setLocale } = useLocale();
@@ -169,12 +187,12 @@ export default function PortalShell({ children }) {
     () => [
       { href: "/", label: copy.nav.home },
       {
-        href: hasActiveSession ? "/mis-incidencias" : "/login",
-        label: copy.nav.myCases,
-      },
-      {
         href: hasActiveSession ? assistantHref : "/login",
         label: copy.nav.newRequest,
+      },
+      {
+        href: hasActiveSession ? "/mis-incidencias" : "/login",
+        label: copy.nav.myCases,
       },
       { href: "/#ayuda-soporte", label: copy.nav.help },
     ],
@@ -300,9 +318,10 @@ export default function PortalShell({ children }) {
     [copy.portal.footerGroups, copy.portal.footerLinks]
   );
   const [mobileFooterAccordionState, setMobileFooterAccordionState] = useState({
-    onlineServices: false,
+    managements: false,
+    myManagements: false,
     helpSupport: false,
-    institutionalInfo: false,
+    information: false,
   });
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const footerRef = useRef(null);
@@ -450,7 +469,12 @@ export default function PortalShell({ children }) {
               <ul className="portal-nav__list">
                 {mainNav.map((item) => (
                   <li key={item.label}>
-                    <Link href={item.href} className="portal-nav__link">
+                    <Link
+                      href={item.href}
+                      className={`portal-nav__link${
+                        isMainNavItemActive(pathname, item.href) ? " portal-nav__link--active" : ""
+                      }`}
+                    >
                       {item.label}
                     </Link>
                   </li>
@@ -472,6 +496,9 @@ export default function PortalShell({ children }) {
                       aria-controls={userMenuPanelId}
                       onClick={toggleUserMenu}
                     >
+                      <span className="portal-user-menu__user-icon" aria-hidden="true">
+                        <Icon name="profile" />
+                      </span>
                       <span className="portal-user-menu__name">
                         {copy.portal.greeting}, {shortName}
                       </span>
