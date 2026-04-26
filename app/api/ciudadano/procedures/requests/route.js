@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAuthenticatedUser } from "../../../../../../lib/auth";
-import { listProcedureRequestsForCitizen } from "../../../../../../lib/procedureRequests";
+import { requireAuthenticatedUser } from "../../../../../lib/auth";
+import { listProcedureRequestsForCitizen } from "../../../../../lib/procedureRequests";
 
 export async function GET(request) {
   try {
