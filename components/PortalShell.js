@@ -423,9 +423,10 @@ export default function PortalShell({ children }) {
     },
     [handleLogout]
   );
+  const isAssistantView = pathname === "/asistente";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isAssistantView ? " app-shell--assistant-view" : ""}`}>
       <a href="#contenido-principal" className="skip-link">
         {copy.portal.skipToContent}
       </a>
@@ -602,27 +603,96 @@ export default function PortalShell({ children }) {
         {children}
       </div>
 
-      <footer className="portal-footer" id="informacion-institucional" ref={footerRef}>
-        <div className="portal-footer__inner">
-          <div className="portal-footer__brand">
-            <div className="portal-footer__brand-head">
-              <InstitutionalLogo alt={copy.portal.brandName} variant="footer" />
+      {!isAssistantView ? (
+        <footer className="portal-footer" id="informacion-institucional" ref={footerRef}>
+          <div className="portal-footer__inner">
+            <div className="portal-footer__brand">
+              <div className="portal-footer__brand-head">
+                <InstitutionalLogo alt={copy.portal.brandName} variant="footer" />
+              </div>
+              <p className="portal-footer__contact portal-footer__contact--desktop">
+                {copy.portal.footerAddress}
+                <br />
+                Tel. +598 4222 4220
+                <br />
+                {copy.portal.footerMail}
+              </p>
+              <p className="portal-footer__contact portal-footer__contact--mobile">
+                {copy.portal.footerAddress}
+                <br />
+                {copy.portal.footerMail}
+              </p>
+              <ul className="portal-footer__social portal-footer__social--desktop">
+                {SOCIAL_LINKS.map((social) => (
+                  <li key={social.label}>
+                    <a href={social.href} aria-label={social.label}>
+                      {social.shortLabel}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="portal-footer__contact portal-footer__contact--desktop">
-              {copy.portal.footerAddress}
-              <br />
-              Tel. +598 4222 4220
-              <br />
-              {copy.portal.footerMail}
-            </p>
-            <p className="portal-footer__contact portal-footer__contact--mobile">
-              {copy.portal.footerAddress}
-              <br />
-              {copy.portal.footerMail}
-            </p>
-            <ul className="portal-footer__social portal-footer__social--desktop">
+
+            {footerLinkGroups.map((group) => (
+              <section key={group.title} className="portal-footer__column portal-footer__column--desktop">
+                <h3>{group.title}</h3>
+                <ul>
+                  {group.links.map((link) => (
+                    <li key={link.label}>
+                      <Link href={link.href}>{link.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+
+            <div className="portal-footer__mobile-accordion">
+              {footerLinkGroups.map((group) => {
+                const isExpanded = Boolean(mobileFooterAccordionState[group.key]);
+                const panelId = `portal-footer-mobile-group-${group.key}`;
+                const triggerId = `${panelId}-trigger`;
+
+                return (
+                  <section key={group.key} className="portal-footer__accordion-item">
+                    <h3 className="portal-footer__accordion-heading">
+                      <button
+                        id={triggerId}
+                        type="button"
+                        className="portal-footer__accordion-trigger"
+                        aria-expanded={isExpanded}
+                        aria-controls={panelId}
+                        onClick={() => toggleMobileFooterGroup(group.key)}
+                      >
+                        <span>{group.title}</span>
+                        <span className="portal-footer__accordion-icon" aria-hidden="true">
+                          <svg viewBox="0 0 20 20" focusable="false">
+                            <path d="M5.75 7.5 10 11.75 14.25 7.5" />
+                          </svg>
+                        </span>
+                      </button>
+                    </h3>
+                    <div
+                      id={panelId}
+                      className="portal-footer__accordion-panel"
+                      role="region"
+                      aria-labelledby={triggerId}
+                      hidden={!isExpanded}
+                    >
+                      <ul>
+                        {group.links.map((link) => (
+                          <li key={link.label}>
+                            <Link href={link.href}>{link.label}</Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+            <ul className="portal-footer__social portal-footer__social--mobile">
               {SOCIAL_LINKS.map((social) => (
-                <li key={social.label}>
+                <li key={`${social.label}-mobile`}>
                   <a href={social.href} aria-label={social.label}>
                     {social.shortLabel}
                   </a>
@@ -630,81 +700,14 @@ export default function PortalShell({ children }) {
               ))}
             </ul>
           </div>
-
-          {footerLinkGroups.map((group) => (
-            <section key={group.title} className="portal-footer__column portal-footer__column--desktop">
-              <h3>{group.title}</h3>
-              <ul>
-                {group.links.map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href}>{link.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-
-          <div className="portal-footer__mobile-accordion">
-            {footerLinkGroups.map((group) => {
-              const isExpanded = Boolean(mobileFooterAccordionState[group.key]);
-              const panelId = `portal-footer-mobile-group-${group.key}`;
-              const triggerId = `${panelId}-trigger`;
-
-              return (
-                <section key={group.key} className="portal-footer__accordion-item">
-                  <h3 className="portal-footer__accordion-heading">
-                    <button
-                      id={triggerId}
-                      type="button"
-                      className="portal-footer__accordion-trigger"
-                      aria-expanded={isExpanded}
-                      aria-controls={panelId}
-                      onClick={() => toggleMobileFooterGroup(group.key)}
-                    >
-                      <span>{group.title}</span>
-                      <span className="portal-footer__accordion-icon" aria-hidden="true">
-                        <svg viewBox="0 0 20 20" focusable="false">
-                          <path d="M5.75 7.5 10 11.75 14.25 7.5" />
-                        </svg>
-                      </span>
-                    </button>
-                  </h3>
-                  <div
-                    id={panelId}
-                    className="portal-footer__accordion-panel"
-                    role="region"
-                    aria-labelledby={triggerId}
-                    hidden={!isExpanded}
-                  >
-                    <ul>
-                      {group.links.map((link) => (
-                        <li key={link.label}>
-                          <Link href={link.href}>{link.label}</Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </section>
-              );
-            })}
+          <div className="portal-footer__legal">
+            <p>{copy.portal.footerRights}</p>
+            <p className="portal-footer__version">
+              {copy.portal.footerAppVersionLabel} {getAppDisplayVersion()}
+            </p>
           </div>
-          <ul className="portal-footer__social portal-footer__social--mobile">
-            {SOCIAL_LINKS.map((social) => (
-              <li key={`${social.label}-mobile`}>
-                <a href={social.href} aria-label={social.label}>
-                  {social.shortLabel}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="portal-footer__legal">
-          <p>{copy.portal.footerRights}</p>
-          <p className="portal-footer__version">
-            {copy.portal.footerAppVersionLabel} {getAppDisplayVersion()}
-          </p>
-        </div>
-      </footer>
+        </footer>
+      ) : null}
 
       {pathname !== "/asistente" ? (
         <Link
