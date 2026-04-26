@@ -55,6 +55,10 @@ function parseJsonInput(value, fallback = {}) {
   }
 }
 
+function stringifyJson(value) {
+  return JSON.stringify(value || {}, null, 2);
+}
+
 function humanizeTaskKey(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -69,6 +73,9 @@ function humanizeTaskKey(value) {
 
 function getLocalStatusLabel(value) {
   const key = String(value || "").trim().toUpperCase();
+  if (key === "PENDING_CAMUNDA_SYNC") {
+    return "Pendiente de procesamiento";
+  }
   return LOCAL_STATUS_LABELS[key] || value || "-";
 }
 
@@ -144,7 +151,34 @@ function resolveLocationValue(collectedData) {
   if (typeof location === "string") {
     return location;
   }
-  return JSON.stringify(location, null, 2);
+  return stringifyJson(location);
+}
+
+function resolvePrimaryDescription(procedureRequest, collectedData) {
+  const candidates = [
+    collectedData?.description,
+    collectedData?.detail,
+    collectedData?.details,
+    collectedData?.descripcion,
+    collectedData?.resumen,
+    procedureRequest?.summary,
+  ];
+  const raw = candidates.find((item) => typeof item === "string" && item.trim()) || "";
+  return raw
+    .replace(/si está correcto,\s*confirma para continuar\.?/gi, "")
+    .replace(/si esta correcto,\s*confirma para continuar\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveContactEmail(procedureRequest, collectedData) {
+  const candidates = [
+    collectedData?.email,
+    collectedData?.contactEmail,
+    collectedData?.correo,
+    procedureRequest?.userEmail,
+  ];
+  return candidates.find((item) => typeof item === "string" && item.trim()) || null;
 }
 
 function ProcedureFieldVariables({ requiredVariables }) {
@@ -179,6 +213,57 @@ function BackToBandejaLink() {
       </Link>
     </p>
   );
+}
+
+function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariablesJson, setCompleteVariablesJson, internalObservation, setInternalObservation, nextStatus, setNextStatus }) {
+  if (!actions.length) {
+    return <p className="empty-message">No hay acciones operativas pendientes para este expediente.</p>;
+  }
+  return actions.map((action) => {
+    const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
+    const actionTitle = buildActionTitle(action);
+    const actionDescription = buildActionDescription(action);
+    return (
+      <div key={actionKey} className="admin-procedure-fields__item">
+        <p className="small">
+          <strong>{actionTitle}</strong>
+        </p>
+        {actionDescription ? <p className="small">{actionDescription}</p> : null}
+        {action.actionKey === "complete_task" ? (
+          <>
+            <label className="small">Variables para avanzar (JSON)</label>
+            <textarea
+              rows={6}
+              value={completeVariablesJson}
+              onChange={(event) => setCompleteVariablesJson(event.target.value)}
+            />
+            <label className="small">Observaciones internas</label>
+            <textarea
+              rows={3}
+              value={internalObservation}
+              onChange={(event) => setInternalObservation(event.target.value)}
+            />
+            <label className="small">Cambio de estado local (opcional)</label>
+            <input
+              type="text"
+              value={nextStatus}
+              onChange={(event) => setNextStatus(event.target.value)}
+              placeholder="Ej: PENDING_BACKOFFICE_ACTION"
+            />
+            <ProcedureFieldVariables requiredVariables={action.requiredVariables} />
+          </>
+        ) : null}
+        <button
+          type="button"
+          className="button-inline"
+          onClick={() => onRunAction(action)}
+          disabled={actionLoadingKey === actionKey}
+        >
+          {actionLoadingKey === actionKey ? "Procesando..." : actionTitle}
+        </button>
+      </div>
+    );
+  });
 }
 
 export default function FuncionarioExpedienteDetailPage() {
@@ -219,9 +304,7 @@ export default function FuncionarioExpedienteDetailPage() {
     if (!requestId) {
       setDetail(null);
       setDetailLoading(false);
-      setFatalError({
-        message: "No se encontró el expediente solicitado.",
-      });
+      setFatalError({ message: "No se encontró el expediente solicitado." });
       return;
     }
     setDetailLoading(true);
@@ -270,6 +353,13 @@ export default function FuncionarioExpedienteDetailPage() {
     () => (Array.isArray(detail?.availableActions) ? detail.availableActions : []),
     [detail?.availableActions]
   );
+
+  const procedureRequest = detail?.procedureRequest || null;
+  const isAvailable = procedureRequest?.assignmentScope === "available";
+  const claimAction = availableActions.find((action) => action?.actionKey === "claim_task") || null;
+  const operationalActions = isAvailable
+    ? availableActions.filter((action) => action?.actionKey !== "claim_task")
+    : availableActions;
 
   const runAction = async (action) => {
     if (!action?.endpoint || !procedureRequestId) {
@@ -342,10 +432,11 @@ export default function FuncionarioExpedienteDetailPage() {
     return null;
   }
 
-  const procedureRequest = detail?.procedureRequest || null;
   const collectedData = procedureRequest?.collectedData || {};
   const attachmentValue = resolveAttachmentValue(collectedData);
   const locationValue = resolveLocationValue(collectedData);
+  const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
+  const contactEmail = resolveContactEmail(procedureRequest, collectedData);
   const activeTaskLabel =
     detail?.activeTaskDisplay?.title ||
     detail?.activeTask?.taskDefinitionName ||
@@ -360,15 +451,6 @@ export default function FuncionarioExpedienteDetailPage() {
           <div>
             <p className="eyebrow">ÁREA DEL FUNCIONARIO</p>
             <h1>Detalle del expediente</h1>
-            <p className="description">
-              {trackingCode ? (
-                <>
-                  Expediente <span className="admin-procedure-table__mono">{trackingCode}</span>
-                </>
-              ) : (
-                "Expediente"
-              )}
-            </p>
           </div>
           <p className="small" style={{ marginTop: "0.75rem" }}>
             <Link href="/funcionario/dashboard" className="portal-action-link">
@@ -401,15 +483,24 @@ export default function FuncionarioExpedienteDetailPage() {
             )}
           </p>
           {procedureRequest ? (
-            <p className="small" style={{ marginTop: "0.5rem" }}>
-              <span
-                className={`badge ${
-                  procedureRequest.assignmentScope === "assigned_to_me" ? "badge--en-revision" : "badge--recibido"
-                }`}
-              >
-                {getAssignmentScopeLabel(procedureRequest)}
-              </span>
-            </p>
+            <>
+              <p className="small" style={{ marginTop: "0.5rem" }}>
+                <span
+                  className={`badge ${
+                    isAvailable ? "badge--recibido" : "badge--en-revision"
+                  }`}
+                >
+                  {getAssignmentScopeLabel(procedureRequest)}
+                </span>
+              </p>
+              <p className="small" style={{ marginTop: "0.5rem" }}>
+                <strong>Tipo:</strong> {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}{" "}
+                {" · "}
+                <strong>Canal:</strong> {procedureRequest.channel || "-"} {" · "}
+                <strong>Creado:</strong> {formatDateTime(procedureRequest.createdAt, locale)} {" · "}
+                <strong>Estado:</strong> {getLocalStatusLabel(procedureRequest.status)}
+              </p>
+            </>
           ) : null}
         </div>
         <p className="small" style={{ marginTop: "0.75rem" }}>
@@ -437,15 +528,43 @@ export default function FuncionarioExpedienteDetailPage() {
       ) : null}
 
       {!detailLoading && procedureRequest ? (
-        <div className="admin-inbox-detail">
+        <>
+          {isAvailable ? (
+            <section className="card dashboard-section">
+              <h3>Expediente disponible</h3>
+              <p className="small">
+                Este expediente está disponible para ser tomado. Para gestionarlo, primero debes asignarlo a tu
+                bandeja.
+              </p>
+              {claimAction ? (
+                <button
+                  type="button"
+                  className="button-inline"
+                  onClick={() => runAction(claimAction)}
+                  disabled={actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`}
+                >
+                  {actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`
+                    ? "Procesando..."
+                    : "Tomar expediente"}
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
           <section className="card dashboard-section admin-procedure-fields">
-            <h4>Resumen del expediente</h4>
-            <p className="small">
-              <strong>Resumen:</strong> {procedureRequest.summary || "Sin resumen"}
-            </p>
+            <h3>Resumen del caso</h3>
             <p className="small">
               <strong>Tipo de procedimiento:</strong>{" "}
               {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}
+            </p>
+            <p className="small">
+              <strong>Descripción:</strong> {caseDescription || "Sin descripción informada."}
+            </p>
+            <p className="small">
+              <strong>Ubicación:</strong> {locationValue || "No informada"}
+            </p>
+            <p className="small">
+              <strong>Imagen adjunta:</strong> {attachmentValue || "No adjunta"}
             </p>
             <p className="small">
               <strong>Canal de origen:</strong> {procedureRequest.channel || "-"}
@@ -453,137 +572,108 @@ export default function FuncionarioExpedienteDetailPage() {
             <p className="small">
               <strong>Fecha de creación:</strong> {formatDateTime(procedureRequest.createdAt, locale)}
             </p>
+          </section>
+
+          <section className="card dashboard-section admin-procedure-fields">
+            <h3>Datos del ciudadano / contacto</h3>
+            <p className="small">
+              <strong>Ciudadano asociado:</strong> {procedureRequest.userId || "No asociado"}
+            </p>
+            <p className="small">
+              <strong>Número de WhatsApp:</strong> {procedureRequest.whatsappPhone || "No informado"}
+            </p>
+            <p className="small">
+              <strong>Email:</strong> {contactEmail || "No informado"}
+            </p>
+          </section>
+
+          <section className="card dashboard-section admin-procedure-fields">
+            <h3>Estado operativo</h3>
             <p className="small">
               <strong>Estado local:</strong> {getLocalStatusLabel(procedureRequest.status)}
             </p>
             <p className="small">
-              <strong>Responsable actual:</strong> {procedureRequest.assignedToUserId || "Sin asignar"}
-            </p>
-            <p className="small">
-              <strong>ID interno:</strong>{" "}
-              <span className="admin-procedure-table__mono">{procedureRequest.id}</span>
-            </p>
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h4>Datos del ciudadano / contacto</h4>
-            <p className="small">
-              <strong>Ciudadano asociado:</strong> {procedureRequest.userId || "-"}
-            </p>
-            <p className="small">
-              <strong>Número de WhatsApp:</strong> {procedureRequest.whatsappPhone || "-"}
-            </p>
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h4>Datos recibidos por chatbot</h4>
-            <label className="small">Datos recolectados</label>
-            <textarea readOnly rows={8} value={JSON.stringify(collectedData || {}, null, 2)} />
-            <p className="small">
-              <strong>Imagen adjunta:</strong> {attachmentValue || "-"}
-            </p>
-            <p className="small">
-              <strong>Ubicación:</strong> {locationValue || "-"}
-            </p>
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h4>Estado Camunda</h4>
-            <p className="small">
               <strong>Estado Camunda:</strong>{" "}
               {getCamundaStatusLabel(procedureRequest.camundaStatus || detail?.activeTask?.taskState)}
-            </p>
-            <p className="small">
-              <strong>Instancia:</strong> {procedureRequest.camundaProcessInstanceKey || "-"}
-            </p>
-            <p className="small">
-              <strong>Definición:</strong> {procedureRequest.camundaProcessDefinitionId || "-"}
             </p>
             <p className="small">
               <strong>Tarea activa:</strong> {activeTaskLabel}
             </p>
             {activeTaskDescription ? (
               <p className="small">
-                <strong>Descripción funcional:</strong> {activeTaskDescription}
+                <strong>Detalle de tarea:</strong> {activeTaskDescription}
               </p>
             ) : null}
-            <label className="small">Variables de Camunda</label>
-            <textarea readOnly rows={6} value={JSON.stringify(procedureRequest.camundaMetadata || {}, null, 2)} />
             <p className="small">
-              <strong>Errores de sincronización:</strong> {procedureRequest.camundaError || "Sin errores"}
+              <strong>Responsable actual:</strong> {procedureRequest.assignedToUserId || "Sin asignar"}
+            </p>
+            <p className="small">
+              <strong>Relación con mi bandeja:</strong> {getAssignmentScopeLabel(procedureRequest)}
             </p>
           </section>
 
           <section className="card dashboard-section admin-procedure-fields">
-            <h4>Acciones del funcionario</h4>
-            {procedureRequest.assignmentScope === "available" ? (
-              <>
-                <p className="small">Este expediente está disponible para ser tomado.</p>
-                <p className="small">
-                  Usa <strong>Tomar expediente</strong> para habilitar la gestión y las acciones de Camunda.
-                </p>
-              </>
+            <h3>Acciones operativas</h3>
+            {isAvailable ? (
+              <p className="small">
+                Hasta tomar el expediente no se habilitan acciones de gestión ni avances de Camunda.
+              </p>
             ) : (
               <p className="small">
-                Las acciones visibles se calculan por tarea activa y configuración del procedimiento.
+                Acciones habilitadas para este expediente asignado a tu bandeja.
               </p>
             )}
-            {availableActions.length ? (
-              availableActions.map((action) => {
-                const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
-                const actionTitle = buildActionTitle(action);
-                const actionDescription = buildActionDescription(action);
-                return (
-                  <div key={actionKey} className="admin-procedure-fields__item">
-                    <p className="small">
-                      <strong>{actionTitle}</strong>
-                    </p>
-                    {actionDescription ? <p className="small">{actionDescription}</p> : null}
-                    {action.actionKey === "complete_task" ? (
-                      <>
-                        <label className="small">Variables para avanzar (JSON)</label>
-                        <textarea
-                          rows={6}
-                          value={completeVariablesJson}
-                          onChange={(event) => setCompleteVariablesJson(event.target.value)}
-                        />
-                        <label className="small">Observaciones internas</label>
-                        <textarea
-                          rows={3}
-                          value={internalObservation}
-                          onChange={(event) => setInternalObservation(event.target.value)}
-                        />
-                        <label className="small">Cambio de estado local (opcional)</label>
-                        <input
-                          type="text"
-                          value={nextStatus}
-                          onChange={(event) => setNextStatus(event.target.value)}
-                          placeholder="Ej: PENDING_BACKOFFICE_ACTION"
-                        />
-                        <ProcedureFieldVariables requiredVariables={action.requiredVariables} />
-                      </>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="button-inline"
-                      onClick={() => runAction(action)}
-                      disabled={actionLoadingKey === actionKey}
-                    >
-                      {actionLoadingKey === actionKey ? "Procesando..." : actionTitle}
-                    </button>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="empty-message">No hay acciones pendientes para este expediente.</p>
-            )}
+            <ActionCards
+              actions={operationalActions}
+              onRunAction={runAction}
+              actionLoadingKey={actionLoadingKey}
+              completeVariablesJson={completeVariablesJson}
+              setCompleteVariablesJson={setCompleteVariablesJson}
+              internalObservation={internalObservation}
+              setInternalObservation={setInternalObservation}
+              nextStatus={nextStatus}
+              setNextStatus={setNextStatus}
+            />
           </section>
 
           <section className="card dashboard-section admin-procedure-fields">
-            <h4>Historial / observaciones</h4>
-            <textarea readOnly rows={8} value={JSON.stringify(detail.history || [], null, 2)} />
+            <h3>Información técnica</h3>
+
+            <details>
+              <summary>Ver datos técnicos del expediente</summary>
+              <p className="small">
+                <strong>ID interno:</strong>{" "}
+                <span className="admin-procedure-table__mono">{procedureRequest.id}</span>
+              </p>
+              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
+                {stringifyJson(collectedData)}
+              </pre>
+            </details>
+
+            <details>
+              <summary>Ver variables de Camunda</summary>
+              <p className="small">
+                <strong>Instancia:</strong> {procedureRequest.camundaProcessInstanceKey || "-"}
+              </p>
+              <p className="small">
+                <strong>Definición:</strong> {procedureRequest.camundaProcessDefinitionId || "-"}
+              </p>
+              <p className="small">
+                <strong>Error de sincronización:</strong> {procedureRequest.camundaError || "Sin errores"}
+              </p>
+              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
+                {stringifyJson(procedureRequest.camundaMetadata)}
+              </pre>
+            </details>
+
+            <details>
+              <summary>Ver historial técnico</summary>
+              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
+                {stringifyJson(detail.history || [])}
+              </pre>
+            </details>
           </section>
-        </div>
+        </>
       ) : null}
     </main>
   );
