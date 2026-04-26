@@ -261,6 +261,57 @@ describe("api/admin/procedures", () => {
     expect(body.error).toMatch(/duplicados|scope/i);
   });
 
+  it("PATCH acepta fieldDefinitions como fuente principal sin requiredFields", async () => {
+    const existing = createProcedure();
+    const updated = createProcedure({
+      code: "registrar_incidencia",
+      name: "Registrar incidencia",
+      category: "Incidencia",
+      camundaProcessId: "proceso_incidencia_v1",
+      fieldDefinitions: [
+        { key: "description", label: "Descripción", type: "text", required: true, order: 1 },
+        { key: "aclaracion", label: "Aclaración", type: "text", required: false, order: 2 },
+      ],
+      requiredFields: [
+        { key: "description", label: "Descripción", type: "text", required: true, order: 1 },
+        { key: "aclaracion", label: "Aclaración", type: "text", required: false, order: 2 },
+      ],
+    });
+    mocks.getProcedureCatalogEntryByCode
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce(updated);
+    mocks.sqlQueue.push([{ id: "proc-1", code: "registrar_incidencia" }]);
+
+    const request = new Request("http://localhost/api/admin/procedures?locale=es", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalCode: "registrar_incidencia",
+        code: "registrar_incidencia",
+        name: "Registrar incidencia",
+        category: "Incidencia",
+        camundaProcessId: "proceso_incidencia_v1",
+        enabledChannels: ["web", "whatsapp"],
+        fieldDefinitions: [
+          { key: "description", label: "Descripción", type: "text", required: true },
+          { key: "aclaracion", label: "Aclaración", type: "text", required: false },
+        ],
+      }),
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.procedure.code).toBe("registrar_incidencia");
+    expect(mocks.replaceProcedureTypeFields).toHaveBeenCalledWith(
+      "proc-1",
+      expect.arrayContaining([
+        expect.objectContaining({ key: "description", required: true }),
+        expect.objectContaining({ key: "aclaracion", required: false }),
+      ])
+    );
+  });
+
   it("DELETE bloquea eliminación de procedimientos activos", async () => {
     mocks.sqlQueue.push([{ code: "registrar_incidencia", is_active: true }]);
     const request = new Request("http://localhost/api/admin/procedures?locale=es", {

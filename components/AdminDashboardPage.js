@@ -237,10 +237,12 @@ function ProcedureSummaryCard({ icon, label, value }) {
 }
 
 function createProcedureFormState(procedure = null) {
-  const requiredFields = Array.isArray(procedure?.requiredFields)
-    ? procedure.requiredFields
+  const fieldDefinitions = Array.isArray(procedure?.fieldDefinitions)
+    ? procedure.fieldDefinitions
+    : Array.isArray(procedure?.requiredFields)
+      ? procedure.requiredFields
     : DEFAULT_REQUIRED_FIELDS;
-  const normalizedFields = requiredFields.map((field, index) => ({
+  const normalizedFields = fieldDefinitions.map((field, index) => ({
     key: normalizeCode(field?.key || field?.label || `field_${index + 1}`),
     label: normalizeSimpleText(field?.label || `Campo ${index + 1}`, 80),
     type: normalizeSimpleText(field?.type || "text", 24).toLowerCase() || "text",

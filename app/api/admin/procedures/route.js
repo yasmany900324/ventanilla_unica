@@ -381,8 +381,8 @@ function normalizeProcedurePayload(rawPayload, messages) {
     return { ok: false, error: messages.missingName };
   }
 
-  const requiredFields = normalizeRequiredFields(payload.requiredFields || []);
-  if (requiredFields.length === 0) {
+  const fieldDefinitions = normalizeRequiredFields(payload.fieldDefinitions || payload.requiredFields || []);
+  if (fieldDefinitions.length === 0) {
     return { ok: false, error: messages.missingFields };
   }
   const camundaProcessId = normalizeText(payload.camundaProcessId, 160);
@@ -395,7 +395,7 @@ function normalizeProcedurePayload(rawPayload, messages) {
   }
 
   const camundaVariableMappings = normalizeCamundaVariableMappings(payload.camundaVariableMappings);
-  const mappingsValidation = validateCamundaVariableMappings(camundaVariableMappings, requiredFields);
+  const mappingsValidation = validateCamundaVariableMappings(camundaVariableMappings, fieldDefinitions);
   if (!mappingsValidation.ok) {
     return { ok: false, error: mappingsValidation.error };
   }
@@ -413,7 +413,9 @@ function normalizeProcedurePayload(rawPayload, messages) {
       camundaProcessId,
       camundaVersion: normalizeText(payload.camundaVersion, 80),
       enabledChannels,
-      requiredFields,
+      fieldDefinitions,
+      // Deprecated alias for backward-compatible payload handling.
+      requiredFields: fieldDefinitions,
       camundaVariableMappings,
       flowDefinition: normalizeFlowDefinition(payload.flowDefinition),
     },
@@ -512,7 +514,7 @@ export async function POST(request) {
         ${normalized.value.camundaProcessId},
         ${normalized.value.camundaVersion || null},
         ${JSON.stringify(normalized.value.enabledChannels)}::jsonb,
-        ${JSON.stringify(normalized.value.requiredFields)}::jsonb,
+        ${JSON.stringify(normalized.value.fieldDefinitions)}::jsonb,
         ${JSON.stringify(normalized.value.flowDefinition)}::jsonb,
         NOW()
       )
@@ -520,7 +522,7 @@ export async function POST(request) {
     `;
 
     if (created?.id) {
-      await replaceProcedureTypeFields(created.id, normalized.value.requiredFields);
+      await replaceProcedureTypeFields(created.id, normalized.value.fieldDefinitions);
       await replaceProcedureTypeCamundaVariableMappings(
         created.id,
         normalized.value.camundaVariableMappings
@@ -648,7 +650,7 @@ export async function PATCH(request) {
         camunda_process_id = ${normalized.value.camundaProcessId},
         version = ${normalized.value.camundaVersion || null},
         enabled_channels_json = ${JSON.stringify(normalized.value.enabledChannels)}::jsonb,
-        required_fields_json = ${JSON.stringify(normalized.value.requiredFields)}::jsonb,
+        required_fields_json = ${JSON.stringify(normalized.value.fieldDefinitions)}::jsonb,
         flow_definition_json = ${JSON.stringify(normalized.value.flowDefinition)}::jsonb,
         updated_at = NOW()
       WHERE code = ${originalCode}
@@ -659,7 +661,7 @@ export async function PATCH(request) {
       return NextResponse.json({ error: messages.notFound }, { status: 404 });
     }
 
-    await replaceProcedureTypeFields(updated.id, normalized.value.requiredFields);
+    await replaceProcedureTypeFields(updated.id, normalized.value.fieldDefinitions);
     await replaceProcedureTypeCamundaVariableMappings(
       updated.id,
       normalized.value.camundaVariableMappings
