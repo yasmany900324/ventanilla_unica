@@ -28,8 +28,8 @@ const FOOTER_LINK_GROUPS = [
   {
     titleKey: "myManagements",
     links: [
-      { href: "/mis-incidencias", labelKey: "myRequests" },
-      { href: "/mis-incidencias", labelKey: "myFiles" },
+      { href: "/ciudadano/dashboard", labelKey: "myRequests" },
+      { href: "/ciudadano/dashboard", labelKey: "myFiles" },
       { href: "/ciudadano/dashboard", labelKey: "notifications" },
     ],
   },
@@ -191,7 +191,7 @@ export default function PortalShell({ children }) {
         label: copy.nav.newRequest,
       },
       {
-        href: hasActiveSession ? "/mis-incidencias" : "/login",
+        href: hasActiveSession ? "/ciudadano/dashboard" : "/login",
         label: copy.nav.myCases,
       },
       { href: "/#ayuda-soporte", label: copy.nav.help },
@@ -209,10 +209,11 @@ export default function PortalShell({ children }) {
       },
       {
         key: "cases",
-        href: hasActiveSession ? "/mis-incidencias" : "/login",
+        href: hasActiveSession ? "/ciudadano/dashboard" : "/login",
         label: copy.portal.mobile.myCases,
         icon: "cases",
-        isActive: pathname === "/mis-incidencias",
+        isActive:
+          pathname === "/ciudadano/dashboard" || pathname?.startsWith("/ciudadano/dashboard/"),
       },
       {
         key: "new",
@@ -523,7 +524,7 @@ export default function PortalShell({ children }) {
                         {copy.portal.mySpace}
                       </Link>
                       <Link
-                        href="/mis-incidencias"
+                        href="/ciudadano/dashboard"
                         className="portal-user-menu__link"
                         role="menuitem"
                         onClick={closeUserMenu}

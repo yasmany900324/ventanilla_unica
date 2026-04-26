@@ -29,14 +29,14 @@ function getHomeContent(locale = "es") {
           id: "my",
           title: "My managements",
           description: "Check and track your managements.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "myManagements",
         },
         {
           id: "file",
           title: "Check file",
           description: "Check the status of an existing file.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "consultFile",
         },
         {
@@ -132,14 +132,14 @@ function getHomeContent(locale = "es") {
           id: "my",
           title: "Minhas gestões",
           description: "Consulte e acompanhe suas gestões.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "myManagements",
         },
         {
           id: "file",
           title: "Consultar expediente",
           description: "Consulte o estado de um expediente existente.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "consultFile",
         },
         {
@@ -231,14 +231,14 @@ function getHomeContent(locale = "es") {
           id: "my",
           title: "Mis gestiones",
           description: "Consultá y hacé seguimiento de tus gestiones.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "myManagements",
         },
         {
           id: "file",
           title: "Consultar expediente",
           description: "Consultá el estado de un expediente existente.",
-          href: "/mis-incidencias",
+          href: "/ciudadano/dashboard",
           iconKey: "consultFile",
         },
         {
@@ -784,7 +784,7 @@ export default function HomePageClient() {
               <span aria-hidden="true">+</span>
               {content.startManagement}
             </Link>
-            <Link href="/mis-incidencias" className="home-onify-btn home-onify-btn--secondary">
+            <Link href="/ciudadano/dashboard" className="home-onify-btn home-onify-btn--secondary">
               <span aria-hidden="true">▤</span>
               {content.checkStatus}
             </Link>
@@ -855,7 +855,7 @@ export default function HomePageClient() {
         <article className="home-onify-recent" aria-labelledby="recent-managements-title">
           <header className="home-onify-section-head">
             <h2 id="recent-managements-title">{content.recentTitle}</h2>
-            <Link href="/mis-incidencias" className="home-onify-section-head__link">
+            <Link href="/ciudadano/dashboard" className="home-onify-section-head__link">
               {content.viewAllMine}
               <span className="home-onify-section-head__arrow" aria-hidden="true">
                 <FrequentManagementIcon iconKey="frequentCardArrow" />
@@ -881,7 +881,7 @@ export default function HomePageClient() {
                 const status = normalizeStatus(procedure.status);
                 return (
                   <li key={procedure.id}>
-                    <Link href={`/mis-incidencias?incidentId=${procedure.id}`} className="home-onify-recent__row">
+                    <Link href={`/ciudadano/dashboard?incidentId=${procedure.id}`} className="home-onify-recent__row">
                       <div className="home-onify-recent__main-group">
                         <span className="home-onify-recent__avatar" aria-hidden="true">
                           ●

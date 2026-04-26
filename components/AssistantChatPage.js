@@ -829,7 +829,7 @@ function ChatHeader({ copy }) {
             </Link>
           </li>
           <li>
-            <Link href="/mis-incidencias" className="assistant-chat-header__action-link">
+            <Link href="/ciudadano/dashboard" className="assistant-chat-header__action-link">
               {copy.header.viewIncidents}
             </Link>
           </li>
