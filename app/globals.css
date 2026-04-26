@@ -330,11 +330,11 @@
   border-radius: 20px;
   border: 1px solid #d7e3f5;
   background: #ffffff;
-  padding: 1.24rem 1.18rem;
+  padding: 1.18rem 1.18rem 1.18rem 0.92rem;
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   gap: 1.05rem;
-  align-items: start;
+  align-items: stretch;
   min-height: 240px;
   box-shadow: 0 7px 16px rgba(15, 61, 138, 0.06);
   transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
@@ -347,8 +347,8 @@
 }
 
 .home-onify-frequent__icon {
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 3.05rem;
+  height: 3.05rem;
   border-radius: 999px;
   background: #eef5ff;
   border: 1px solid #d5e3f6;
@@ -356,13 +356,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 0.06rem;
-  justify-self: center;
+  justify-self: start;
+  align-self: center;
 }
 
 .home-onify-frequent__icon svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.56rem;
+  height: 1.56rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -383,6 +383,7 @@
   display: grid;
   gap: 0.5rem;
   align-content: start;
+  align-self: start;
 }
 
 .home-onify-frequent__pill--report {

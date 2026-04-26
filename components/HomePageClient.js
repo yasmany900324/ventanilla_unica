@@ -372,34 +372,51 @@ function HeroLineArt() {
 }
 
 function FrequentManagementIcon({ iconKey }) {
+  if (iconKey === "roadAlert") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4.5 6.8 17.2h10.4L12 4.5Z" />
+        <path d="M10.7 10.2h2.6M10.2 12.7h3.6" />
+        <path d="M5.6 18.6h12.8" />
+      </svg>
+    );
+  }
   if (iconKey === "streetLamp") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 4v14M12 7h4l-1 4h-3" />
-        <path d="M9 21h6M10 18h4" />
+        <path d="M8 18.2v-3.6c0-.5.2-1 .55-1.35l3.9-3.9c.34-.34.54-.8.54-1.28V6.8" />
+        <path d="M12.9 6.8h2.7l-1 1.2h-2.2" />
+        <path d="M7.2 18.2h2.2v3H7.2z" />
+        <path d="M6.3 21.5h4" />
       </svg>
     );
   }
   if (iconKey === "container") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 7h10M8 7l1 12h6l1-12M10 7V5h4v2" />
-        <path d="M10 10v7M14 10v7" />
+        <path d="M10 6.2h4l.9 1.1h-5.8z" />
+        <path d="M6.2 8.3h11.6" />
+        <path d="M7.4 8.3h9.2l-.9 10.1H8.3z" />
+        <path d="M9.2 19h5.6" />
       </svg>
     );
   }
   if (iconKey === "building") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 20V6l7-2 7 2v14M9 10h1M13 10h1M9 13h1M13 13h1M11 20v-3h2v3" />
+        <path d="M5.6 18.9h12.8" />
+        <path d="M7.1 10.1h9.8v8.8H7.1z" />
+        <path d="M6.4 10.1h11.2l-.9-1.4H7.3z" />
+        <path d="M8.2 8.7v-1.4h2.8M13 7.3h2.8v1.4" />
+        <path d="M10.9 18.9v-2.8a1.1 1.1 0 0 1 2.2 0v2.8" />
+        <path d="M8.8 12.6h.01M15.2 12.6h.01M8.8 14.9h.01M15.2 14.9h.01" />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 4 5 18h14L12 4Z" />
-      <path d="M12 9v4M12 16h.01" />
-      <path d="M6 20h12" />
+      <circle cx="12" cy="12" r="7" />
+      <path d="M12 9v3M12 15h.01" />
     </svg>
   );
 }
