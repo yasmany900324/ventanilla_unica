@@ -7206,19 +7206,23 @@ a.dashboard-onify-detail-btn {
 .funcionario-bandeja.page.page--dashboard {
   box-sizing: border-box;
   width: 100%;
-  max-width: min(1220px, calc(100vw - 32px));
-  margin-left: auto;
-  margin-right: auto;
+  max-width: none;
+  margin: 0;
   padding-top: 1.1rem;
   padding-bottom: 2.85rem;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: 0;
+  padding-right: 0;
+  overflow-x: clip;
 }
 
 .funcionario-bandeja__inner {
   display: grid;
   gap: 1.05rem;
-  width: 100%;
+  width: min(calc(100% - 32px), 1220px);
+  max-width: 1220px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .funcionario-bandeja .card {
@@ -7421,6 +7425,7 @@ a.dashboard-onify-detail-btn {
 
 .funcionario-bandeja__work-card {
   padding: 1.45rem 1.5rem 1.5rem;
+  min-width: 0;
 }
 
 .funcionario-bandeja__work-head {
@@ -7449,6 +7454,7 @@ a.dashboard-onify-detail-btn {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.45rem;
+  min-width: 0;
 }
 
 .funcionario-bandeja__metric {
@@ -7465,6 +7471,7 @@ a.dashboard-onify-detail-btn {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
     0 1px 2px rgba(15, 23, 42, 0.04);
+  min-width: 0;
 }
 
 .funcionario-bandeja__metric-icon {
@@ -7498,6 +7505,7 @@ a.dashboard-onify-detail-btn {
   text-transform: uppercase;
   letter-spacing: 0.055em;
   color: #6b7c94;
+  overflow-wrap: anywhere;
 }
 
 .funcionario-bandeja__metric-value {
@@ -7569,19 +7577,25 @@ a.dashboard-onify-detail-btn {
 }
 
 .funcionario-bandeja__table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0;
   border-radius: 16px;
   border: 1px solid rgba(203, 213, 225, 0.55);
   background: #ffffff;
+  -webkit-overflow-scrolling: touch;
 }
 
 .funcionario-bandeja__table {
-  width: 100%;
+  width: max(100%, 1040px);
   min-width: 1040px;
   border-collapse: collapse;
   font-size: 0.875rem;
   line-height: 1.48;
+  table-layout: fixed;
 }
 
 .funcionario-bandeja__table thead th {
@@ -7602,6 +7616,8 @@ a.dashboard-onify-detail-btn {
   vertical-align: middle;
   border-bottom: 1px solid #eef1f6;
   color: #1e293b;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .funcionario-bandeja__row:hover td {
@@ -7629,6 +7645,8 @@ a.dashboard-onify-detail-btn {
   display: block;
   font-weight: 800;
   color: #0f172a;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .funcionario-bandeja__exp-id {
@@ -7637,6 +7655,8 @@ a.dashboard-onify-detail-btn {
   font-size: 0.76rem;
   font-weight: 500;
   color: #64748b;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .funcionario-bandeja__cell--nowrap {
@@ -7694,6 +7714,8 @@ a.dashboard-onify-detail-btn {
   font-size: 0.8rem;
   color: #64748b;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .funcionario-bandeja button.funcionario-bandeja__btn-primary {
@@ -7841,8 +7863,8 @@ a.dashboard-onify-detail-btn {
 }
 
 @media (max-width: 1366px) {
-  .funcionario-bandeja.page.page--dashboard {
-    max-width: min(1180px, calc(100vw - 28px));
+  .funcionario-bandeja__inner {
+    width: min(calc(100% - 28px), 1220px);
   }
 }
 
@@ -7854,10 +7876,11 @@ a.dashboard-onify-detail-btn {
 
 @media (max-width: 720px) {
   .funcionario-bandeja.page.page--dashboard {
-    max-width: min(1220px, calc(100vw - 24px));
     padding-bottom: 3rem;
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
+  }
+
+  .funcionario-bandeja__inner {
+    width: min(calc(100% - 24px), 1220px);
   }
 
   .funcionario-bandeja__inner {
