@@ -573,18 +573,22 @@ export default function HomePageClient() {
               <span className="home-onify-frequent__icon" aria-hidden="true">
                 <FrequentManagementIcon iconKey={item.iconKey} />
               </span>
-              <span
-                className={`home-onify-frequent__pill ${
-                  item.type === "REPORTE" ? "home-onify-frequent__pill--report" : "home-onify-frequent__pill--procedure"
-                }`}
-              >
-                {item.type}
-              </span>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <span className="home-onify-frequent__arrow" aria-hidden="true">
-                →
-              </span>
+              <div className="home-onify-frequent__content">
+                <span
+                  className={`home-onify-frequent__pill ${
+                    item.type === "REPORTE"
+                      ? "home-onify-frequent__pill--report"
+                      : "home-onify-frequent__pill--procedure"
+                  }`}
+                >
+                  {item.type}
+                </span>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <span className="home-onify-frequent__arrow" aria-hidden="true">
+                  →
+                </span>
+              </div>
             </Link>
           ))}
         </div>

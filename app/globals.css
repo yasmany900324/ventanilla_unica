@@ -330,9 +330,11 @@
   border-radius: 20px;
   border: 1px solid #d7e3f5;
   background: #ffffff;
-  padding: 1.18rem;
+  padding: 1.24rem 1.18rem;
   display: grid;
-  gap: 0.58rem;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 1.05rem;
+  align-items: start;
   min-height: 240px;
   box-shadow: 0 7px 16px rgba(15, 61, 138, 0.06);
   transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
@@ -354,6 +356,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-top: 0.06rem;
+  justify-self: center;
 }
 
 .home-onify-frequent__icon svg {
@@ -374,6 +378,13 @@
   font-weight: 700;
 }
 
+.home-onify-frequent__content {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
 .home-onify-frequent__pill--report {
   background: #e6f6eb;
   color: #246b3b;
@@ -385,22 +396,31 @@
 }
 
 .home-onify-frequent__card h3 {
-  margin: 0;
+  margin: 0.04rem 0 0;
   color: #102a56;
-  font-size: 1.03rem;
+  font-size: 1.08rem;
+  line-height: 1.28;
 }
 
 .home-onify-frequent__card p {
-  margin: 0;
+  margin: 0.08rem 0 0;
   color: #53657d;
-  font-size: 0.86rem;
+  font-size: 0.87rem;
   line-height: 1.45;
+  max-width: 34ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .home-onify-frequent__arrow {
-  margin-top: auto;
+  margin-top: 0.3rem;
   color: #7f95ba;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
 }
 
 .home-onify-dashboard {
@@ -802,6 +822,11 @@
 
   .home-onify-frequent__grid {
     grid-template-columns: 1fr;
+  }
+
+  .home-onify-frequent__card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 0.92rem;
   }
 
   .home-onify-recent__row {
