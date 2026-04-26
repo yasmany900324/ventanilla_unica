@@ -109,6 +109,173 @@ function filterOptionsFromList(list, selector) {
   return values.sort((a, b) => String(a).localeCompare(String(b), "es"));
 }
 
+function getRelationBadgeClass(item) {
+  if (item?.assignmentScope === "assigned_to_me") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--relation-assigned";
+  }
+  if (item?.assignmentScope === "available") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--relation-available";
+  }
+  return "funcionario-bandeja-badge funcionario-bandeja-badge--neutral";
+}
+
+function getChannelBadgeClass(channel) {
+  const key = String(channel || "").trim().toUpperCase();
+  if (key === "WHATSAPP") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--channel-wa";
+  }
+  if (key === "WEB") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--channel-web";
+  }
+  return "funcionario-bandeja-badge funcionario-bandeja-badge--neutral";
+}
+
+function getLocalStatusBadgeClass(status) {
+  const key = String(status || "").trim().toUpperCase();
+  if (key === "ERROR_CAMUNDA_SYNC") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--sync-error";
+  }
+  if (key === "RESOLVED" || key === "REJECTED" || key === "CLOSED" || key === "ARCHIVED") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--finished";
+  }
+  if (
+    key === "PENDING_CONFIRMATION" ||
+    key === "PENDING_CAMUNDA_SYNC" ||
+    key === "PENDING_BACKOFFICE_ACTION"
+  ) {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--pending";
+  }
+  if (key === "IN_PROGRESS") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--follow-up";
+  }
+  if (key === "WAITING_CITIZEN_INFO") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--info-wait";
+  }
+  if (key === "DRAFT") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--neutral";
+  }
+  return "funcionario-bandeja-badge funcionario-bandeja-badge--follow-up";
+}
+
+function getCamundaBadgeClass(camundaStatus) {
+  const key = String(camundaStatus || "").trim().toUpperCase();
+  if (key === "ERROR_SYNC") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--sync-error";
+  }
+  if (key === "TASK_ACTIVE") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--pending";
+  }
+  if (key === "PROCESS_RUNNING") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--follow-up";
+  }
+  if (key === "NOT_SYNCED") {
+    return "funcionario-bandeja-badge funcionario-bandeja-badge--neutral";
+  }
+  return "funcionario-bandeja-badge funcionario-bandeja-badge--neutral";
+}
+
+const WORK_FILTER_OPTIONS = [
+  { id: "all", label: "Todos" },
+  { id: "assigned_to_me", label: "Asignados a mí" },
+  { id: "available", label: "Disponibles" },
+  { id: "pending", label: "Pendientes de acción" },
+  { id: "follow_up", label: "En seguimiento" },
+  { id: "finished", label: "Finalizados" },
+];
+
+function IconFolderExpediente() {
+  return (
+    <svg className="funcionario-bandeja__hero-icon-svg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <path
+        d="M10 14h9l3 3h16a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3Z"
+        fill="currentColor"
+        fillOpacity="0.12"
+      />
+      <path
+        d="M10 14h9l3 3h16a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M17 22h22M17 28h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconMetricCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M8 6V4m8 2V4M5 10h14M6 6h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconMetricDoc() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14 2H8a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8l-6-6Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path d="M14 2v6h6M10 13h4M10 17h4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconMetricChecklist() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9 11l2 2 4-4M5 5h4M5 12h4M5 19h4M13 5h6M13 12h6M13 19h6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconMetricClock() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconMetricCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M12 10v6M12 7h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function FuncionarioBandejaExpedientesPage() {
   const router = useRouter();
   const { user, isLoadingAuth } = useAuth();
@@ -196,6 +363,17 @@ export default function FuncionarioBandejaExpedientesPage() {
 
   const pendingCount = useMemo(() => filteredList.filter((item) => isPendingItem(item)).length, [filteredList]);
 
+  const workMetrics = useMemo(() => {
+    const total = filteredList.length;
+    const disponibles = filteredList.filter((item) => item.assignmentScope === "available").length;
+    const pendientes = filteredList.filter((item) => isPendingItem(item)).length;
+    const seguimiento = filteredList.filter(
+      (item) => !isTerminalStatus(item.status) && !isPendingItem(item)
+    ).length;
+    const finalizados = filteredList.filter((item) => isTerminalStatus(item.status)).length;
+    return { total, disponibles, pendientes, seguimiento, finalizados };
+  }, [filteredList]);
+
   const goToExpedienteDetail = (item) => {
     const internalId = item?.procedureRequestId || item?.id;
     if (!internalId) {
@@ -206,9 +384,9 @@ export default function FuncionarioBandejaExpedientesPage() {
 
   if (isLoadingAuth) {
     return (
-      <main className="page page--dashboard" lang={locale}>
-        <section className="card dashboard-header">
-          <p className="info-message">Cargando…</p>
+      <main className="page page--dashboard funcionario-bandeja" lang={locale}>
+        <section className="card funcionario-bandeja__hero funcionario-bandeja__hero--loading">
+          <p className="funcionario-bandeja__loading-text">Cargando…</p>
         </section>
       </main>
     );
@@ -219,81 +397,113 @@ export default function FuncionarioBandejaExpedientesPage() {
   }
 
   return (
-    <main className="page page--dashboard" lang={locale}>
-      <section className="card dashboard-header">
-        <div>
-          <p className="eyebrow">ÁREA DEL FUNCIONARIO</p>
-          <h1>Bandeja de expedientes</h1>
-          <p className="description">
-            Consulta los expedientes asignados a ti y los disponibles para tomar. Abre el detalle en una página
-            dedicada.
-          </p>
+    <main className="page page--dashboard funcionario-bandeja" lang={locale}>
+      <section className="card funcionario-bandeja__hero" aria-labelledby="funcionario-bandeja-title">
+        <div className="funcionario-bandeja__hero-main">
+          <div className="funcionario-bandeja__hero-icon-wrap" aria-hidden="true">
+            <IconFolderExpediente />
+          </div>
+          <div className="funcionario-bandeja__hero-copy">
+            <p className="funcionario-bandeja__hero-badge">Área del funcionario</p>
+            <h1 id="funcionario-bandeja-title" className="funcionario-bandeja__hero-title">
+              Bandeja de expedientes
+            </h1>
+            <p className="funcionario-bandeja__hero-description">
+              Consulta los expedientes asignados a ti y los disponibles para tomar. Abre el detalle en una página
+              dedicada.
+            </p>
+          </div>
         </div>
+        <div className="funcionario-bandeja__hero-wave" aria-hidden="true" />
       </section>
 
-      <section className="card dashboard-section">
-        <div className="admin-procedure-toolbar__filters">
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "all" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("all")}
+      <section className="card funcionario-bandeja__pill-card">
+        <div className="funcionario-bandeja__pills-scroll">
+          <div
+            className="funcionario-bandeja__pills"
+            role="group"
+            aria-label="Filtrar expedientes por relación y estado de trabajo"
           >
-            Todos
-          </button>
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "assigned_to_me" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("assigned_to_me")}
-          >
-            Asignados a mí
-          </button>
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "available" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("available")}
-          >
-            Disponibles
-          </button>
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "pending" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("pending")}
-          >
-            Pendientes de acción
-          </button>
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "follow_up" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("follow_up")}
-          >
-            En seguimiento
-          </button>
-          <button
-            type="button"
-            className={`button-inline ${workFilter === "finished" ? "button-inline--selected" : ""}`}
-            onClick={() => setWorkFilter("finished")}
-          >
-            Finalizados
-          </button>
+            {WORK_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`funcionario-bandeja__pill${workFilter === option.id ? " funcionario-bandeja__pill--active" : ""}`}
+                aria-pressed={workFilter === option.id}
+                onClick={() => setWorkFilter(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="small">Mostrando expedientes asignados a ti y expedientes disponibles para tomar.</p>
+        <p className="funcionario-bandeja__pills-hint">
+          Mostrando expedientes asignados a ti y expedientes disponibles para tomar.
+        </p>
       </section>
 
       {error ? (
-        <section className="card">
+        <section className="card funcionario-bandeja__error-card">
           <p className="error-message">{error}</p>
         </section>
       ) : null}
 
-      <section className="card dashboard-section">
-        <div className="admin-procedure-table__header">
-          <h3>Bandeja de trabajo</h3>
-          <p className="small">
-            Total filtrado: {filteredList.length}. Con acción pendiente: {pendingCount}.
-          </p>
-        </div>
-        <div className="admin-inbox-filters">
+      <section className="card funcionario-bandeja__work-card">
+        <header className="funcionario-bandeja__work-head">
           <div>
+            <h2 className="funcionario-bandeja__work-title">Bandeja de trabajo</h2>
+            <p className="funcionario-bandeja__work-sub">
+              <strong>{pendingCount}</strong> expediente{pendingCount === 1 ? "" : "s"} con acción pendiente en esta
+              vista.
+            </p>
+          </div>
+        </header>
+
+        <div className="funcionario-bandeja__metrics" aria-label="Resumen de la vista actual">
+          <div className="funcionario-bandeja__metric">
+            <span className="funcionario-bandeja__metric-icon funcionario-bandeja__metric-icon--primary">
+              <IconMetricCalendar />
+            </span>
+            <span className="funcionario-bandeja__metric-label">Total filtrado</span>
+            <span className="funcionario-bandeja__metric-value">{workMetrics.total}</span>
+            <span className="funcionario-bandeja__metric-unit">expedientes</span>
+          </div>
+          <div className="funcionario-bandeja__metric">
+            <span className="funcionario-bandeja__metric-icon">
+              <IconMetricDoc />
+            </span>
+            <span className="funcionario-bandeja__metric-label">Disponibles</span>
+            <span className="funcionario-bandeja__metric-value">{workMetrics.disponibles}</span>
+            <span className="funcionario-bandeja__metric-unit">expedientes</span>
+          </div>
+          <div className="funcionario-bandeja__metric">
+            <span className="funcionario-bandeja__metric-icon">
+              <IconMetricChecklist />
+            </span>
+            <span className="funcionario-bandeja__metric-label">Pendientes de acción</span>
+            <span className="funcionario-bandeja__metric-value">{workMetrics.pendientes}</span>
+            <span className="funcionario-bandeja__metric-unit">expedientes</span>
+          </div>
+          <div className="funcionario-bandeja__metric">
+            <span className="funcionario-bandeja__metric-icon">
+              <IconMetricClock />
+            </span>
+            <span className="funcionario-bandeja__metric-label">En seguimiento</span>
+            <span className="funcionario-bandeja__metric-value">{workMetrics.seguimiento}</span>
+            <span className="funcionario-bandeja__metric-unit">expedientes</span>
+          </div>
+          <div className="funcionario-bandeja__metric">
+            <span className="funcionario-bandeja__metric-icon">
+              <IconMetricCheck />
+            </span>
+            <span className="funcionario-bandeja__metric-label">Finalizados</span>
+            <span className="funcionario-bandeja__metric-value">{workMetrics.finalizados}</span>
+            <span className="funcionario-bandeja__metric-unit">expedientes</span>
+          </div>
+        </div>
+
+        <div className="funcionario-bandeja__filters">
+          <div className="funcionario-bandeja__field">
             <label htmlFor="funcionario-inbox-channel-filter">Canal</label>
             <select
               id="funcionario-inbox-channel-filter"
@@ -308,7 +518,7 @@ export default function FuncionarioBandejaExpedientesPage() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="funcionario-bandeja__field">
             <label htmlFor="funcionario-inbox-local-status-filter">Estado local</label>
             <select
               id="funcionario-inbox-local-status-filter"
@@ -323,7 +533,7 @@ export default function FuncionarioBandejaExpedientesPage() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="funcionario-bandeja__field">
             <label htmlFor="funcionario-inbox-camunda-status-filter">Estado Camunda</label>
             <select
               id="funcionario-inbox-camunda-status-filter"
@@ -339,67 +549,79 @@ export default function FuncionarioBandejaExpedientesPage() {
             </select>
           </div>
         </div>
+
         {loading ? (
-          <p className="info-message">Cargando expedientes...</p>
+          <p className="funcionario-bandeja__table-status">Cargando expedientes…</p>
         ) : filteredList.length === 0 ? (
-          <p className="empty-message">No hay expedientes para los filtros seleccionados.</p>
+          <p className="funcionario-bandeja__table-status funcionario-bandeja__table-status--muted">
+            No hay expedientes para los filtros seleccionados.
+          </p>
         ) : (
-          <div className="admin-procedure-table__container">
-            <table className="admin-procedure-table">
+          <div className="funcionario-bandeja__table-wrap">
+            <table className="funcionario-bandeja__table">
               <thead>
                 <tr>
-                  <th>ID / número de expediente</th>
-                  <th>Tipo de procedimiento</th>
-                  <th>Relación</th>
-                  <th>Canal</th>
-                  <th>Estado local</th>
-                  <th>Estado Camunda</th>
-                  <th>Fecha de creación</th>
-                  <th>Acción pendiente</th>
-                  <th>Acciones</th>
+                  <th scope="col">Nº de expediente</th>
+                  <th scope="col">Tipo de procedimiento</th>
+                  <th scope="col">Relación</th>
+                  <th scope="col">Canal</th>
+                  <th scope="col">Estado local</th>
+                  <th scope="col">Estado Camunda</th>
+                  <th scope="col">Fecha de creación</th>
+                  <th scope="col">Acción pendiente</th>
+                  <th scope="col">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredList.map((item) => {
                   const rowPending = isPendingItem(item);
                   const pendingLabel = buildPendingLabel(item);
+                  const camundaDisplay = item.camundaStatusLabel || getCamundaStatusLabel(item.camundaStatus);
                   return (
                     <tr
                       key={item.id}
-                      className={rowPending ? "admin-inbox-table__row--attention" : ""}
+                      className={rowPending ? "funcionario-bandeja__row funcionario-bandeja__row--attention" : "funcionario-bandeja__row"}
                     >
-                      <td className="admin-procedure-table__mono">
-                        <span className="admin-procedure-table__primary">{item.requestCode || "—"}</span>
-                        <p className="admin-procedure-table__secondary">ID interno: {item.id}</p>
+                      <td className="funcionario-bandeja__cell funcionario-bandeja__cell--mono">
+                        <span className="funcionario-bandeja__exp-code">{item.requestCode || "—"}</span>
+                        <span className="funcionario-bandeja__exp-id">ID interno: {item.id}</span>
                       </td>
-                      <td>{item.procedureName || item.procedureCode || "-"}</td>
-                      <td>
+                      <td className="funcionario-bandeja__cell">{item.procedureName || item.procedureCode || "—"}</td>
+                      <td className="funcionario-bandeja__cell">
+                        <span className={getRelationBadgeClass(item)}>{getAssignmentScopeLabel(item)}</span>
+                      </td>
+                      <td className="funcionario-bandeja__cell">
+                        {item.channel ? (
+                          <span className={getChannelBadgeClass(item.channel)}>{item.channel}</span>
+                        ) : (
+                          <span className="funcionario-bandeja-badge funcionario-bandeja-badge--neutral">—</span>
+                        )}
+                      </td>
+                      <td className="funcionario-bandeja__cell">
+                        <span className={getLocalStatusBadgeClass(item.status)}>{getLocalStatusLabel(item.status)}</span>
+                      </td>
+                      <td className="funcionario-bandeja__cell">
+                        <span className={getCamundaBadgeClass(item.camundaStatus)}>{camundaDisplay}</span>
+                      </td>
+                      <td className="funcionario-bandeja__cell funcionario-bandeja__cell--nowrap">
+                        {formatDateTime(item.createdAt, locale)}
+                      </td>
+                      <td className="funcionario-bandeja__cell">
                         <span
-                          className={`badge ${
-                            item.assignmentScope === "assigned_to_me" ? "badge--en-revision" : "badge--recibido"
-                          }`}
+                          className={
+                            pendingLabel === "Tomar expediente"
+                              ? "funcionario-bandeja__pending funcionario-bandeja__pending--take"
+                              : "funcionario-bandeja__pending"
+                          }
                         >
-                          {getAssignmentScopeLabel(item)}
+                          {pendingLabel}
                         </span>
+                        <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
                       </td>
-                      <td>{item.channel || "-"}</td>
-                      <td>
-                        <span className="badge badge--en-revision">{getLocalStatusLabel(item.status)}</span>
-                      </td>
-                      <td>
-                        <span className="badge badge--recibido">
-                          {item.camundaStatusLabel || getCamundaStatusLabel(item.camundaStatus)}
-                        </span>
-                      </td>
-                      <td>{formatDateTime(item.createdAt, locale)}</td>
-                      <td>
-                        <p className="admin-procedure-table__primary">{pendingLabel}</p>
-                        <p className="admin-procedure-table__secondary">{item.pendingAction || "-"}</p>
-                      </td>
-                      <td>
+                      <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
                         <button
                           type="button"
-                          className="button-inline"
+                          className="funcionario-bandeja__btn-primary"
                           onClick={() => goToExpedienteDetail(item)}
                         >
                           Ver detalle
@@ -414,12 +636,15 @@ export default function FuncionarioBandejaExpedientesPage() {
         )}
       </section>
 
-      <section className="card dashboard-section">
-        <p className="small">
-          Usa <strong>Ver detalle</strong> para abrir el expediente en una página aparte. Allí podrás tomar
-          expedientes disponibles o gestionar los asignados a ti.
+      <div className="funcionario-bandeja__info-alert" role="status">
+        <span className="funcionario-bandeja__info-alert-icon" aria-hidden="true">
+          <IconInfo />
+        </span>
+        <p className="funcionario-bandeja__info-alert-text">
+          Usa <strong className="funcionario-bandeja__kbd-strong">Ver detalle</strong> para abrir el expediente en
+          una página aparte. Allí podrás tomar expedientes disponibles o gestionar los asignados a ti.
         </p>
-      </section>
+      </div>
     </main>
   );
 }
