@@ -357,6 +357,7 @@ export default function PortalShell({ children }) {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setIsUserMenuOpen(false);
+      setIsMobileMoreOpen(false);
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [pathname]);
@@ -722,96 +723,98 @@ export default function PortalShell({ children }) {
         </Link>
       ) : null}
 
-      <nav className="mobile-bottom-nav" aria-label={copy.portal.mobileNavAriaLabel}>
-        <ul className="mobile-bottom-nav__list">
-          {mobilePrimaryNav.map((item) => (
-            <li key={item.key}>
-              <Link
-                href={item.href}
-                className={`mobile-bottom-nav__link${
-                  item.isActive ? " mobile-bottom-nav__link--active" : ""
-                }`}
-                onClick={() => setIsMobileMoreOpen(false)}
-              >
-                <span className="mobile-bottom-nav__icon">
-                  <Icon name={item.icon} />
-                </span>
-                <span className="mobile-bottom-nav__label">{item.label}</span>
-              </Link>
+      {!isAssistantView ? (
+        <nav className="mobile-bottom-nav" aria-label={copy.portal.mobileNavAriaLabel}>
+          <ul className="mobile-bottom-nav__list">
+            {mobilePrimaryNav.map((item) => (
+              <li key={item.key}>
+                <Link
+                  href={item.href}
+                  className={`mobile-bottom-nav__link${
+                    item.isActive ? " mobile-bottom-nav__link--active" : ""
+                  }`}
+                  onClick={() => setIsMobileMoreOpen(false)}
+                >
+                  <span className="mobile-bottom-nav__icon">
+                    <Icon name={item.icon} />
+                  </span>
+                  <span className="mobile-bottom-nav__label">{item.label}</span>
+                </Link>
+              </li>
+            ))}
+            <li className="mobile-bottom-nav__item--more">
+              <div className="mobile-bottom-nav__more-wrap">
+                <button
+                  type="button"
+                  className={`mobile-bottom-nav__link mobile-bottom-nav__button${
+                    isMobileMoreOpen ? " mobile-bottom-nav__link--active" : ""
+                  }`}
+                  onClick={handleMobileMoreToggle}
+                  aria-expanded={isMobileMoreOpen}
+                  aria-haspopup="menu"
+                  aria-label={
+                    isMobileMoreOpen
+                      ? copy.portal.mobile.closeMoreMenu
+                      : copy.portal.mobile.openMoreMenu
+                  }
+                >
+                  <span className="mobile-bottom-nav__icon">
+                    <Icon name="profile" />
+                  </span>
+                  <span className="mobile-bottom-nav__label">{copy.portal.mobile.more}</span>
+                </button>
+                {isMobileMoreOpen ? (
+                  <>
+                    <button
+                      type="button"
+                      className="mobile-bottom-nav__overlay"
+                      aria-label={copy.portal.mobile.closeMoreMenu}
+                      onClick={() => setIsMobileMoreOpen(false)}
+                    />
+                    <div className="mobile-bottom-nav__more-panel" role="menu">
+                      <p className="mobile-bottom-nav__more-title">{copy.portal.mobile.moreMenuTitle}</p>
+                      {mobileOverflowItems.map((item) =>
+                        item.type === "link" ? (
+                          <Link
+                            key={item.key}
+                            href={item.href}
+                            role="menuitem"
+                            className={`mobile-bottom-nav__more-link${
+                              getIsMobileItemActive(pathname, item.href)
+                                ? " mobile-bottom-nav__more-link--active"
+                                : ""
+                            }`}
+                            onClick={() => setIsMobileMoreOpen(false)}
+                          >
+                            <span className="mobile-bottom-nav__more-icon">
+                              <Icon name={item.icon} />
+                            </span>
+                            <span>{item.label}</span>
+                          </Link>
+                        ) : (
+                          <button
+                            key={item.key}
+                            type="button"
+                            role="menuitem"
+                            className="mobile-bottom-nav__more-button"
+                            onClick={() => handleMobileOverflowItemClick(item)}
+                            disabled={item.disabled}
+                          >
+                            <span className="mobile-bottom-nav__more-icon">
+                              <Icon name={item.icon} />
+                            </span>
+                            <span>{item.label}</span>
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </div>
             </li>
-          ))}
-          <li className="mobile-bottom-nav__item--more">
-            <div className="mobile-bottom-nav__more-wrap">
-              <button
-                type="button"
-                className={`mobile-bottom-nav__link mobile-bottom-nav__button${
-                  isMobileMoreOpen ? " mobile-bottom-nav__link--active" : ""
-                }`}
-                onClick={handleMobileMoreToggle}
-                aria-expanded={isMobileMoreOpen}
-                aria-haspopup="menu"
-                aria-label={
-                  isMobileMoreOpen
-                    ? copy.portal.mobile.closeMoreMenu
-                    : copy.portal.mobile.openMoreMenu
-                }
-              >
-                <span className="mobile-bottom-nav__icon">
-                  <Icon name="profile" />
-                </span>
-                <span className="mobile-bottom-nav__label">{copy.portal.mobile.more}</span>
-              </button>
-              {isMobileMoreOpen ? (
-                <>
-                  <button
-                    type="button"
-                    className="mobile-bottom-nav__overlay"
-                    aria-label={copy.portal.mobile.closeMoreMenu}
-                    onClick={() => setIsMobileMoreOpen(false)}
-                  />
-                  <div className="mobile-bottom-nav__more-panel" role="menu">
-                    <p className="mobile-bottom-nav__more-title">{copy.portal.mobile.moreMenuTitle}</p>
-                    {mobileOverflowItems.map((item) =>
-                      item.type === "link" ? (
-                        <Link
-                          key={item.key}
-                          href={item.href}
-                          role="menuitem"
-                          className={`mobile-bottom-nav__more-link${
-                            getIsMobileItemActive(pathname, item.href)
-                              ? " mobile-bottom-nav__more-link--active"
-                              : ""
-                          }`}
-                          onClick={() => setIsMobileMoreOpen(false)}
-                        >
-                          <span className="mobile-bottom-nav__more-icon">
-                            <Icon name={item.icon} />
-                          </span>
-                          <span>{item.label}</span>
-                        </Link>
-                      ) : (
-                        <button
-                          key={item.key}
-                          type="button"
-                          role="menuitem"
-                          className="mobile-bottom-nav__more-button"
-                          onClick={() => handleMobileOverflowItemClick(item)}
-                          disabled={item.disabled}
-                        >
-                          <span className="mobile-bottom-nav__more-icon">
-                            <Icon name={item.icon} />
-                          </span>
-                          <span>{item.label}</span>
-                        </button>
-                      )
-                    )}
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </li>
-        </ul>
-      </nav>
+          </ul>
+        </nav>
+      ) : null}
     </div>
   );
 }

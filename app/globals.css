@@ -4061,6 +4061,10 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(45, 166, 90, 0.2);
 }
 
+.assistant-chat-header__subtitle--mobile {
+  display: none;
+}
+
 .assistant-prompt-chip {
   width: auto;
   border: 1px solid #c8d8f4;
@@ -5407,9 +5411,7 @@ textarea:focus-visible {
     gap: 0.5rem;
     max-width: 100%;
     width: 100%;
-    min-height: calc(
-      100dvh - 112px - var(--mobile-bottom-nav-height) - env(safe-area-inset-bottom, 0px)
-    );
+    min-height: calc(100dvh - 112px - env(safe-area-inset-bottom, 0px));
     padding-left: 0.75rem;
     padding-right: 0.75rem;
     padding-top: 0.45rem;
@@ -5417,12 +5419,8 @@ textarea:focus-visible {
   }
 
   .assistant-chat-card {
-    --assistant-composer-bottom-offset: calc(
-      var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 0.45rem
-    );
-    min-height: calc(
-      100dvh - 112px - var(--mobile-bottom-nav-height) - env(safe-area-inset-bottom, 0px)
-    );
+    --assistant-composer-bottom-offset: 0px;
+    min-height: calc(100dvh - 112px - env(safe-area-inset-bottom, 0px));
     width: 100%;
     padding: 0.5rem;
     border-radius: 14px;
@@ -5474,9 +5472,7 @@ textarea:focus-visible {
     max-height: none;
     border-radius: 10px;
     padding: 0.56rem;
-    padding-bottom: calc(
-      0.56rem + var(--assistant-composer-height) + var(--assistant-composer-bottom-offset)
-    );
+    padding-bottom: calc(0.56rem + var(--assistant-composer-height));
   }
 
   .assistant-message {
@@ -6967,15 +6963,15 @@ a.dashboard-onify-detail-btn {
 
 @media (max-width: 640px) {
   .app-shell--assistant-view .app-shell__content {
-    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(0.2rem, env(safe-area-inset-bottom, 0px));
   }
 
   .app-shell--assistant-view .page--assistant {
-    padding-top: 0.2rem;
+    padding-top: 0.15rem;
     padding-bottom: 0;
     padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
-    gap: 0.35rem;
+    gap: 0.3rem;
   }
 
   .app-shell--assistant-view .assistant-chat-card {
@@ -6986,8 +6982,8 @@ a.dashboard-onify-detail-btn {
     border-top: 1px solid #d8e4f4;
     border-bottom: none;
     box-shadow: none;
-    padding: 0.35rem max(0.75rem, env(safe-area-inset-left, 0px)) 0.3rem
-      max(0.75rem, env(safe-area-inset-right, 0px));
+    padding: 0.3rem max(0.75rem, env(safe-area-inset-left, 0px))
+      max(0.35rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-right, 0px));
   }
 
   .app-shell--assistant-view .assistant-chat-composer {
@@ -6997,7 +6993,42 @@ a.dashboard-onify-detail-btn {
   }
 
   .app-shell--assistant-view .assistant-chat-messages {
-    padding-bottom: calc(0.55rem + var(--assistant-composer-height));
+    padding-bottom: calc(0.45rem + var(--assistant-composer-height));
+  }
+
+  .app-shell--assistant-view .assistant-chat-header {
+    gap: 0.22rem;
+    padding: 0.3rem 2.35rem 0.32rem 0.45rem;
+    border-radius: 10px;
+  }
+
+  .app-shell--assistant-view .assistant-chat-header__title {
+    font-size: 0.92rem;
+    line-height: 1.18;
+  }
+
+  .app-shell--assistant-view .assistant-chat-header__subtitle {
+    font-size: 0.72rem;
+    line-height: 1.28;
+  }
+
+  .app-shell--assistant-view .assistant-chat-header__avatar {
+    width: 1.65rem;
+    height: 1.65rem;
+    font-size: 0.62rem;
+  }
+
+  .app-shell--assistant-view .assistant-chat-header__status {
+    font-size: 0.58rem;
+    padding: 0.08rem 0.32rem;
+  }
+
+  .assistant-chat-header__subtitle--desktop {
+    display: none;
+  }
+
+  .assistant-chat-header__subtitle--mobile {
+    display: block;
   }
 
   .assistant-chat-header {

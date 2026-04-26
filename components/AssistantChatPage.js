@@ -839,7 +839,14 @@ function ChatHeader({ copy, onClose }) {
           {copy.header.online}
         </p>
       </div>
-      <p className="assistant-chat-header__subtitle">{copy.header.subtitle}</p>
+      <p className="assistant-chat-header__subtitle assistant-chat-header__subtitle--desktop">
+        {copy.header.subtitle}
+      </p>
+      {copy.header.subtitleMobile ? (
+        <p className="assistant-chat-header__subtitle assistant-chat-header__subtitle--mobile">
+          {copy.header.subtitleMobile}
+        </p>
+      ) : null}
     </header>
   );
 }
