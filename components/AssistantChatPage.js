@@ -9,6 +9,8 @@ import { resolveLocationReferenceLabel } from "../lib/resolveLocationReferenceLa
 import LocationPickerModal from "./LocationPickerModal";
 
 const MAX_MESSAGE_LENGTH = 500;
+/** Límite para texto mostrado/persistido en el hilo (p. ej. resumen de trámite); el compositor sigue en MAX_MESSAGE_LENGTH. */
+const MAX_CHAT_DISPLAY_TEXT = 8000;
 
 const MAX_TEXTAREA_HEIGHT = 168;
 const AUTO_SCROLL_THRESHOLD = 120;
@@ -95,7 +97,7 @@ function normalizeMessageText(value) {
     .replace(/[^\S\n]+/g, " ")
     .replace(/\n{4,}/g, "\n\n\n")
     .trim()
-    .slice(0, MAX_MESSAGE_LENGTH);
+    .slice(0, MAX_CHAT_DISPLAY_TEXT);
 }
 
 function normalizeLocationPayload(value) {
