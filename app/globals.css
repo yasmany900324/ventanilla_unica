@@ -166,6 +166,26 @@
   flex-shrink: 0;
 }
 
+.home-onify-hero__search-arrow {
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-onify-hero__search-icon {
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-onify-hero__search-icon .home-onify-access__icon-svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
+}
+
 .home-onify-hero__actions {
   display: flex;
   flex-wrap: wrap;
@@ -273,6 +293,13 @@
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  line-height: 0;
+}
+
+.home-onify-access__icon .home-onify-access__icon-svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
 }
 
 .home-onify-access__card h2 {
@@ -291,6 +318,10 @@
 .home-onify-access__arrow {
   color: #8099be;
   font-weight: 700;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .home-onify-frequent {
@@ -318,6 +349,19 @@
   font-weight: 700;
 }
 
+.home-onify-section-head__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.home-onify-section-head__arrow {
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .home-onify-frequent__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -330,10 +374,10 @@
   border-radius: 20px;
   border: 1px solid #d7e3f5;
   background: #ffffff;
-  padding: 1.18rem 1.18rem 1.18rem 0.92rem;
+  padding: 1.18rem 0.98rem 1.18rem 0.72rem;
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 1.05rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.4875rem;
   align-items: stretch;
   min-height: 240px;
   box-shadow: 0 7px 16px rgba(15, 61, 138, 0.06);
@@ -360,7 +404,7 @@
   align-self: center;
 }
 
-.home-onify-frequent__icon svg {
+.home-onify-frequent__icon .home-onify-frequent__management-svg:not(.home-onify-frequent__card-arrow-svg) {
   width: 1.56rem;
   height: 1.56rem;
   fill: none;
@@ -368,6 +412,18 @@
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.home-onify-frequent__card-arrow-svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: block;
+  flex-shrink: 0;
+}
+
+.home-onify-frequent__arrow .home-onify-frequent__card-arrow-svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .home-onify-frequent__pill {
@@ -380,10 +436,19 @@
 
 .home-onify-frequent__content {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  min-height: 100%;
+  align-self: stretch;
+}
+
+.home-onify-frequent__text {
+  width: 100%;
   display: grid;
   gap: 0.5rem;
   align-content: start;
-  align-self: start;
 }
 
 .home-onify-frequent__pill--report {
@@ -396,14 +461,14 @@
   color: #204e96;
 }
 
-.home-onify-frequent__card h3 {
+.home-onify-frequent__text h3 {
   margin: 0.04rem 0 0;
   color: #102a56;
   font-size: 1.08rem;
   line-height: 1.28;
 }
 
-.home-onify-frequent__card p {
+.home-onify-frequent__text p {
   margin: 0.08rem 0 0;
   color: #53657d;
   font-size: 0.87rem;
@@ -416,12 +481,14 @@
 }
 
 .home-onify-frequent__arrow {
-  margin-top: 0.3rem;
+  margin-top: auto;
+  align-self: flex-end;
   color: #7f95ba;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   width: fit-content;
+  line-height: 0;
 }
 
 .home-onify-dashboard {
@@ -562,6 +629,10 @@
 
 .home-onify-recent__chevron {
   color: #8098be;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .home-onify-help {
@@ -620,23 +691,29 @@
 .home-onify-help__option-arrow {
   color: #7f95ba;
   font-weight: 700;
-}
-
-.home-onify-help__option-icon {
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 999px;
-  border: 1px solid #d3e1f4;
-  background: #eef5ff;
-  color: #174890;
+  line-height: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
+.home-onify-help__option-icon {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  color: #174890;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
 .home-onify-help__option-icon svg {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.42rem;
+  height: 1.42rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -652,10 +729,6 @@
   display: flex;
   align-items: flex-start;
   gap: 0.62rem;
-}
-
-.home-onify-help__option-icon--line {
-  background: #ffffff;
 }
 
 .home-onify-help__line-copy {
@@ -826,8 +899,7 @@
   }
 
   .home-onify-frequent__card {
-    grid-template-columns: 64px minmax(0, 1fr);
-    gap: 0.92rem;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .home-onify-recent__row {
