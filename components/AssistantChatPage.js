@@ -7,7 +7,6 @@ import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 import { resolveLocationReferenceLabel } from "../lib/resolveLocationReferenceLabel";
 import LocationPickerModal from "./LocationPickerModal";
-import LocationMapPreview from "./LocationMapPreview";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -811,11 +810,9 @@ function UserLocationMessageCard({ message, copy }) {
         <p className="assistant-user-location-card__title">{buildUserLocationSentText(copy)}</p>
       </header>
       {referenceText ? <p className="assistant-user-location-card__reference">{referenceText}</p> : null}
-      <LocationMapPreview
-        latitude={location.latitude}
-        longitude={location.longitude}
-        ariaLabel={locationMapCopy.pendingConfirmMapPreviewAria || "Vista previa compacta de la ubicación enviada"}
-      />
+      <p className="assistant-user-location-card__coords">
+        {Number(location.latitude).toFixed(5)}, {Number(location.longitude).toFixed(5)}
+      </p>
       {mapUrl ? (
         <a
           className="assistant-user-location-card__link"

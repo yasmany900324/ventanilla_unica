@@ -4207,9 +4207,12 @@ button:disabled {
   color: rgba(255, 255, 255, 0.92);
 }
 
-.assistant-user-location-card .assistant-location-preview-map {
-  height: 120px;
-  border-color: rgba(255, 255, 255, 0.32);
+.assistant-user-location-card__coords {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.01em;
 }
 
 .assistant-user-location-card__link {
@@ -5674,9 +5677,6 @@ textarea:focus-visible {
     padding: 0.4rem;
   }
 
-  .assistant-user-location-card .assistant-location-preview-map {
-    height: 110px;
-  }
 
   .assistant-message p {
     font-size: 0.86rem;
