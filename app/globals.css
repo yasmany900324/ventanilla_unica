@@ -4141,6 +4141,10 @@ button:disabled {
   font-size: 0.94rem;
 }
 
+.assistant-message__text {
+  white-space: pre-line;
+}
+
 .assistant-message--bot {
   border: 1px solid #d8e3f3;
   background: #ffffff;

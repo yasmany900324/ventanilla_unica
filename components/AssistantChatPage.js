@@ -927,7 +927,7 @@ function ChatMessageBubble({
         {!isBot && message.type === MESSAGE_TYPE_LOCATION ? (
           <UserLocationMessageCard message={message} copy={copy} />
         ) : null}
-        {shouldRenderText ? <p>{messageText}</p> : null}
+        {shouldRenderText ? <p className="assistant-message__text">{messageText}</p> : null}
         {isBot && message.incidentDraftPreview ? (
           <IncidentDraftPreviewCard preview={message.incidentDraftPreview} copy={copy} />
         ) : null}
