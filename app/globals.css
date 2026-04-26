@@ -7217,12 +7217,17 @@ a.dashboard-onify-detail-btn {
 
 .funcionario-bandeja__inner {
   display: grid;
-  gap: 1.05rem;
+  gap: 1.35rem;
   width: min(calc(100% - 32px), 1220px);
   max-width: 1220px;
   margin-inline: auto;
   box-sizing: border-box;
   min-width: 0;
+}
+
+.funcionario-bandeja .dashboard-onify-hero .info-message {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .funcionario-bandeja .card {
@@ -7231,108 +7236,6 @@ a.dashboard-onify-detail-btn {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.78) inset,
     0 16px 42px rgba(15, 23, 42, 0.05);
-}
-
-.funcionario-bandeja__hero {
-  position: relative;
-  overflow: hidden;
-  min-height: clamp(7.65rem, 12.5vw, 9.75rem);
-  padding: 1.4rem 1.55rem 1.45rem 1.45rem;
-  background:
-    linear-gradient(122deg, #ffffff 0%, #f6f9ff 36%, #e9f0fb 72%, #dfe9f7 100%);
-  border: 1px solid rgba(29, 78, 216, 0.1);
-}
-
-.funcionario-bandeja__hero--loading {
-  min-height: 6.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.funcionario-bandeja__loading-text {
-  margin: 0;
-  color: #3d5a8a;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.funcionario-bandeja__hero-main {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-  max-width: min(100%, 52rem);
-}
-
-.funcionario-bandeja__hero-icon-wrap {
-  flex: 0 0 auto;
-  width: 3.85rem;
-  height: 3.85rem;
-  border-radius: 50%;
-  background: linear-gradient(148deg, #2563eb 0%, #1d4ed8 42%, #133e92 100%);
-  color: #f8fafc;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.28) inset,
-    0 10px 26px rgba(29, 78, 216, 0.32),
-    0 0 0 6px rgba(59, 130, 246, 0.08);
-}
-
-.funcionario-bandeja__hero-icon-svg {
-  width: 1.68rem;
-  height: 1.68rem;
-}
-
-.funcionario-bandeja__hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.funcionario-bandeja__hero-badge {
-  display: inline-block;
-  margin: 0 0 0.48rem;
-  padding: 0.26rem 0.68rem;
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #1e40af;
-  background: #ffffff;
-  border: 1px solid rgba(29, 78, 216, 0.2);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.funcionario-bandeja__hero-title {
-  margin: 0 0 0.48rem;
-  font-size: clamp(1.62rem, 2.9vw, 2.12rem);
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  color: #0a1f3a;
-}
-
-.funcionario-bandeja__hero-description {
-  margin: 0;
-  max-width: 52ch;
-  color: #4b5f7a;
-  font-size: 0.97rem;
-  line-height: 1.58;
-}
-
-.funcionario-bandeja__hero-wave {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 58% 95% at 100% 45%, rgba(59, 130, 246, 0.14) 0%, transparent 56%),
-    radial-gradient(circle at 92% 12%, rgba(37, 99, 235, 0.1) 0%, transparent 38%),
-    radial-gradient(circle at 96% 92%, rgba(147, 197, 253, 0.12) 0%, transparent 36%),
-    linear-gradient(100deg, transparent 48%, rgba(239, 246, 255, 0.55) 100%);
 }
 
 .funcionario-bandeja__pill-card {
@@ -7884,12 +7787,7 @@ a.dashboard-onify-detail-btn {
   }
 
   .funcionario-bandeja__inner {
-    gap: 0.92rem;
-  }
-
-  .funcionario-bandeja__hero-main {
-    flex-direction: column;
-    align-items: flex-start;
+    gap: 1rem;
   }
 
   .funcionario-bandeja__metrics {

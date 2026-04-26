@@ -183,25 +183,6 @@ const WORK_FILTER_OPTIONS = [
   { id: "finished", label: "Finalizados" },
 ];
 
-function IconFolderExpediente() {
-  return (
-    <svg className="funcionario-bandeja__hero-icon-svg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <path
-        d="M10 14h9l3 3h16a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3Z"
-        fill="currentColor"
-        fillOpacity="0.12"
-      />
-      <path
-        d="M10 14h9l3 3h16a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path d="M17 22h22M17 28h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function IconMetricCalendar() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -400,8 +381,10 @@ export default function FuncionarioBandejaExpedientesPage() {
     return (
       <main className="page page--dashboard funcionario-bandeja" lang={locale}>
         <div className="funcionario-bandeja__inner">
-          <section className="card funcionario-bandeja__hero funcionario-bandeja__hero--loading">
-            <p className="funcionario-bandeja__loading-text">Cargando…</p>
+          <section className="dashboard-onify-card dashboard-onify-hero" aria-busy="true">
+            <div className="dashboard-onify-hero__content">
+              <p className="info-message">Cargando…</p>
+            </div>
           </section>
         </div>
       </main>
@@ -415,23 +398,18 @@ export default function FuncionarioBandejaExpedientesPage() {
   return (
     <main className="page page--dashboard funcionario-bandeja" lang={locale}>
       <div className="funcionario-bandeja__inner">
-      <section className="card funcionario-bandeja__hero" aria-labelledby="funcionario-bandeja-title">
-        <div className="funcionario-bandeja__hero-main">
-          <div className="funcionario-bandeja__hero-icon-wrap" aria-hidden="true">
-            <IconFolderExpediente />
-          </div>
-          <div className="funcionario-bandeja__hero-copy">
-            <p className="funcionario-bandeja__hero-badge">Área del funcionario</p>
-            <h1 id="funcionario-bandeja-title" className="funcionario-bandeja__hero-title">
-              Bandeja de expedientes
-            </h1>
-            <p className="funcionario-bandeja__hero-description">
-              Consulta los expedientes asignados a ti y los disponibles para tomar. Abre el detalle en una página
-              dedicada.
-            </p>
-          </div>
+      <section
+        className="dashboard-onify-card dashboard-onify-hero"
+        aria-labelledby="funcionario-bandeja-title"
+      >
+        <div className="dashboard-onify-hero__content">
+          <p className="dashboard-onify-hero__eyebrow">Área del funcionario</p>
+          <h1 id="funcionario-bandeja-title">Bandeja de expedientes</h1>
+          <p>
+            Consulta los expedientes asignados a ti y los disponibles para tomar. Abre el detalle en una página
+            dedicada.
+          </p>
         </div>
-        <div className="funcionario-bandeja__hero-wave" aria-hidden="true" />
       </section>
 
       <section className="card funcionario-bandeja__pill-card">
