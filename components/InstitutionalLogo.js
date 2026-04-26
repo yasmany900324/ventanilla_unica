@@ -6,7 +6,7 @@ const LOGO_DIMENSIONS = {
 };
 
 const VARIANT_SIZES = {
-  header: "(max-width: 640px) 58vw, (max-width: 960px) 30vw, 310px",
+  header: "(max-width: 640px) 42vw, (max-width: 960px) 22vw, 174px",
   footer: "(max-width: 640px) 64vw, (max-width: 960px) 40vw, 300px",
 };
 

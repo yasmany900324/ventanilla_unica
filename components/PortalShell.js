@@ -466,6 +466,25 @@ export default function PortalShell({ children }) {
               <InstitutionalLogo alt={copy.portal.brandName} variant="header" priority />
             </Link>
 
+            {!hasActiveSession ? (
+              <div className="portal-header__mobile-quick">
+                <Link
+                  href="/login"
+                  className="portal-header__mobile-quick__link"
+                  aria-label={copy.portal.login}
+                >
+                  <Icon name="login" />
+                </Link>
+                <Link
+                  href="/registro"
+                  className="portal-header__mobile-quick__link portal-header__mobile-quick__link--primary"
+                  aria-label={copy.portal.createAccount}
+                >
+                  <Icon name="register" />
+                </Link>
+              </div>
+            ) : null}
+
             <nav className="portal-nav" aria-label={copy.portal.mainNavAriaLabel}>
               <ul className="portal-nav__list">
                 {mainNav.map((item) => (
