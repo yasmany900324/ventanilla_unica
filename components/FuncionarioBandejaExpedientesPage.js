@@ -276,6 +276,20 @@ function IconInfo() {
   );
 }
 
+function IconChevronRight() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M7.5 5.5 12.5 10 7.5 14.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function FuncionarioBandejaExpedientesPage() {
   const router = useRouter();
   const { user, isLoadingAuth } = useAuth();
@@ -385,9 +399,11 @@ export default function FuncionarioBandejaExpedientesPage() {
   if (isLoadingAuth) {
     return (
       <main className="page page--dashboard funcionario-bandeja" lang={locale}>
-        <section className="card funcionario-bandeja__hero funcionario-bandeja__hero--loading">
-          <p className="funcionario-bandeja__loading-text">Cargando…</p>
-        </section>
+        <div className="funcionario-bandeja__inner">
+          <section className="card funcionario-bandeja__hero funcionario-bandeja__hero--loading">
+            <p className="funcionario-bandeja__loading-text">Cargando…</p>
+          </section>
+        </div>
       </main>
     );
   }
@@ -398,6 +414,7 @@ export default function FuncionarioBandejaExpedientesPage() {
 
   return (
     <main className="page page--dashboard funcionario-bandeja" lang={locale}>
+      <div className="funcionario-bandeja__inner">
       <section className="card funcionario-bandeja__hero" aria-labelledby="funcionario-bandeja-title">
         <div className="funcionario-bandeja__hero-main">
           <div className="funcionario-bandeja__hero-icon-wrap" aria-hidden="true">
@@ -607,16 +624,25 @@ export default function FuncionarioBandejaExpedientesPage() {
                         {formatDateTime(item.createdAt, locale)}
                       </td>
                       <td className="funcionario-bandeja__cell">
-                        <span
-                          className={
-                            pendingLabel === "Tomar expediente"
-                              ? "funcionario-bandeja__pending funcionario-bandeja__pending--take"
-                              : "funcionario-bandeja__pending"
-                          }
-                        >
-                          {pendingLabel}
-                        </span>
-                        <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
+                        <div className="funcionario-bandeja__pending-wrap">
+                          <div className="funcionario-bandeja__pending-line">
+                            <span
+                              className={
+                                pendingLabel === "Tomar expediente"
+                                  ? "funcionario-bandeja__pending funcionario-bandeja__pending--take"
+                                  : "funcionario-bandeja__pending"
+                              }
+                            >
+                              {pendingLabel}
+                            </span>
+                            {pendingLabel === "Tomar expediente" ? (
+                              <span className="funcionario-bandeja__take-chevron" aria-hidden="true">
+                                <IconChevronRight />
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
+                        </div>
                       </td>
                       <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
                         <button
@@ -644,6 +670,7 @@ export default function FuncionarioBandejaExpedientesPage() {
           Usa <strong className="funcionario-bandeja__kbd-strong">Ver detalle</strong> para abrir el expediente en
           una página aparte. Allí podrás tomar expedientes disponibles o gestionar los asignados a ti.
         </p>
+      </div>
       </div>
     </main>
   );
