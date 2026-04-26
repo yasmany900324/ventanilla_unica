@@ -4,6 +4,7 @@
   /* Header logo: ancho máximo acotado para ~80–90px de altura total de la franja blanca en desktop */
   --institutional-logo-header-width: clamp(118px, 12.5vw, 174px);
   --institutional-logo-footer-width: clamp(200px, 28vw, 300px);
+  --mobile-safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 /* Portal refresh: institutional header + home Onify concept */
@@ -6962,8 +6963,13 @@ a.dashboard-onify-detail-btn {
 }
 
 @media (max-width: 640px) {
+  .app-shell--assistant-view {
+    height: 100svh;
+    min-height: 100svh;
+  }
+
   .app-shell--assistant-view .app-shell__content {
-    padding-bottom: max(0.2rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--mobile-safe-bottom);
   }
 
   .app-shell--assistant-view .page--assistant {
@@ -6972,18 +6978,24 @@ a.dashboard-onify-detail-btn {
     padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
     gap: 0.3rem;
+    min-height: calc(100svh - 112px);
+    height: calc(100svh - 112px);
+    max-height: calc(100svh - 112px);
   }
 
   .app-shell--assistant-view .assistant-chat-card {
-    --assistant-composer-bottom-offset: 0px;
+    --assistant-composer-bottom-offset: var(--mobile-safe-bottom);
     border-radius: 0;
     border-left: none;
     border-right: none;
     border-top: 1px solid #d8e4f4;
     border-bottom: none;
     box-shadow: none;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
     padding: 0.3rem max(0.75rem, env(safe-area-inset-left, 0px))
-      max(0.35rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-right, 0px));
+      var(--mobile-safe-bottom) max(0.75rem, env(safe-area-inset-right, 0px));
   }
 
   .app-shell--assistant-view .assistant-chat-composer {
@@ -6993,7 +7005,7 @@ a.dashboard-onify-detail-btn {
   }
 
   .app-shell--assistant-view .assistant-chat-messages {
-    padding-bottom: calc(0.45rem + var(--assistant-composer-height));
+    padding-bottom: 0.45rem;
   }
 
   .app-shell--assistant-view .assistant-chat-header {
