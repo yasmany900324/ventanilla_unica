@@ -7206,13 +7206,9 @@ a.dashboard-onify-detail-btn {
 .funcionario-bandeja.page.page--dashboard {
   box-sizing: border-box;
   width: 100%;
-  max-width: none;
-  margin: 0;
-  padding-top: 1.1rem;
-  padding-bottom: 2.85rem;
-  padding-left: 0;
-  padding-right: 0;
-  overflow-x: clip;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.2rem 1rem 2.25rem;
 }
 
 .funcionario-bandeja__inner {
@@ -7484,7 +7480,7 @@ a.dashboard-onify-detail-btn {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   margin: 0;
   border-radius: 16px;
   border: 1px solid rgba(203, 213, 225, 0.55);
