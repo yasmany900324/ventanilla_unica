@@ -6969,48 +6969,60 @@ a.dashboard-onify-detail-btn {
   }
 
   .app-shell--assistant-view .app-shell__content {
-    padding-bottom: var(--mobile-safe-bottom);
+    padding-bottom: 0;
   }
 
   .app-shell--assistant-view .page--assistant {
     padding-top: 0.15rem;
     padding-bottom: 0;
-    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
-    gap: 0.3rem;
+    padding-left: max(0.2rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.2rem, env(safe-area-inset-right, 0px));
+    gap: 0.22rem;
     min-height: calc(100svh - 112px);
     height: calc(100svh - 112px);
     max-height: calc(100svh - 112px);
+    overflow: hidden;
   }
 
   .app-shell--assistant-view .assistant-chat-card {
     --assistant-composer-bottom-offset: var(--mobile-safe-bottom);
     border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-top: 1px solid #d8e4f4;
+    border: none;
     border-bottom: none;
     box-shadow: none;
     min-height: 0;
     height: 100%;
     max-height: 100%;
-    padding: 0.3rem max(0.75rem, env(safe-area-inset-left, 0px))
-      var(--mobile-safe-bottom) max(0.75rem, env(safe-area-inset-right, 0px));
+    gap: 0.32rem;
+    padding: 0.24rem 0.16rem 0;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
   }
 
   .app-shell--assistant-view .assistant-chat-composer {
-    position: relative;
-    bottom: auto;
-    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.07);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    width: 100%;
+    border: none;
+    border-top: 1px solid #d4dfef;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.1);
+    background: #ffffff;
+    backdrop-filter: none;
+    padding: 0.5rem 0.75rem var(--mobile-safe-bottom);
   }
 
   .app-shell--assistant-view .assistant-chat-messages {
-    padding-bottom: 0.45rem;
+    border-radius: 12px;
+    padding: 0.52rem;
+    padding-bottom: calc(var(--assistant-composer-height) + var(--mobile-safe-bottom) + 0.9rem);
   }
 
   .app-shell--assistant-view .assistant-chat-header {
     gap: 0.22rem;
-    padding: 0.3rem 2.35rem 0.32rem 0.45rem;
+    padding: 0.28rem 2.2rem 0.3rem 0.45rem;
     border-radius: 10px;
   }
 
