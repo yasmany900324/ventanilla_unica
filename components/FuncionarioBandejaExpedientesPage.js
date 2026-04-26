@@ -688,13 +688,6 @@ export default function FuncionarioBandejaExpedientesPage() {
                       </td>
                       <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
                         <div className="funcionario-bandeja__actions">
-                          <button
-                            type="button"
-                            className="funcionario-bandeja__btn-primary"
-                            onClick={() => goToExpedienteDetail(item)}
-                          >
-                            Ver detalle
-                          </button>
                           <details className="funcionario-bandeja__menu">
                             <summary
                               className="funcionario-bandeja__menu-trigger"
@@ -703,6 +696,20 @@ export default function FuncionarioBandejaExpedientesPage() {
                               <span aria-hidden="true">⋮</span>
                             </summary>
                             <div className="funcionario-bandeja__menu-panel" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="funcionario-bandeja__menu-item"
+                                onClick={(event) => {
+                                  const detailsElement = event.currentTarget.closest("details");
+                                  if (detailsElement) {
+                                    detailsElement.removeAttribute("open");
+                                  }
+                                  goToExpedienteDetail(item);
+                                }}
+                              >
+                                Ver detalle
+                              </button>
                               <button
                                 type="button"
                                 role="menuitem"
@@ -736,8 +743,10 @@ export default function FuncionarioBandejaExpedientesPage() {
           <IconInfo />
         </span>
         <p className="funcionario-bandeja__info-alert-text">
-          Usa <strong className="funcionario-bandeja__kbd-strong">Ver detalle</strong> para abrir el expediente en
-          una página aparte. Allí podrás tomar expedientes disponibles o gestionar los asignados a ti.
+          En <strong className="funcionario-bandeja__kbd-strong">Acciones</strong>, abre el menú{" "}
+          <strong className="funcionario-bandeja__kbd-strong">⋮</strong> y elige{" "}
+          <strong className="funcionario-bandeja__kbd-strong">Ver detalle</strong> para abrir el expediente en una
+          página aparte. Allí podrás tomar expedientes disponibles o gestionar los asignados a ti.
         </p>
       </div>
       </div>

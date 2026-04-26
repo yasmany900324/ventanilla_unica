@@ -7658,6 +7658,9 @@ a.dashboard-onify-detail-btn {
 }
 
 .funcionario-bandeja button.funcionario-bandeja__menu-item--danger {
+  margin-top: 0.2rem;
+  padding-top: 0.42rem;
+  border-top: 1px solid #e8eef5;
   color: #b42318;
 }
 
@@ -7713,39 +7716,6 @@ a.dashboard-onify-detail-btn {
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
-}
-
-.funcionario-bandeja button.funcionario-bandeja__btn-primary {
-  width: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.45rem 0.92rem;
-  border-radius: 10px;
-  font-size: 0.82rem;
-  font-weight: 650;
-  background: #ffffff;
-  border: 1px solid #c5d5ea;
-  color: #1e3a8a;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.funcionario-bandeja button.funcionario-bandeja__btn-primary:hover:not(:disabled) {
-  background: #f4f7fd;
-  border-color: #1d4ed8;
-  color: #0f2744;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-}
-
-.funcionario-bandeja button.funcionario-bandeja__btn-primary:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.35);
-  outline-offset: 2px;
 }
 
 .funcionario-bandeja-badge {
