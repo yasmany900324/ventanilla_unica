@@ -387,17 +387,22 @@ export default function FuncionarioExpedienteDetailPage() {
   const [completeVariablesJson, setCompleteVariablesJson] = useState("{}");
   const [internalObservation, setInternalObservation] = useState("");
   const [nextStatus, setNextStatus] = useState("");
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteTechnicalDetail, setDeleteTechnicalDetail] = useState("");
 
   const isFuncionario = hasRole(user, "agente");
+  const isAdmin = hasRole(user, "administrador");
+  const isBackofficeManager = isFuncionario || isAdmin;
 
   useEffect(() => {
     if (isLoadingAuth) {
       return;
     }
-    if (!user || !isFuncionario) {
+    if (!user || !isBackofficeManager) {
       router.replace("/");
     }
-  }, [isFuncionario, isLoadingAuth, router, user]);
+  }, [isBackofficeManager, isLoadingAuth, router, user]);
 
   const loadDetail = useCallback(async (requestId) => {
     if (!requestId) {
@@ -410,6 +415,7 @@ export default function FuncionarioExpedienteDetailPage() {
     setFatalError(null);
     setActionError("");
     setSuccessMessage("");
+    setDeleteTechnicalDetail("");
     try {
       const response = await fetch(`/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`, {
         cache: "no-store",
@@ -421,7 +427,7 @@ export default function FuncionarioExpedienteDetailPage() {
         } else if (response.status === 403) {
           setFatalError({
             message:
-              "No tienes permisos para ver este expediente o ya fue tomado por otro funcionario.",
+              "No tienes permisos para ver este expediente o no está asignado a tu bandeja.",
           });
         } else {
           setFatalError({ message: data?.error || "No se pudo cargar el detalle del expediente." });
@@ -442,11 +448,11 @@ export default function FuncionarioExpedienteDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (isLoadingAuth || !user || !isFuncionario || !procedureRequestId) {
+    if (isLoadingAuth || !user || !isBackofficeManager || !procedureRequestId) {
       return;
     }
     loadDetail(procedureRequestId);
-  }, [isFuncionario, isLoadingAuth, loadDetail, procedureRequestId, user]);
+  }, [isBackofficeManager, isLoadingAuth, loadDetail, procedureRequestId, user]);
 
   const availableActions = useMemo(
     () => (Array.isArray(detail?.availableActions) ? detail.availableActions : []),
@@ -557,7 +563,7 @@ export default function FuncionarioExpedienteDetailPage() {
     );
   }
 
-  if (!user || !isFuncionario) {
+  if (!user || !isBackofficeManager) {
     return null;
   }
 
@@ -578,6 +584,42 @@ export default function FuncionarioExpedienteDetailPage() {
   const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
   const trackingCode = procedureRequest?.requestCode || null;
   const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
+  const canManageDeletion = Boolean(procedureRequest && (isAssignedToMe || isAdmin));
+
+  const handleDeleteExpediente = async () => {
+    if (!procedureRequest?.id || deleteLoading) {
+      return;
+    }
+    setDeleteLoading(true);
+    setActionError("");
+    setSuccessMessage("");
+    setDeleteTechnicalDetail("");
+    try {
+      const response = await fetch(`/api/funcionario/expedientes/${encodeURIComponent(procedureRequest.id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const message =
+          response.status === 409 && String(data?.error || "").toLowerCase().includes("camunda")
+            ? "No se pudo eliminar la instancia en Camunda. El expediente no fue eliminado."
+            : data?.error || "No se pudo eliminar el expediente.";
+        setActionError(message);
+        if (data?.technicalDetails) {
+          setDeleteTechnicalDetail(stringifyJson(data.technicalDetails));
+        }
+        return;
+      }
+      setSuccessMessage("Expediente eliminado correctamente.");
+      setIsDeleteConfirmOpen(false);
+      router.push("/funcionario/dashboard");
+    } catch (error) {
+      setActionError("No se pudo eliminar el expediente.");
+      setDeleteTechnicalDetail(stringifyJson({ message: error?.message || "network_error" }));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   if (fatalError) {
     return (
@@ -864,7 +906,98 @@ export default function FuncionarioExpedienteDetailPage() {
               </pre>
             </details>
           </section>
+
+          {canManageDeletion ? (
+            <section className="card dashboard-section admin-procedure-fields">
+              <h3>Zona de peligro</h3>
+              <p className="small">
+                Esta acción es destructiva. El expediente se elimina en forma permanente y no puede recuperarse.
+              </p>
+              <button
+                type="button"
+                className="button-inline button-inline--danger"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Eliminando..." : "Eliminar expediente"}
+              </button>
+            </section>
+          ) : null}
         </>
+      ) : null}
+
+      {deleteTechnicalDetail ? (
+        <section className="card dashboard-section admin-procedure-fields">
+          <details>
+            <summary>Detalle técnico de eliminación</summary>
+            <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
+              {deleteTechnicalDetail}
+            </pre>
+          </details>
+        </section>
+      ) : null}
+
+      {isDeleteConfirmOpen && procedureRequest ? (
+        <div
+          className="admin-roles-confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-expediente-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !deleteLoading) {
+              setIsDeleteConfirmOpen(false);
+            }
+          }}
+        >
+          <section className="admin-roles-confirm-dialog__panel" onClick={(event) => event.stopPropagation()}>
+            <header className="admin-roles-confirm-dialog__header">
+              <h2 id="delete-expediente-title" className="admin-roles-confirm-dialog__title">
+                Confirmar eliminación del expediente
+              </h2>
+            </header>
+            <p className="admin-roles-confirm-dialog__lead">
+              Esta acción eliminará el expediente del sistema. Si existe una instancia asociada en Camunda, primero
+              se intentará eliminar/cancelar esa instancia. Esta acción no se puede deshacer.
+            </p>
+            <dl className="admin-roles-confirm-dialog__details">
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Número de expediente</dt>
+                <dd>{procedureRequest.requestCode || "-"}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Estado local</dt>
+                <dd>{getLocalStatusLabel(procedureRequest.status)}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Instancia Camunda</dt>
+                <dd>{procedureRequest.camundaProcessInstanceKey || "-"}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Definición Camunda</dt>
+                <dd>{procedureRequest.camundaProcessDefinitionId || "-"}</dd>
+              </div>
+            </dl>
+            <div className="admin-roles-confirm-dialog__actions">
+              <button
+                type="button"
+                className="admin-roles-confirm-dialog__button admin-roles-confirm-dialog__button--ghost"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={deleteLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="admin-roles-confirm-dialog__button"
+                onClick={handleDeleteExpediente}
+                disabled={deleteLoading}
+                style={{ background: "#b91c1c", borderColor: "#b91c1c" }}
+              >
+                {deleteLoading ? "Eliminando..." : "Sí, eliminar expediente"}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </main>
   );

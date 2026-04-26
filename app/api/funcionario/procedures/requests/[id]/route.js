@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireFuncionario } from "../../../../../../lib/auth";
+import { requireBackofficeUser, userHasRole } from "../../../../../../lib/auth";
+import { ROLES } from "../../../../../../lib/roles";
 import { getAppRouteParamString } from "../../../../../../lib/nextAppRouteParams";
 import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActiveTaskForProcedure";
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
@@ -19,8 +20,8 @@ import {
 
 export async function GET(request, { params }) {
   try {
-    const funcionario = await requireFuncionario(request);
-    if (!funcionario) {
+    const actor = await requireBackofficeUser(request);
+    if (!actor) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const procedureRequestId = await getAppRouteParamString(params, "id");
@@ -28,11 +29,14 @@ export async function GET(request, { params }) {
     if (!procedureRequest) {
       return NextResponse.json({ error: "No se encontró el expediente solicitado." }, { status: 404 });
     }
-    const assignmentScope = await resolveFuncionarioAssignmentScopeForProcedureRequest({
-      funcionarioUserId: funcionario.id,
-      procedureRequestId: procedureRequest.id,
-    });
-    if (!assignmentScope) {
+    const isAdmin = userHasRole(actor, ROLES.ADMIN);
+    const assignmentScope = isAdmin
+      ? "admin"
+      : await resolveFuncionarioAssignmentScopeForProcedureRequest({
+          funcionarioUserId: actor.id,
+          procedureRequestId: procedureRequest.id,
+        });
+    if (!isAdmin && !assignmentScope) {
       return NextResponse.json(
         {
           error:
@@ -77,7 +81,7 @@ export async function GET(request, { params }) {
         },
         activeTask,
         procedureType,
-        actorId: funcionario.id,
+        actorId: actor.id,
         requestsApiSegment: "funcionario",
         includeClaimTask: false,
         assignmentScope,
