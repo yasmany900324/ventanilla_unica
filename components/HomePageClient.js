@@ -55,28 +55,28 @@ function getHomeContent(locale = "es") {
           type: "REPORT",
           description: "Report issues in public space.",
           href: "/asistente",
-          icon: "◉",
+          iconKey: "roadAlert",
         },
         {
           title: "Public lighting",
           type: "REPORT",
           description: "Report failures or lights off in your area.",
           href: "/asistente",
-          icon: "✦",
+          iconKey: "streetLamp",
         },
         {
           title: "Overflowing container",
           type: "REPORT",
           description: "Report containers needing urgent emptying.",
           href: "/asistente",
-          icon: "▣",
+          iconKey: "container",
         },
         {
           title: "Business registration",
           type: "PROCEDURE",
           description: "Commercial permit for new businesses.",
           href: "/asistente",
-          icon: "▤",
+          iconKey: "building",
         },
       ],
       recentTitle: "My recent managements",
@@ -93,10 +93,22 @@ function getHomeContent(locale = "es") {
       flowTitle: "Simple tracking",
       flowSubtitle: "Managing your request is this easy.",
       flow: [
-        { title: "Start your management", description: "Choose the management type and complete the details." },
-        { title: "We receive your request", description: "We register it and send you a file number." },
-        { title: "We follow up", description: "Our team works on the resolution." },
-        { title: "We notify you", description: "We inform you about each progress and solution." },
+        {
+          title: "Start your management",
+          description: "Choose the management type and complete the details.",
+          iconKey: "document",
+        },
+        {
+          title: "We receive your request",
+          description: "We register it and send you a file number.",
+          iconKey: "inbox",
+        },
+        { title: "We follow up", description: "Our team works on the resolution.", iconKey: "search" },
+        {
+          title: "We notify you",
+          description: "We inform you about each progress and solution.",
+          iconKey: "check",
+        },
       ],
     },
     pt: {
@@ -146,28 +158,28 @@ function getHomeContent(locale = "es") {
           type: "REPORTE",
           description: "Reporte problemas no espaço público.",
           href: "/asistente",
-          icon: "◉",
+          iconKey: "roadAlert",
         },
         {
           title: "Iluminação pública",
           type: "REPORTE",
           description: "Reporte falhas ou luzes apagadas na sua zona.",
           href: "/asistente",
-          icon: "✦",
+          iconKey: "streetLamp",
         },
         {
           title: "Contêiner transbordando",
           type: "REPORTE",
           description: "Informe contêineres que precisam de esvaziamento urgente.",
           href: "/asistente",
-          icon: "▣",
+          iconKey: "container",
         },
         {
           title: "Registro de empresa",
           type: "TRÂMITE",
           description: "Habilitação comercial para novos empreendimentos.",
           href: "/asistente",
-          icon: "▤",
+          iconKey: "building",
         },
       ],
       recentTitle: "Minhas gestões recentes",
@@ -184,10 +196,18 @@ function getHomeContent(locale = "es") {
       flowTitle: "Acompanhamento simples",
       flowSubtitle: "Assim é fácil fazer sua gestão.",
       flow: [
-        { title: "Inicie sua gestão", description: "Escolha o tipo de gestão e complete os dados." },
-        { title: "Recebemos sua solicitação", description: "Registramos e enviamos um número de expediente." },
-        { title: "Fazemos acompanhamento", description: "Nossa equipe trabalha na resolução." },
-        { title: "Notificamos você", description: "Informamos cada avanço e a solução." },
+        {
+          title: "Inicie sua gestão",
+          description: "Escolha o tipo de gestão e complete os dados.",
+          iconKey: "document",
+        },
+        {
+          title: "Recebemos sua solicitação",
+          description: "Registramos e enviamos um número de expediente.",
+          iconKey: "inbox",
+        },
+        { title: "Fazemos acompanhamento", description: "Nossa equipe trabalha na resolução.", iconKey: "search" },
+        { title: "Notificamos você", description: "Informamos cada avanço e a solução.", iconKey: "check" },
       ],
     },
     es: {
@@ -237,28 +257,28 @@ function getHomeContent(locale = "es") {
           type: "REPORTE",
           description: "Reportá problemas en el espacio público.",
           href: "/asistente",
-          icon: "◉",
+          iconKey: "roadAlert",
         },
         {
           title: "Alumbrado público",
           type: "REPORTE",
           description: "Reportá fallas o luces apagadas en tu zona.",
           href: "/asistente",
-          icon: "✦",
+          iconKey: "streetLamp",
         },
         {
           title: "Contenedor desbordado",
           type: "REPORTE",
           description: "Informá sobre contenedores que necesitan vaciado urgente.",
           href: "/asistente",
-          icon: "▣",
+          iconKey: "container",
         },
         {
           title: "Registro de empresa",
           type: "TRÁMITE",
           description: "Habilitación comercial para nuevos emprendimientos.",
           href: "/asistente",
-          icon: "▤",
+          iconKey: "building",
         },
       ],
       recentTitle: "Mis gestiones recientes",
@@ -275,10 +295,18 @@ function getHomeContent(locale = "es") {
       flowTitle: "Seguimiento simple",
       flowSubtitle: "Así de fácil es hacer tu gestión.",
       flow: [
-        { title: "Iniciá tu gestión", description: "Elegí el tipo de gestión y completá los datos." },
-        { title: "Recibimos tu solicitud", description: "La registramos y te enviamos un número de expediente." },
-        { title: "Hacemos seguimiento", description: "Nuestro equipo trabaja en la resolución." },
-        { title: "Te notificamos", description: "Te informamos cada avance y la solución." },
+        {
+          title: "Iniciá tu gestión",
+          description: "Elegí el tipo de gestión y completá los datos.",
+          iconKey: "document",
+        },
+        {
+          title: "Recibimos tu solicitud",
+          description: "La registramos y te enviamos un número de expediente.",
+          iconKey: "inbox",
+        },
+        { title: "Hacemos seguimiento", description: "Nuestro equipo trabaja en la resolución.", iconKey: "search" },
+        { title: "Te notificamos", description: "Te informamos cada avance y la solución.", iconKey: "check" },
       ],
     },
   };
@@ -339,6 +367,98 @@ function HeroLineArt() {
         <rect x="352" y="104" width="88" height="62" rx="14" stroke="#C2D6F2" strokeWidth="2.2" />
         <path d="M370 127h52M370 143h34" stroke="#C2D6F2" strokeWidth="2.2" />
       </g>
+    </svg>
+  );
+}
+
+function FrequentManagementIcon({ iconKey }) {
+  if (iconKey === "streetLamp") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4v14M12 7h4l-1 4h-3" />
+        <path d="M9 21h6M10 18h4" />
+      </svg>
+    );
+  }
+  if (iconKey === "container") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 7h10M8 7l1 12h6l1-12M10 7V5h4v2" />
+        <path d="M10 10v7M14 10v7" />
+      </svg>
+    );
+  }
+  if (iconKey === "building") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 20V6l7-2 7 2v14M9 10h1M13 10h1M9 13h1M13 13h1M11 20v-3h2v3" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4 5 18h14L12 4Z" />
+      <path d="M12 9v4M12 16h.01" />
+      <path d="M6 20h12" />
+    </svg>
+  );
+}
+
+function HelpPanelIcon({ type }) {
+  if (type === "channels") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 13a8 8 0 1 1 16 0" />
+        <path d="M4 13v4h3v-4M17 13v4h3v-4" />
+        <path d="M8 20h8" />
+      </svg>
+    );
+  }
+  if (type === "phone") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 5h3l1 4-2 2a14 14 0 0 0 4 4l2-2 4 1v3a2 2 0 0 1-2 2h-1C9.9 19 5 14.1 5 8V7a2 2 0 0 1 2-2Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6h14v9H9l-4 3V6Z" />
+      <path d="M9 10h6M9 13h4" />
+    </svg>
+  );
+}
+
+function StepIcon({ iconKey }) {
+  if (iconKey === "inbox") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16v10H4z" />
+        <path d="M8 13h8l-1.5 2h-5z" />
+      </svg>
+    );
+  }
+  if (iconKey === "search") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="5" />
+        <path d="m15 15 4 4" />
+      </svg>
+    );
+  }
+  if (iconKey === "check") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12.5 10 17l9-9" />
+        <path d="M4 12a8 8 0 1 1 16 0" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4h8l2 2v14H7z" />
+      <path d="M9 10h6M9 13h5" />
+      <path d="m11 16 1 1 2-2" />
     </svg>
   );
 }
@@ -451,7 +571,7 @@ export default function HomePageClient() {
           {content.frequent.map((item) => (
             <Link href={item.href} key={item.title} className="home-onify-frequent__card">
               <span className="home-onify-frequent__icon" aria-hidden="true">
-                {item.icon}
+                <FrequentManagementIcon iconKey={item.iconKey} />
               </span>
               <span
                 className={`home-onify-frequent__pill ${
@@ -473,7 +593,7 @@ export default function HomePageClient() {
       <section className="home-onify-dashboard">
         <article className="home-onify-recent" aria-labelledby="recent-managements-title">
           <header className="home-onify-section-head">
-            <h2 id="recent-managements-title">Mis gestiones recientes</h2>
+            <h2 id="recent-managements-title">{content.recentTitle}</h2>
             <Link href="/mis-incidencias">{content.viewAllMine}</Link>
           </header>
 
@@ -496,15 +616,21 @@ export default function HomePageClient() {
                 return (
                   <li key={procedure.id}>
                     <Link href={`/mis-incidencias?incidentId=${procedure.id}`} className="home-onify-recent__row">
-                      <span className="home-onify-recent__avatar" aria-hidden="true">
-                        ●
-                      </span>
-                      <div className="home-onify-recent__main">
-                        <strong>{procedure.procedureName || "Gestión ciudadana"}</strong>
-                        <p>Expediente {procedure.requestCode || procedure.id}</p>
+                      <div className="home-onify-recent__main-group">
+                        <span className="home-onify-recent__avatar" aria-hidden="true">
+                          ●
+                        </span>
+                        <div className="home-onify-recent__main">
+                          <strong>{procedure.procedureName || "Gestión ciudadana"}</strong>
+                          <p>Expediente {procedure.requestCode || procedure.id}</p>
+                        </div>
                       </div>
-                      <p className="home-onify-recent__date">{formatDate(procedure.createdAt, locale)}</p>
-                      <span className={`home-onify-status home-onify-status--${status.tone}`}>{status.label}</span>
+                      <div className="home-onify-recent__date-col">
+                        <p className="home-onify-recent__date">{formatDate(procedure.createdAt, locale)}</p>
+                      </div>
+                      <div className="home-onify-recent__status-col">
+                        <span className={`home-onify-status home-onify-status--${status.tone}`}>{status.label}</span>
+                      </div>
                       <span className="home-onify-recent__chevron" aria-hidden="true">
                         →
                       </span>
@@ -522,23 +648,38 @@ export default function HomePageClient() {
           <ul>
             <li>
               <Link href="/#ayuda-soporte">
-                <span>{content.faqTitle}</span>
-                <small>{content.faqDescription}</small>
-                <span aria-hidden="true">→</span>
+                <span className="home-onify-help__option-icon" aria-hidden="true">
+                  <HelpPanelIcon type="faq" />
+                </span>
+                <span className="home-onify-help__option-copy">
+                  <span>{content.faqTitle}</span>
+                  <small>{content.faqDescription}</small>
+                </span>
+                <span className="home-onify-help__option-arrow" aria-hidden="true">→</span>
               </Link>
             </li>
             <li>
               <Link href="/#ayuda-soporte">
-                <span>{content.channelsTitle}</span>
-                <small>{content.channelsDescription}</small>
-                <span aria-hidden="true">→</span>
+                <span className="home-onify-help__option-icon" aria-hidden="true">
+                  <HelpPanelIcon type="channels" />
+                </span>
+                <span className="home-onify-help__option-copy">
+                  <span>{content.channelsTitle}</span>
+                  <small>{content.channelsDescription}</small>
+                </span>
+                <span className="home-onify-help__option-arrow" aria-hidden="true">→</span>
               </Link>
             </li>
           </ul>
           <div className="home-onify-help__line">
-            <strong>{content.helpLine}</strong>
-            <p>0800 4200</p>
-            <small>Lunes a viernes de 8 a 18 h</small>
+            <span className="home-onify-help__option-icon home-onify-help__option-icon--line" aria-hidden="true">
+              <HelpPanelIcon type="phone" />
+            </span>
+            <div className="home-onify-help__line-copy">
+              <strong>{content.helpLine}</strong>
+              <p>0800 4200</p>
+              <small>Lunes a viernes de 8 a 18 h</small>
+            </div>
           </div>
           <p className="home-onify-help__hello">
             {copy.portal.greeting}, {greetingName}
@@ -551,12 +692,24 @@ export default function HomePageClient() {
           <h2 id="simple-tracking-title">{content.flowTitle}</h2>
           <p>{content.flowSubtitle}</p>
         </header>
-        <ol>
+        <ol className="home-onify-flow__steps">
           {content.flow.map((step, index) => (
-            <li key={step.title}>
-              <span aria-hidden="true">{index + 1}</span>
-              <h3>{step.title}</h3>
-              <p>{step.description}</p>
+            <li key={step.title} className="home-onify-flow__step">
+              <div className="home-onify-flow__step-head">
+                <span className="home-onify-flow__step-number" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="home-onify-flow__step-icon" aria-hidden="true">
+                  <StepIcon iconKey={step.iconKey} />
+                </span>
+              </div>
+              <div className="home-onify-flow__step-copy">
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+              </div>
+              {index < content.flow.length - 1 ? (
+                <span className="home-onify-flow__connector" aria-hidden="true" />
+              ) : null}
             </li>
           ))}
         </ol>
