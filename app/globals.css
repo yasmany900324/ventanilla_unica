@@ -6112,7 +6112,7 @@ textarea:focus-visible {
 .dashboard-onify-hero {
   padding: 2rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 1.35rem;
   align-items: center;
 }
@@ -6120,6 +6120,7 @@ textarea:focus-visible {
 .dashboard-onify-hero__content {
   display: grid;
   gap: 0.8rem;
+  width: 100%;
 }
 
 .dashboard-onify-hero__eyebrow {
@@ -6143,7 +6144,7 @@ textarea:focus-visible {
   color: #556982;
   font-size: 1rem;
   line-height: 1.58;
-  max-width: 64ch;
+  max-width: none;
 }
 
 .dashboard-onify-hero__actions {

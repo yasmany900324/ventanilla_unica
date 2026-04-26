@@ -347,7 +347,6 @@ export default function CitizenDashboard() {
   const dashboardCopy = copy.dashboard;
   const localeText = getDashboardLocaleContent(locale);
   const statusLabels = dashboardCopy.procedureStatusLabels || {};
-  const assistantHref = "/asistente";
   const requestedProcedureId = searchParams.get("procedureId") || searchParams.get("incidentId");
   const [procedures, setProcedures] = useState([]);
   const [selectedProcedureId, setSelectedProcedureId] = useState("");
@@ -468,14 +467,6 @@ export default function CitizenDashboard() {
             {dashboardCopy.hello}, {user?.fullName || dashboardCopy.greetingFallback}
           </h1>
           <p>{dashboardCopy.description}</p>
-        </div>
-        <div className="dashboard-onify-hero__actions">
-          <Link href={assistantHref} className="home-onify-btn home-onify-btn--primary dashboard-onify-btn">
-            <span className="dashboard-onify-btn__icon" aria-hidden="true">
-              <DashboardIcon name="chat" />
-            </span>
-            {dashboardCopy.newIncident}
-          </Link>
         </div>
       </section>
 
