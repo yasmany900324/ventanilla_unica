@@ -279,6 +279,8 @@ export default function FuncionarioBandejaExpedientesPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
@@ -377,6 +379,43 @@ export default function FuncionarioBandejaExpedientesPage() {
     router.push(`/funcionario/expedientes/${encodeURIComponent(internalId)}`);
   };
 
+  const handleDeleteExpediente = async (item) => {
+    const internalId = item?.procedureRequestId || item?.id;
+    if (!internalId || deletingId) {
+      return;
+    }
+    const tracking = item?.requestCode || internalId;
+    const confirmed = window.confirm(
+      `¿Seguro que deseas eliminar el expediente ${tracking}?\n\nSi está sincronizado en Camunda, se eliminará primero allí y luego en la base de datos.`
+    );
+    if (!confirmed) {
+      return;
+    }
+    setDeletingId(String(internalId));
+    setError("");
+    setSuccessMessage("");
+    try {
+      const response = await fetch(`/api/funcionario/expedientes/${encodeURIComponent(internalId)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          response.status === 409 && String(data?.error || "").toLowerCase().includes("camunda")
+            ? "No se pudo eliminar la instancia en Camunda. El expediente no fue eliminado."
+            : data?.error || "No se pudo eliminar el expediente.";
+        setError(message);
+        return;
+      }
+      setSuccessMessage(data?.message || "Expediente eliminado correctamente.");
+      await loadList();
+    } catch (_error) {
+      setError("No se pudo eliminar el expediente.");
+    } finally {
+      setDeletingId("");
+    }
+  };
+
   if (isLoadingAuth) {
     return (
       <main className="page page--dashboard funcionario-bandeja" lang={locale}>
@@ -453,6 +492,8 @@ export default function FuncionarioBandejaExpedientesPage() {
             </p>
           </div>
         </header>
+
+        {successMessage ? <p className="status-message">{successMessage}</p> : null}
 
         <div className="funcionario-bandeja__metrics" aria-label="Resumen de la vista actual">
           <div className="funcionario-bandeja__metric">
@@ -623,13 +664,40 @@ export default function FuncionarioBandejaExpedientesPage() {
                         </div>
                       </td>
                       <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
-                        <button
-                          type="button"
-                          className="funcionario-bandeja__btn-primary"
-                          onClick={() => goToExpedienteDetail(item)}
-                        >
-                          Ver detalle
-                        </button>
+                        <div className="funcionario-bandeja__actions">
+                          <button
+                            type="button"
+                            className="funcionario-bandeja__btn-primary"
+                            onClick={() => goToExpedienteDetail(item)}
+                          >
+                            Ver detalle
+                          </button>
+                          <details className="funcionario-bandeja__menu">
+                            <summary
+                              className="funcionario-bandeja__menu-trigger"
+                              aria-label={`Abrir acciones para expediente ${item.requestCode || item.id}`}
+                            >
+                              <span aria-hidden="true">⋮</span>
+                            </summary>
+                            <div className="funcionario-bandeja__menu-panel" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="funcionario-bandeja__menu-item funcionario-bandeja__menu-item--danger"
+                                disabled={deletingId === String(item.procedureRequestId || item.id)}
+                                onClick={(event) => {
+                                  const detailsElement = event.currentTarget.closest("details");
+                                  if (detailsElement) {
+                                    detailsElement.removeAttribute("open");
+                                  }
+                                  handleDeleteExpediente(item);
+                                }}
+                              >
+                                {deletingId === String(item.procedureRequestId || item.id) ? "Eliminando..." : "Eliminar"}
+                              </button>
+                            </div>
+                          </details>
+                        </div>
                       </td>
                     </tr>
                   );

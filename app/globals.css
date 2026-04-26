@@ -7484,7 +7484,7 @@ a.dashboard-onify-detail-btn {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   margin: 0;
   border-radius: 16px;
   border: 1px solid rgba(203, 213, 225, 0.55);
@@ -7569,6 +7569,86 @@ a.dashboard-onify-detail-btn {
 
 .funcionario-bandeja__cell--actions {
   white-space: nowrap;
+}
+
+.funcionario-bandeja__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.funcionario-bandeja__menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.funcionario-bandeja__menu-trigger {
+  list-style: none;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  border: 1px solid #d4e0ef;
+  background: #ffffff;
+  color: #315683;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 1rem;
+  user-select: none;
+}
+
+.funcionario-bandeja__menu-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.funcionario-bandeja__menu-trigger:hover {
+  background: #f4f8ff;
+  border-color: #b9cde8;
+}
+
+.funcionario-bandeja__menu-trigger:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.funcionario-bandeja__menu-panel {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 8;
+  min-width: 9rem;
+  padding: 0.3rem;
+  border-radius: 10px;
+  border: 1px solid #d9e3f2;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.funcionario-bandeja button.funcionario-bandeja__menu-item {
+  width: 100%;
+  min-height: 2rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #0f2744;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.38rem 0.5rem;
+}
+
+.funcionario-bandeja button.funcionario-bandeja__menu-item:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.funcionario-bandeja button.funcionario-bandeja__menu-item--danger {
+  color: #b42318;
+}
+
+.funcionario-bandeja button.funcionario-bandeja__menu-item--danger:hover:not(:disabled) {
+  background: #fef2f2;
 }
 
 .funcionario-bandeja__pending-wrap {
