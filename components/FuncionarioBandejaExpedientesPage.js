@@ -91,6 +91,29 @@ function getAssignmentScopeLabel(item) {
   return "Sin relación";
 }
 
+function canClaimExpediente(item) {
+  if (!item) {
+    return false;
+  }
+  if (isTerminalStatus(item.status)) {
+    return false;
+  }
+  if (item.assignmentScope === "assigned_to_me") {
+    return false;
+  }
+  if (item.assignmentScope === "available" || item.isAvailableToClaim === true) {
+    return true;
+  }
+  if (getAssignmentScopeLabel(item) === "Disponible") {
+    return true;
+  }
+  const hasOwner = Boolean(item.assignedToUserId && String(item.assignedToUserId).trim() !== "");
+  if (!hasOwner) {
+    return String(item.pendingAction || "").trim() === "Tomar expediente";
+  }
+  return false;
+}
+
 function filterOptionsFromList(list, selector) {
   const values = Array.from(new Set(list.map(selector).filter(Boolean)));
   return values.sort((a, b) => String(a).localeCompare(String(b), "es"));
@@ -279,6 +302,8 @@ export default function FuncionarioBandejaExpedientesPage() {
   const [actionsMenuPlacement, setActionsMenuPlacement] = useState({ top: 0, right: 0 });
   const actionsMenuAnchorRef = useRef(null);
   const deleteRequestInFlightRef = useRef(false);
+  const claimRequestInFlightRef = useRef(false);
+  const [claimingId, setClaimingId] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
@@ -491,6 +516,51 @@ export default function FuncionarioBandejaExpedientesPage() {
     }
     router.push(`/funcionario/expedientes/${encodeURIComponent(internalId)}`);
   };
+
+  const handleClaimExpediente = useCallback(
+    async (item) => {
+      setOpenActionsMenuId(null);
+      const internalId = item?.procedureRequestId || item?.id;
+      if (!internalId || !canClaimExpediente(item) || claimRequestInFlightRef.current) {
+        return;
+      }
+      claimRequestInFlightRef.current = true;
+      setClaimingId(String(internalId));
+      setError("");
+      setSuccessMessage("");
+      try {
+        const response = await fetch(
+          `/api/funcionario/procedures/requests/${encodeURIComponent(internalId)}/claim-task`,
+          { method: "POST" }
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          let message = data?.error || "No se pudo ejecutar la acción.";
+          if (response.status === 409) {
+            message = "Este expediente ya fue tomado por otro funcionario.";
+          } else if (response.status === 404) {
+            message = data?.error || "No se encontró el expediente solicitado.";
+          } else if (response.status === 403) {
+            message = data?.error || "No estás habilitado para tomar este tipo de procedimiento.";
+          } else if (response.status >= 500) {
+            message = data?.error || "No se pudo tomar el expediente.";
+          }
+          setError(message);
+          return;
+        }
+        setSuccessMessage(
+          data?.message || "Expediente tomado correctamente."
+        );
+        await loadList();
+      } catch (_error) {
+        setError("No se pudo tomar el expediente.");
+      } finally {
+        setClaimingId("");
+        claimRequestInFlightRef.current = false;
+      }
+    },
+    [loadList]
+  );
 
   const executeDeleteExpediente = useCallback(async (item) => {
     const internalId = item?.procedureRequestId || item?.id;
@@ -777,7 +847,22 @@ export default function FuncionarioBandejaExpedientesPage() {
                       </td>
                       <td className="funcionario-bandeja__cell">
                         <div className="funcionario-bandeja__pending-wrap">
-                          <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
+                          {canClaimExpediente(item) ? (
+                            <button
+                              type="button"
+                              className="funcionario-bandeja__pending-take"
+                              onClick={() => void handleClaimExpediente(item)}
+                              disabled={claimingId === rowActionsId}
+                            >
+                              {claimingId === rowActionsId
+                                ? "Tomando…"
+                                : item.pendingAction || "Tomar expediente"}
+                            </button>
+                          ) : (
+                            <span className="funcionario-bandeja__pending-detail">
+                              {item.pendingAction || "—"}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
@@ -852,6 +937,19 @@ export default function FuncionarioBandejaExpedientesPage() {
               >
                 Ver detalle
               </button>
+              {canClaimExpediente(openActionsItem) ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="funcionario-bandeja__menu-item"
+                  disabled={claimingId === openActionsMenuId}
+                  onClick={() => {
+                    void handleClaimExpediente(openActionsItem);
+                  }}
+                >
+                  {claimingId === openActionsMenuId ? "Tomando…" : "Tomar"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 role="menuitem"
