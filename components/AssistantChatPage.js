@@ -805,14 +805,14 @@ function PendingLocationConfirmCard({ selection, copy }) {
 function ChatHeader({ copy }) {
   return (
     <header className="assistant-chat-header">
-      <div className="assistant-chat-header__top">
+      <div className="assistant-chat-header__row">
         <div className="assistant-chat-header__identity">
           <div className="assistant-chat-header__avatar" aria-hidden="true">
             AV
           </div>
-          <div>
+          <div className="assistant-chat-header__titles">
             <p className="assistant-chat-header__eyebrow">{copy.header.eyebrow}</p>
-            <h1>{copy.header.title}</h1>
+            <h1 className="assistant-chat-header__title">{copy.header.title}</h1>
           </div>
         </div>
         <p className="assistant-chat-header__status" aria-live="polite">
@@ -821,20 +821,6 @@ function ChatHeader({ copy }) {
         </p>
       </div>
       <p className="assistant-chat-header__subtitle">{copy.header.subtitle}</p>
-      <nav className="assistant-chat-header__nav" aria-label={copy.header.secondaryNavAria}>
-        <ul className="assistant-chat-header__actions">
-          <li>
-            <Link href="/" className="assistant-chat-header__action-link">
-              {copy.header.backHome}
-            </Link>
-          </li>
-          <li>
-            <Link href="/ciudadano/dashboard" className="assistant-chat-header__action-link">
-              {copy.header.viewIncidents}
-            </Link>
-          </li>
-        </ul>
-      </nav>
     </header>
   );
 }
