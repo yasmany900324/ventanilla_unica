@@ -23,15 +23,25 @@ const DEFAULT_LOCATION_MAP_CENTER = {
   lat: -34.9011,
   lng: -56.1645,
 };
-const LOCATION_MAP_DELTA = 0.015;
 const LOCATION_SHARE_SOURCE_GEO = "geo";
 const LOCATION_SHARE_SOURCE_MAP = "map";
+const MESSAGE_TYPE_TEXT = "text";
+const MESSAGE_TYPE_IMAGE = "image";
+const MESSAGE_TYPE_LOCATION = "location";
+const MESSAGE_TYPE_QUICK_REPLY = "quick_reply";
 
 function createLocalMessage(partial) {
+  const sender = partial?.sender === "user" ? "user" : "bot";
+  const role =
+    normalizeContextParam(partial?.role, 20) || (sender === "user" ? "user" : "assistant");
+  const type = normalizeContextParam(partial?.type, 40) || MESSAGE_TYPE_TEXT;
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    createdAt: new Date().toISOString(),
     ...partial,
+    id: normalizeContextParam(partial?.id, 120) || `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    createdAt: partial?.createdAt || new Date().toISOString(),
+    sender,
+    role,
+    type,
   };
 }
 
@@ -51,14 +61,11 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
-function buildUserPhotoAttachedLine(fileName, copy) {
+function buildUserPhotoAttachedLine(_fileName, copy) {
   const fallback = "Listo, adjunte tu foto.";
   const rawTemplate =
     normalizeContextParam(copy?.incidentPhoto?.userAttachedLine, MAX_MESSAGE_LENGTH) || fallback;
-  const safeName = normalizeChipLabel(fileName).slice(0, 120) || "imagen";
-  const merged = rawTemplate.includes("{name}")
-    ? rawTemplate.replace("{name}", safeName)
-    : rawTemplate;
+  const merged = rawTemplate.includes("{name}") ? rawTemplate.replace("{name}", "foto") : rawTemplate;
   return normalizeChipLabel(merged) || fallback;
 }
 
@@ -80,6 +87,31 @@ function normalizeChipLabel(value) {
   }
 
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function normalizeLocationPayload(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+  return {
+    latitude,
+    longitude,
+    source: normalizeContextParam(value.source, 24) || LOCATION_SHARE_SOURCE_MAP,
+    reference: normalizeContextParam(value.reference, 220),
+  };
+}
+
+function buildUserLocationSentText(copy) {
+  return (
+    normalizeContextParam(copy?.locationMap?.historyLabel, 80) ||
+    normalizeContextParam(copy?.locationMap?.locationHistoryConfirmedPrefix, 80) ||
+    "Ubicación enviada"
+  );
 }
 
 function isNearBottom(container) {
@@ -217,8 +249,10 @@ function normalizePersistedMessage(rawMessage, index) {
     return null;
   }
 
+  const messageType = normalizeContextParam(rawMessage.type, 40) || MESSAGE_TYPE_TEXT;
+  const location = normalizeLocationPayload(rawMessage.location);
   const text = normalizeChipLabel(rawMessage.text);
-  if (!text) {
+  if (!text && !location && !rawMessage.attachmentImageUrl) {
     return null;
   }
 
@@ -235,7 +269,16 @@ function normalizePersistedMessage(rawMessage, index) {
   return {
     id: normalizeContextParam(rawMessage.id, 80) || `msg-restored-${Date.now()}-${index}`,
     sender,
-    text,
+    role:
+      normalizeContextParam(rawMessage.role, 20) || (sender === "user" ? "user" : "assistant"),
+    type: messageType,
+    text:
+      text ||
+      (messageType === MESSAGE_TYPE_LOCATION
+        ? "Ubicación enviada"
+        : messageType === MESSAGE_TYPE_IMAGE
+          ? "Foto enviada"
+          : ""),
     createdAt: hasValidDate ? createdAt : new Date().toISOString(),
     kind: normalizeContextParam(rawMessage.kind, 40) || undefined,
     intent: normalizeContextParam(rawMessage.intent, 60) || null,
@@ -257,6 +300,15 @@ function normalizePersistedMessage(rawMessage, index) {
     redirectLabel: normalizeContextParam(rawMessage.redirectLabel, 120) || null,
     needsClarification: Boolean(rawMessage.needsClarification),
     attachmentImageUrl: normalizeContextParam(rawMessage.attachmentImageUrl, 600) || null,
+    location,
+    quickReply:
+      rawMessage.quickReply && typeof rawMessage.quickReply === "object"
+        ? {
+            label: normalizeContextParam(rawMessage.quickReply.label, 120) || "",
+            command: normalizeContextParam(rawMessage.quickReply.command, 80) || DEFAULT_CHAT_COMMAND,
+            commandField: normalizeContextParam(rawMessage.quickReply.commandField, 80) || null,
+          }
+        : null,
   };
 }
 
@@ -328,18 +380,6 @@ function isPhotoPromptStep(message) {
     return false;
   }
   return stepField === "photo" || stepField.includes("foto") || stepField.includes("image");
-}
-
-function buildFriendlyLocationConfirmation({ copy, referenceLabel }) {
-  const locationMapCopy = copy?.locationMap || {};
-  const template =
-    normalizeContextParam(locationMapCopy.confirmationQuestionTemplate, 220) ||
-    "Detecté una ubicación aproximada en la zona de {reference}. ¿Es correcta?";
-  const safeReference =
-    normalizeContextParam(referenceLabel, 120) ||
-    normalizeContextParam(locationMapCopy.referenceFallback, 120) ||
-    "la zona seleccionada";
-  return normalizeContextParam(template.replace("{reference}", safeReference), MAX_MESSAGE_LENGTH);
 }
 
 function getChatEntryContext(searchParams) {
@@ -729,15 +769,6 @@ function StatusSummaryCard({ statusSummary }) {
   );
 }
 
-function formatApproxWgs84Coordinates(latitude, longitude) {
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return "";
-  }
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
 function buildOpenStreetMapLink(latitude, longitude) {
   const lat = Number(latitude);
   const lng = Number(longitude);
@@ -758,54 +789,42 @@ function buildLocationConfirmedHistoryMessage({ reference, copy }) {
   return normalizeContextParam(prefix, MAX_MESSAGE_LENGTH);
 }
 
-function PendingLocationConfirmCard({ selection, copy }) {
+function UserLocationMessageCard({ message, copy }) {
+  const location = normalizeLocationPayload(message?.location);
+  if (!location) {
+    return null;
+  }
   const locationMapCopy = copy?.locationMap || {};
-  const title =
-    locationMapCopy.pendingConfirmHeading ||
-    locationMapCopy.pendingConfirmTitleMap ||
-    "Ubicación seleccionada";
-  const openMapLabel = locationMapCopy.pendingConfirmOpenMap || "Ver en mapa";
-  const techSummary =
-    locationMapCopy.pendingConfirmTechSummary || "Coordenadas (opcional)";
-  const coordsLabel = locationMapCopy.pendingConfirmCoordsLabel || "WGS84";
-  const referenceText = normalizeContextParam(selection?.reference, 200) || "—";
-  const coordLine = formatApproxWgs84Coordinates(selection?.latitude, selection?.longitude);
-  const mapUrl = buildOpenStreetMapLink(selection?.latitude, selection?.longitude);
-
+  const mapUrl = buildOpenStreetMapLink(location.latitude, location.longitude);
+  const referenceText = normalizeContextParam(location.reference, 220);
   return (
     <section
-      className="assistant-location-pending-card assistant-location-pending-card--visual"
-      aria-labelledby="assistant-pending-location-title"
-      aria-live="polite"
+      className="assistant-user-location-card"
+      aria-label={locationMapCopy.pendingConfirmMapPreviewAria || "Ubicación enviada por la persona usuaria"}
     >
-      <h3 id="assistant-pending-location-title" className="assistant-location-pending-card__title">
-        {title}
-      </h3>
+      <header className="assistant-user-location-card__header">
+        <span className="assistant-user-location-card__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2.5a7 7 0 0 0-7 7c0 4.9 5.2 10.8 6.5 12.2a.65.65 0 0 0 1 0C13.8 20.3 19 14.4 19 9.5a7 7 0 0 0-7-7Zm0 9.3a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6Z" />
+          </svg>
+        </span>
+        <p className="assistant-user-location-card__title">{buildUserLocationSentText(copy)}</p>
+      </header>
+      {referenceText ? <p className="assistant-user-location-card__reference">{referenceText}</p> : null}
       <LocationMapPreview
-        latitude={selection?.latitude}
-        longitude={selection?.longitude}
-        ariaLabel={
-          locationMapCopy.pendingConfirmMapPreviewAria || "Vista aproximada del punto en el mapa"
-        }
+        latitude={location.latitude}
+        longitude={location.longitude}
+        ariaLabel={locationMapCopy.pendingConfirmMapPreviewAria || "Vista previa compacta de la ubicación enviada"}
       />
-      <p className="assistant-location-pending-card__place">{referenceText}</p>
       {mapUrl ? (
         <a
-          className="assistant-location-pending-card__link assistant-location-pending-card__link--subtle"
+          className="assistant-user-location-card__link"
           href={mapUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
-          {openMapLabel}
+          {locationMapCopy.pendingConfirmOpenMap || "Ver en mapa"}
         </a>
-      ) : null}
-      {coordLine ? (
-        <details className="assistant-location-pending-card__details">
-          <summary>{techSummary}</summary>
-          <p className="assistant-location-pending-card__meta">
-            {coordsLabel}: <code>{coordLine}</code>
-          </p>
-        </details>
       ) : null}
     </section>
   );
@@ -855,11 +874,44 @@ function ChatMessageBubble({
   message,
   onRedirectClick,
   copy,
-  mapPickerOpen = false,
-  pendingLocationSelection = null,
+  onQuickReplySelect,
+  isInteractive = false,
+  disableInteractions = false,
 }) {
   const isBot = message.sender === "bot";
   const timeLabel = formatMessageTime(message.createdAt);
+  const suggestedReplies = Array.isArray(message.suggestedReplies) ? message.suggestedReplies : [];
+  const actionOptions = Array.isArray(message.actionOptions) ? message.actionOptions : [];
+  const interactiveItems = [];
+  const seenOptionLabels = new Set();
+  suggestedReplies.forEach((reply) => {
+    const label = normalizeChipLabel(reply);
+    if (!label || seenOptionLabels.has(label.toLowerCase())) {
+      return;
+    }
+    seenOptionLabels.add(label.toLowerCase());
+    interactiveItems.push({
+      id: `reply-${label.toLowerCase()}`,
+      label,
+      command: DEFAULT_CHAT_COMMAND,
+      commandField: null,
+      type: MESSAGE_TYPE_QUICK_REPLY,
+    });
+  });
+  actionOptions.forEach((option, index) => {
+    const label = normalizeChipLabel(option?.label);
+    if (!label || seenOptionLabels.has(label.toLowerCase())) {
+      return;
+    }
+    seenOptionLabels.add(label.toLowerCase());
+    interactiveItems.push({
+      id: `action-${index}-${label.toLowerCase()}`,
+      label,
+      command: normalizeChipLabel(option?.command) || DEFAULT_CHAT_COMMAND,
+      commandField: normalizeChipLabel(option?.commandField) || null,
+      type: MESSAGE_TYPE_QUICK_REPLY,
+    });
+  });
 
   return (
     <li className={`assistant-thread__item assistant-thread__item--${message.sender}`}>
@@ -871,9 +923,12 @@ function ChatMessageBubble({
           // eslint-disable-next-line @next/next/no-img-element -- vista previa desde URL del API (sesión autenticada)
           <img
             src={message.attachmentImageUrl}
-            alt=""
+            alt={copy?.incidentPhoto?.userSentAlt || "Foto enviada por la persona usuaria"}
             className="assistant-message__image-attachment"
           />
+        ) : null}
+        {!isBot && message.type === MESSAGE_TYPE_LOCATION ? (
+          <UserLocationMessageCard message={message} copy={copy} />
         ) : null}
         {!(isBot && message.statusSummary) ? <p>{message.text}</p> : null}
         {isBot && message.incidentDraftPreview ? (
@@ -882,17 +937,30 @@ function ChatMessageBubble({
         {isBot && message.statusSummary ? (
           <StatusSummaryCard statusSummary={message.statusSummary} />
         ) : null}
-        {isLocationPromptStep(message) && !mapPickerOpen && pendingLocationSelection ? (
-          <div className="assistant-location-map assistant-location-map--resolved" role="status">
-            <p className="assistant-location-map__resolved-badge">
-              {copy.locationMap?.locationStepDoneBadge || "Ubicación elegida — confirmala abajo"}
-            </p>
-          </div>
-        ) : null}
         {isBot && message.needsClarification ? (
           <p className="assistant-message__clarification">
             {copy.clarification}
           </p>
+        ) : null}
+        {isBot && interactiveItems.length ? (
+          <div className="assistant-chat-quick-replies">
+            <p className="assistant-chat-quick-replies__title">
+              {copy.quickRepliesTitle || "Sugerencias rápidas"}
+            </p>
+            <div className="assistant-chat-quick-replies__list">
+              {interactiveItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="assistant-prompt-chip"
+                  disabled={!isInteractive || disableInteractions}
+                  onClick={() => onQuickReplySelect?.(item)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         {isBot && message.redirectTo && !message.statusSummary ? (
@@ -973,6 +1041,9 @@ function ChatComposer({
   showLocationMenu,
   onUseCurrentLocation,
   onOpenMapPicker,
+  onSearchLocation,
+  onUsePreviousLocation,
+  canUsePreviousLocation = false,
 }) {
   const shouldShowCounter = characterCount >= MAX_MESSAGE_LENGTH - 80;
   const locationMapCopy = copy?.locationMap || {};
@@ -1016,6 +1087,19 @@ function ChatComposer({
               <button type="button" role="menuitem" onClick={onOpenMapPicker} disabled={isSending}>
                 {locationMapCopy.chooseOnMap || locationMapCopy.useMapSelection || "Elegir en mapa"}
               </button>
+              <button type="button" role="menuitem" onClick={onSearchLocation} disabled={isSending}>
+                {locationMapCopy.searchAddress || "Buscar dirección"}
+              </button>
+              {canUsePreviousLocation ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onUsePreviousLocation}
+                  disabled={isSending}
+                >
+                  {locationMapCopy.usePreviousLocation || "Usar ubicación anterior"}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1058,7 +1142,6 @@ export default function AssistantChatPage() {
   const { locale } = useLocale();
   const uiCopy = getLocaleCopy(locale).chat;
   const entryContext = useMemo(() => getChatEntryContext(searchParams), [searchParams]);
-  const quickPrompts = useMemo(() => [], []);
   const contextualWelcomeMessage = useMemo(
     () => buildContextWelcomeMessage({ context: entryContext, copy: uiCopy }),
     [entryContext, uiCopy]
@@ -1089,8 +1172,6 @@ export default function AssistantChatPage() {
     command: DEFAULT_CHAT_COMMAND,
     commandField: null,
   });
-  /** Si se abrió el mapa desde «Cambiar ubicación», guarda el pending para restaurarlo al cancelar el modal. */
-  const locationPickerRestoreSnapshotRef = useRef(null);
   const [messages, setMessages] = useState([
     createLocalMessage({
       sender: "bot",
@@ -1277,6 +1358,11 @@ export default function AssistantChatPage() {
     setInputValue("");
     setIsSending(false);
     setServiceError(false);
+    setLocationPickerOpen(false);
+    setMapPickerInitialCenter(null);
+    setComposerLocationMenuOpen(false);
+    setIsLocationPickResolving(false);
+    setLastSharedLocation(null);
     setMessages([
       createLocalMessage({
         sender: "bot",
@@ -1287,8 +1373,8 @@ export default function AssistantChatPage() {
   }, [contextualWelcomeMessage, pathname, restartKey, router]);
 
   const canSend = useMemo(() => {
-    return Boolean(normalizeInput(inputValue)) && !isSending;
-  }, [inputValue, isSending]);
+    return Boolean(normalizeInput(inputValue)) && !isSending && !isLocationPickResolving;
+  }, [inputValue, isLocationPickResolving, isSending]);
 
   const submitMessage = useCallback(async ({
     rawValue,
@@ -1554,6 +1640,7 @@ export default function AssistantChatPage() {
           ...previousMessages,
           createLocalMessage({
             sender: "user",
+            type: MESSAGE_TYPE_IMAGE,
             text: userLine,
             attachmentImageUrl: previewUrl,
           }),
@@ -1603,32 +1690,21 @@ export default function AssistantChatPage() {
   );
 
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
-  const [pendingLocationSelection, setPendingLocationSelection] = useState(null);
-  /** null = usar centro por defecto al abrir el mapa; { lat, lng } = reabrir en la última selección (p. ej. editar). */
   const [mapPickerInitialCenter, setMapPickerInitialCenter] = useState(null);
   const [isLocationPickResolving, setIsLocationPickResolving] = useState(false);
   const [isComposerLocationMenuOpen, setComposerLocationMenuOpen] = useState(false);
+  const [lastSharedLocation, setLastSharedLocation] = useState(null);
 
-  const handleLocationResolution = useCallback(
+  const resolveLocationSelection = useCallback(
     async ({ source, latitude, longitude, priorReference = null }) => {
       const lat = Number(latitude);
       const lng = Number(longitude);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return;
+        return null;
       }
 
       const locationMapCopy = uiCopy.locationMap || {};
-      const loadingLine =
-        normalizeContextParam(locationMapCopy.loading, MAX_MESSAGE_LENGTH) ||
-        "Obteniendo ubicación…";
       const stablePrior = normalizeContextParam(priorReference, 200);
-      setPendingLocationSelection({
-        source,
-        latitude: lat,
-        longitude: lng,
-        reference: stablePrior || loadingLine,
-      });
-
       const fallbackReference =
         source === LOCATION_SHARE_SOURCE_GEO
           ? normalizeContextParam(locationMapCopy.geoFallbackReference, 120) || "tu zona"
@@ -1639,14 +1715,46 @@ export default function AssistantChatPage() {
         fallbackLabel: fallbackReference,
         locale,
       });
-      setPendingLocationSelection({
+      return {
         source,
         latitude: lat,
         longitude: lng,
-        reference: resolvedReference || fallbackReference,
-      });
+        reference: stablePrior || resolvedReference || fallbackReference,
+      };
     },
     [locale, uiCopy.locationMap]
+  );
+
+  const submitLocationSelection = useCallback(
+    async (selection) => {
+      const normalizedSelection = normalizeLocationPayload(selection);
+      if (!normalizedSelection || isSending) {
+        return;
+      }
+      const userHistoryText = buildLocationConfirmedHistoryMessage({
+        reference: normalizedSelection.reference,
+        copy: uiCopy,
+      });
+      shouldAutoScrollRef.current = true;
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        createLocalMessage({
+          sender: "user",
+          type: MESSAGE_TYPE_LOCATION,
+          text: buildUserLocationSentText(uiCopy),
+          location: normalizedSelection,
+        }),
+      ]);
+      setLastSharedLocation(normalizedSelection);
+      await submitMessage({
+        rawValue: userHistoryText,
+        command: "set_geo_location",
+        commandField: "location",
+        appendUserMessage: false,
+        restoreComposerFocus: true,
+      });
+    },
+    [isSending, submitMessage, uiCopy]
   );
 
   const handleUseCurrentLocation = useCallback(() => {
@@ -1665,16 +1773,27 @@ export default function AssistantChatPage() {
       ]);
       return;
     }
+    setIsLocationPickResolving(true);
 
     window.navigator.geolocation.getCurrentPosition(
       (position) => {
-        void handleLocationResolution({
-          source: LOCATION_SHARE_SOURCE_GEO,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+        void (async () => {
+          try {
+            const resolved = await resolveLocationSelection({
+              source: LOCATION_SHARE_SOURCE_GEO,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+            if (resolved) {
+              await submitLocationSelection(resolved);
+            }
+          } finally {
+            setIsLocationPickResolving(false);
+          }
+        })();
       },
       (error) => {
+        setIsLocationPickResolving(false);
         const deniedMessage =
           normalizeContextParam(locationMapCopy.permissionDenied, MAX_MESSAGE_LENGTH) ||
           "No pude acceder a tu ubicación. Revisa los permisos del navegador e inténtalo de nuevo.";
@@ -1695,43 +1814,35 @@ export default function AssistantChatPage() {
         maximumAge: 60000,
       }
     );
-  }, [handleLocationResolution, isSending, uiCopy.locationMap]);
+  }, [isSending, resolveLocationSelection, submitLocationSelection, uiCopy.locationMap]);
 
   const handleOpenMapPicker = useCallback(() => {
     if (isSending) {
       return;
     }
     setComposerLocationMenuOpen(false);
-    locationPickerRestoreSnapshotRef.current = null;
-    setMapPickerInitialCenter(null);
-    setPendingLocationSelection(null);
+    setMapPickerInitialCenter(lastSharedLocation || null);
     setLocationPickerOpen(true);
-  }, [isSending]);
+  }, [isSending, lastSharedLocation]);
 
   const handleCancelLocationPicker = useCallback(() => {
     setLocationPickerOpen(false);
     setMapPickerInitialCenter(null);
     setComposerLocationMenuOpen(false);
-    if (locationPickerRestoreSnapshotRef.current) {
-      setPendingLocationSelection({ ...locationPickerRestoreSnapshotRef.current });
-      locationPickerRestoreSnapshotRef.current = null;
-    }
   }, []);
 
   const handleConfirmLocationPicker = useCallback(
     async ({ latitude, longitude }) => {
-      const editSnapshot = locationPickerRestoreSnapshotRef.current;
-      const priorReference =
-        typeof editSnapshot?.reference === "string" ? editSnapshot.reference.trim() : "";
-      locationPickerRestoreSnapshotRef.current = null;
       setIsLocationPickResolving(true);
       try {
-        await handleLocationResolution({
+        const resolved = await resolveLocationSelection({
           source: LOCATION_SHARE_SOURCE_MAP,
           latitude,
           longitude,
-          priorReference: priorReference || null,
         });
+        if (resolved) {
+          await submitLocationSelection(resolved);
+        }
       } finally {
         setIsLocationPickResolving(false);
         setLocationPickerOpen(false);
@@ -1739,49 +1850,18 @@ export default function AssistantChatPage() {
         setComposerLocationMenuOpen(false);
       }
     },
-    [handleLocationResolution]
+    [resolveLocationSelection, submitLocationSelection]
   );
-
-  const handleLocationDecision = useCallback(
-    async (shouldContinue) => {
-      if (!pendingLocationSelection || isSending) {
-        return;
-      }
-      setComposerLocationMenuOpen(false);
-      const locationMapCopy = uiCopy.locationMap || {};
-      if (!shouldContinue) {
-        const snap = pendingLocationSelection;
-        const lat = Number(snap.latitude);
-        const lng = Number(snap.longitude);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          locationPickerRestoreSnapshotRef.current = snap;
-          setMapPickerInitialCenter({ lat, lng });
-        } else {
-          locationPickerRestoreSnapshotRef.current = null;
-          setMapPickerInitialCenter(null);
-        }
-        setPendingLocationSelection(null);
-        setLocationPickerOpen(true);
-        return;
-      }
-
-      locationPickerRestoreSnapshotRef.current = null;
-
-      const userHistoryText = buildLocationConfirmedHistoryMessage({
-        reference: pendingLocationSelection.reference,
-        copy: uiCopy,
-      });
-
-      setPendingLocationSelection(null);
-      await submitMessage({
-        rawValue: userHistoryText,
-        command: "set_geo_location",
-        commandField: "location",
-        appendUserMessage: true,
-      });
-    },
-    [isSending, pendingLocationSelection, submitMessage, uiCopy]
-  );
+  const handleSearchLocation = useCallback(() => {
+    void handleOpenMapPicker();
+  }, [handleOpenMapPicker]);
+  const handleUsePreviousLocation = useCallback(() => {
+    if (!lastSharedLocation || isSending) {
+      return;
+    }
+    setComposerLocationMenuOpen(false);
+    void submitLocationSelection(lastSharedLocation);
+  }, [isSending, lastSharedLocation, submitLocationSelection]);
 
   const handleRetry = async () => {
     const lastFailedInput = lastFailedInputRef.current;
@@ -1836,11 +1916,62 @@ export default function AssistantChatPage() {
     return null;
   }, [messages]);
   const isLocationActionAvailable = useMemo(() => {
-    return isLocationPromptStep(lastBotMessage) || Boolean(pendingLocationSelection) || isLocationPickerOpen;
-  }, [isLocationPickerOpen, lastBotMessage, pendingLocationSelection]);
+    return isLocationPromptStep(lastBotMessage) || isLocationPickerOpen;
+  }, [isLocationPickerOpen, lastBotMessage]);
   const isPhotoActionAvailable = useMemo(() => {
     return isPhotoPromptStep(lastBotMessage);
   }, [lastBotMessage]);
+  const latestInteractiveMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.sender !== "bot") {
+        continue;
+      }
+      const hasInteractiveReplies =
+        (Array.isArray(message.suggestedReplies) && message.suggestedReplies.length > 0) ||
+        (Array.isArray(message.actionOptions) && message.actionOptions.length > 0);
+      if (hasInteractiveReplies) {
+        return message.id;
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const handleQuickReplySelection = useCallback(
+    async (option) => {
+      if (!option || isSending) {
+        return;
+      }
+      const label = normalizeChipLabel(option.label);
+      if (!label) {
+        return;
+      }
+      setComposerLocationMenuOpen(false);
+      shouldAutoScrollRef.current = true;
+      setMessages((previousMessages) => [
+        ...previousMessages,
+        createLocalMessage({
+          sender: "user",
+          type: MESSAGE_TYPE_QUICK_REPLY,
+          text: label,
+          quickReply: {
+            label,
+            command: option.command || DEFAULT_CHAT_COMMAND,
+            commandField: option.commandField || null,
+          },
+        }),
+      ]);
+      await submitMessage({
+        rawValue: label,
+        command: option.command || DEFAULT_CHAT_COMMAND,
+        commandField: option.commandField || null,
+        appendUserMessage: false,
+        restoreComposerFocus: true,
+      });
+    },
+    [isSending, submitMessage]
+  );
+
   const appendControlledComposerMessage = useCallback((text) => {
     const safeText = normalizeContextParam(text, MAX_MESSAGE_LENGTH);
     if (!safeText) {
@@ -1922,8 +2053,9 @@ export default function AssistantChatPage() {
                 message={message}
                 onRedirectClick={handleRedirectClick}
                 copy={uiCopy}
-                mapPickerOpen={isLocationPickerOpen}
-                pendingLocationSelection={pendingLocationSelection}
+                onQuickReplySelect={handleQuickReplySelection}
+                isInteractive={message.id === latestInteractiveMessageId}
+                disableInteractions={isSending}
               />
             ))}
             {isSending ? <TypingIndicator copy={uiCopy} /> : null}
@@ -1933,32 +2065,6 @@ export default function AssistantChatPage() {
             ) : null}
           </ol>
         </div>
-
-        {pendingLocationSelection && !isLocationPickerOpen ? (
-          <div className="assistant-location-pending-stack">
-            <PendingLocationConfirmCard selection={pendingLocationSelection} copy={uiCopy} />
-            <div className="assistant-location-map__actions">
-              <button
-                type="button"
-                className="assistant-location-map__button"
-                onClick={() => void handleLocationDecision(true)}
-                disabled={isSending}
-              >
-                {uiCopy.locationMap?.continueLabel || uiCopy.locationMap?.continueAction || "Sí, continuar"}
-              </button>
-              <button
-                type="button"
-                className="assistant-location-map__button assistant-location-map__button--ghost"
-                onClick={() => void handleLocationDecision(false)}
-                disabled={isSending}
-              >
-                {uiCopy.locationMap?.changeLocationLabel ||
-                  uiCopy.locationMap?.changeLocation ||
-                  "Cambiar ubicación"}
-              </button>
-            </div>
-          </div>
-        ) : null}
 
         <LocationPickerModal
           isOpen={isLocationPickerOpen}
@@ -1984,7 +2090,7 @@ export default function AssistantChatPage() {
           inputValue={inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleSubmit}
-          isSending={isSending}
+          isSending={isSending || isLocationPickResolving}
           canSend={canSend}
           onKeyDown={handleInputKeyDown}
           characterCount={characterCount}
@@ -1995,6 +2101,9 @@ export default function AssistantChatPage() {
           showLocationMenu={isComposerLocationMenuOpen}
           onUseCurrentLocation={handleUseCurrentLocation}
           onOpenMapPicker={handleOpenMapPicker}
+          onSearchLocation={handleSearchLocation}
+          onUsePreviousLocation={handleUsePreviousLocation}
+          canUsePreviousLocation={Boolean(lastSharedLocation)}
         />
       </section>
     </main>
