@@ -7510,6 +7510,11 @@ a.dashboard-onify-detail-btn {
   white-space: nowrap;
 }
 
+.funcionario-bandeja__table thead th.funcionario-bandeja__th--multiline {
+  white-space: normal;
+  line-height: 1.35;
+}
+
 .funcionario-bandeja__table tbody td {
   padding: 0.95rem 0.82rem;
   vertical-align: middle;
@@ -7529,10 +7534,6 @@ a.dashboard-onify-detail-btn {
 
 .funcionario-bandeja__row--attention:hover td {
   background: rgba(248, 250, 252, 0.98);
-}
-
-.funcionario-bandeja__row--attention td:first-child {
-  box-shadow: inset 2px 0 0 0 rgba(217, 119, 6, 0.35);
 }
 
 .funcionario-bandeja__cell--mono {
@@ -7561,6 +7562,23 @@ a.dashboard-onify-detail-btn {
 .funcionario-bandeja__cell--nowrap {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.funcionario-bandeja__cell--created-at {
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.funcionario-bandeja__created-at-line {
+  display: block;
+  line-height: 1.35;
+}
+
+.funcionario-bandeja__created-at-line--time {
+  margin-top: 0.22rem;
+  font-size: 0.82em;
+  font-weight: 500;
+  color: #64748b;
 }
 
 .funcionario-bandeja__cell--actions {

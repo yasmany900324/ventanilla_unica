@@ -13,15 +13,20 @@ function hasRole(user, targetRole) {
   return roles.map((role) => String(role || "").trim().toLowerCase()).includes(normalizedTarget);
 }
 
-function formatDateTime(value, locale) {
+/** @returns {{ date: string, time: string } | null} */
+function formatCreatedAtParts(value, locale) {
   if (!value) {
-    return "-";
+    return null;
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "-";
+    return null;
   }
-  return date.toLocaleString(locale || "es");
+  const loc = locale || "es";
+  return {
+    date: date.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" }),
+    time: date.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" }),
+  };
 }
 
 const LOCAL_STATUS_LABELS = {
@@ -598,12 +603,20 @@ export default function FuncionarioBandejaExpedientesPage() {
               <thead>
                 <tr>
                   <th scope="col">Nº de expediente</th>
-                  <th scope="col">Tipo de procedimiento</th>
+                  <th scope="col" className="funcionario-bandeja__th--multiline">
+                    Tipo de
+                    <br />
+                    procedimiento
+                  </th>
                   <th scope="col">Relación</th>
                   <th scope="col">Canal</th>
                   <th scope="col">Estado local</th>
                   <th scope="col">Estado Camunda</th>
-                  <th scope="col">Fecha de creación</th>
+                  <th scope="col" className="funcionario-bandeja__th--multiline">
+                    Fecha de
+                    <br />
+                    creación
+                  </th>
                   <th scope="col">Acción pendiente</th>
                   <th scope="col">Acciones</th>
                 </tr>
@@ -613,6 +626,7 @@ export default function FuncionarioBandejaExpedientesPage() {
                   const rowPending = isPendingItem(item);
                   const pendingLabel = buildPendingLabel(item);
                   const camundaDisplay = item.camundaStatusLabel || getCamundaStatusLabel(item.camundaStatus);
+                  const createdAtParts = formatCreatedAtParts(item.createdAt, locale);
                   return (
                     <tr
                       key={item.id}
@@ -639,12 +653,21 @@ export default function FuncionarioBandejaExpedientesPage() {
                       <td className="funcionario-bandeja__cell">
                         <span className={getCamundaBadgeClass(item.camundaStatus)}>{camundaDisplay}</span>
                       </td>
-                      <td className="funcionario-bandeja__cell funcionario-bandeja__cell--nowrap">
-                        {formatDateTime(item.createdAt, locale)}
+                      <td className="funcionario-bandeja__cell funcionario-bandeja__cell--created-at">
+                        {createdAtParts ? (
+                          <>
+                            <span className="funcionario-bandeja__created-at-line">{createdAtParts.date}</span>
+                            <span className="funcionario-bandeja__created-at-line funcionario-bandeja__created-at-line--time">
+                              {createdAtParts.time}
+                            </span>
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="funcionario-bandeja__cell">
                         <div className="funcionario-bandeja__pending-wrap">
-                          <div className="funcionario-bandeja__pending-line">
+                          {/* <div className="funcionario-bandeja__pending-line">
                             <span
                               className={
                                 pendingLabel === "Tomar expediente"
@@ -659,7 +682,7 @@ export default function FuncionarioBandejaExpedientesPage() {
                                 <IconChevronRight />
                               </span>
                             ) : null}
-                          </div>
+                          </div> */}
                           <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
                         </div>
                       </td>
