@@ -811,9 +811,19 @@ function PendingLocationConfirmCard({ selection, copy }) {
   );
 }
 
-function ChatHeader({ copy }) {
+function ChatHeader({ copy, onClose }) {
   return (
     <header className="assistant-chat-header">
+      {onClose ? (
+        <button
+          type="button"
+          className="assistant-chat-header__close"
+          onClick={onClose}
+          aria-label={copy.header.closeAria}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      ) : null}
       <div className="assistant-chat-header__row">
         <div className="assistant-chat-header__identity">
           <div className="assistant-chat-header__avatar" aria-hidden="true">
@@ -1859,6 +1869,15 @@ export default function AssistantChatPage() {
     setComposerLocationMenuOpen(false);
     incidentPhotoInputRef.current?.click();
   }, [appendControlledComposerMessage, isPhotoActionAvailable, isSending]);
+
+  const handleCloseAssistant = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/");
+  }, [router]);
+
   return (
     <main className="page page--assistant" lang={locale}>
       <section
@@ -1866,7 +1885,7 @@ export default function AssistantChatPage() {
         className="assistant-chat-card"
         aria-label={uiCopy.conversationAria.section}
       >
-        <ChatHeader copy={uiCopy} />
+        <ChatHeader copy={uiCopy} onClose={handleCloseAssistant} />
 
         <div
           ref={scrollContainerRef}

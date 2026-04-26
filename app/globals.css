@@ -6960,3 +6960,80 @@ a.dashboard-onify-detail-btn {
     justify-content: center;
   }
 }
+
+.assistant-chat-header__close {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .app-shell--assistant-view .app-shell__content {
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell--assistant-view .page--assistant {
+    padding-top: 0.2rem;
+    padding-bottom: 0;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+    gap: 0.35rem;
+  }
+
+  .app-shell--assistant-view .assistant-chat-card {
+    --assistant-composer-bottom-offset: 0px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid #d8e4f4;
+    border-bottom: none;
+    box-shadow: none;
+    padding: 0.35rem max(0.75rem, env(safe-area-inset-left, 0px)) 0.3rem
+      max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .app-shell--assistant-view .assistant-chat-composer {
+    position: relative;
+    bottom: auto;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.07);
+  }
+
+  .app-shell--assistant-view .assistant-chat-messages {
+    padding-bottom: calc(0.55rem + var(--assistant-composer-height));
+  }
+
+  .assistant-chat-header {
+    position: relative;
+    padding-right: 2.4rem;
+  }
+
+  .assistant-chat-header__close {
+    display: inline-flex;
+    position: absolute;
+    top: 0.26rem;
+    right: 0.26rem;
+    z-index: 2;
+    width: 2.05rem;
+    height: 2.05rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid #d2dff0;
+    background: #fbfdff;
+    color: #1f3f7c;
+    font-size: 1.2rem;
+    line-height: 1;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  }
+
+  .assistant-chat-header__close:hover {
+    background: #edf4ff;
+    border-color: #c5d6ee;
+  }
+
+  .assistant-chat-header__close:focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 2px;
+  }
+}
