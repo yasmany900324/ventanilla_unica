@@ -23,8 +23,10 @@ const LOCAL_STATUS_LABELS = {
 const CAMUNDA_STATUS_LABELS = {
   ERROR_SYNC: "Error de sincronización",
   TASK_ACTIVE: "Pendiente de revisión",
-  PROCESS_RUNNING: "En proceso",
-  NOT_SYNCED: "Sin tarea activa",
+  SYNC_PENDING: "Pendiente de sincronización",
+  PROCESS_RUNNING: "Instancia creada (sin tarea activa)",
+  PROCESS_COMPLETED: "Finalizado",
+  NOT_SYNCED: "No sincronizado",
 };
 
 function hasRole(user, targetRole) {
@@ -140,6 +142,29 @@ function resolveAttachmentValue(collectedData) {
   return candidates.find((item) => typeof item === "string" && item.trim()) || null;
 }
 
+function getProcedureFieldDefinitions(detail) {
+  const fromType = Array.isArray(detail?.procedureType?.fieldDefinitions)
+    ? detail.procedureType.fieldDefinitions
+    : Array.isArray(detail?.procedureType?.requiredFields)
+      ? detail.procedureType.requiredFields
+      : [];
+  return fromType.filter((field) => field && typeof field === "object");
+}
+
+function looksLikeUrl(value) {
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim());
+}
+
+function resolveTypedFieldValue(collectedData, fieldDefinitions, expectedType) {
+  const candidate = fieldDefinitions.find(
+    (field) => String(field?.type || "").trim().toLowerCase() === expectedType
+  );
+  if (!candidate?.key) {
+    return null;
+  }
+  return collectedData?.[candidate.key] ?? null;
+}
+
 function resolveLocationValue(collectedData) {
   if (!collectedData || typeof collectedData !== "object") {
     return null;
@@ -152,6 +177,70 @@ function resolveLocationValue(collectedData) {
     return location;
   }
   return stringifyJson(location);
+}
+
+function formatLocationForDisplay(rawLocation) {
+  if (!rawLocation) {
+    return null;
+  }
+  if (typeof rawLocation === "string") {
+    const text = rawLocation.trim();
+    return text.length >= 5 ? text : "Formato inválido";
+  }
+  if (rawLocation && typeof rawLocation === "object") {
+    const text = String(rawLocation.text || rawLocation.address || "").trim();
+    const latitude = Number(rawLocation.latitude ?? rawLocation.lat);
+    const longitude = Number(rawLocation.longitude ?? rawLocation.lng ?? rawLocation.lon);
+    if (text) {
+      return text;
+    }
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return `${latitude}, ${longitude}`;
+    }
+  }
+  return "Formato inválido";
+}
+
+function formatAttachmentForDisplay(rawAttachment) {
+  if (!rawAttachment) {
+    return null;
+  }
+  if (typeof rawAttachment === "string") {
+    return looksLikeUrl(rawAttachment) ? rawAttachment.trim() : "Formato inválido";
+  }
+  if (rawAttachment && typeof rawAttachment === "object") {
+    const url = String(rawAttachment.url || rawAttachment.publicUrl || "").trim();
+    if (looksLikeUrl(url)) {
+      return url;
+    }
+    return "Formato inválido";
+  }
+  return "Formato inválido";
+}
+
+function deriveCamundaStatus(procedureRequest, detail) {
+  const existing = String(procedureRequest?.camundaStatus || "").trim();
+  if (existing) {
+    return existing;
+  }
+  const hasTask = Boolean(detail?.activeTask?.taskDefinitionKey || procedureRequest?.currentTaskDefinitionKey);
+  if (procedureRequest?.camundaError) {
+    return "ERROR_SYNC";
+  }
+  if (hasTask) {
+    return "TASK_ACTIVE";
+  }
+  if (procedureRequest?.camundaProcessInstanceKey) {
+    const localStatus = String(procedureRequest?.status || "").trim().toUpperCase();
+    if (["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"].includes(localStatus)) {
+      return "PROCESS_COMPLETED";
+    }
+    return "PROCESS_RUNNING";
+  }
+  if (String(procedureRequest?.status || "").trim().toUpperCase() === "PENDING_CAMUNDA_SYNC") {
+    return "SYNC_PENDING";
+  }
+  return "NOT_SYNCED";
 }
 
 function resolvePrimaryDescription(procedureRequest, collectedData) {
@@ -473,8 +562,13 @@ export default function FuncionarioExpedienteDetailPage() {
   }
 
   const collectedData = procedureRequest?.collectedData || {};
-  const attachmentValue = resolveAttachmentValue(collectedData);
-  const locationValue = resolveLocationValue(collectedData);
+  const fieldDefinitions = getProcedureFieldDefinitions(detail);
+  const typedLocation = resolveTypedFieldValue(collectedData, fieldDefinitions, "location");
+  const typedAttachment =
+    resolveTypedFieldValue(collectedData, fieldDefinitions, "image") ||
+    resolveTypedFieldValue(collectedData, fieldDefinitions, "file");
+  const attachmentValue = formatAttachmentForDisplay(typedAttachment ?? resolveAttachmentValue(collectedData));
+  const locationValue = formatLocationForDisplay(typedLocation ?? resolveLocationValue(collectedData));
   const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
   const contactEmail = resolveContactEmail(procedureRequest, collectedData);
   const activeTaskLabel =
@@ -483,6 +577,7 @@ export default function FuncionarioExpedienteDetailPage() {
     humanizeTaskKey(detail?.activeTask?.taskDefinitionKey);
   const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
   const trackingCode = procedureRequest?.requestCode || null;
+  const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
 
   if (fatalError) {
     return (
@@ -673,7 +768,7 @@ export default function FuncionarioExpedienteDetailPage() {
             </p>
             <p className="small">
               <strong>Estado Camunda:</strong>{" "}
-              {getCamundaStatusLabel(procedureRequest.camundaStatus || detail?.activeTask?.taskState)}
+              {getCamundaStatusLabel(camundaStatusKey)}
             </p>
             <p className="small">
               <strong>Tarea activa:</strong> {activeTaskLabel}

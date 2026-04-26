@@ -8,6 +8,10 @@ import {
   resolveTaskDisplayConfig,
 } from "../../../../../../lib/procedureRequestInboxDetail";
 import {
+  buildCamundaStatus,
+  buildCamundaStatusLabel,
+} from "../../../../../../lib/procedureRequestInboxListHelpers";
+import {
   getProcedureRequestById,
   listProcedureRequestEvents,
   resolveFuncionarioAssignmentScopeForProcedureRequest,
@@ -44,6 +48,12 @@ export async function GET(request, { params }) {
     const procedureType = procedureRequest.procedureTypeId
       ? await getProcedureCatalogEntryById(procedureRequest.procedureTypeId, { includeInactive: true })
       : null;
+    const currentTaskDefinitionKey =
+      activeTask?.taskDefinitionKey || procedureRequest.currentTaskDefinitionKey || null;
+    const camundaStatus = buildCamundaStatus({
+      ...procedureRequest,
+      currentTaskDefinitionKey,
+    });
     return NextResponse.json({
       procedureRequest: {
         ...procedureRequest,
@@ -51,6 +61,8 @@ export async function GET(request, { params }) {
         assignmentScope,
         isAssignedToMe: assignmentScope === "assigned_to_me",
         isAvailableToClaim: assignmentScope === "available",
+        camundaStatus,
+        camundaStatusLabel: buildCamundaStatusLabel(camundaStatus),
       },
       activeTask,
       activeTaskDisplay: resolveTaskDisplayConfig({ activeTask, procedureType }),
