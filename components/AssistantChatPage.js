@@ -12,6 +12,7 @@ import LocationMapPreview from "./LocationMapPreview";
 const MAX_MESSAGE_LENGTH = 500;
 
 const MAX_TEXTAREA_HEIGHT = 168;
+const AUTO_SCROLL_THRESHOLD = 120;
 const SESSION_ID_STORAGE_KEY = "chatbot_session_id";
 const SESSION_LOCALE_STORAGE_KEY = "chatbot_session_locale";
 const CHATBOT_MESSAGES_STORAGE_KEY = "chatbot_messages";
@@ -79,6 +80,14 @@ function normalizeChipLabel(value) {
   }
 
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function isNearBottom(container) {
+  if (!container) {
+    return true;
+  }
+  const remaining = container.scrollHeight - container.scrollTop - container.clientHeight;
+  return remaining <= AUTO_SCROLL_THRESHOLD;
 }
 
 function extractPayloadChips(fulfillmentMessages) {
@@ -932,6 +941,7 @@ function ChatErrorMessage({ onRetry, disabled, copy }) {
 }
 
 function ChatComposer({
+  composerRef,
   inputValue,
   onInputChange,
   onSubmit,
@@ -951,7 +961,7 @@ function ChatComposer({
   const locationMapCopy = copy?.locationMap || {};
 
   return (
-    <form className="assistant-chat-composer" onSubmit={onSubmit}>
+    <form ref={composerRef} className="assistant-chat-composer" onSubmit={onSubmit}>
       <label htmlFor="assistant-chat-input" className="assistant-chat-composer__sr-only">
         {copy.composer.label}
       </label>
@@ -1001,7 +1011,6 @@ function ChatComposer({
           value={inputValue}
           onChange={onInputChange}
           onKeyDown={onKeyDown}
-          disabled={isSending}
           rows={1}
         />
         <button
@@ -1051,8 +1060,11 @@ export default function AssistantChatPage() {
   }, [entryContext]);
   const restartKey = useMemo(() => normalizeContextParam(searchParams.get("restart"), 8), [searchParams]);
   const scrollContainerRef = useRef(null);
+  const chatCardRef = useRef(null);
+  const composerRef = useRef(null);
   const inputRef = useRef(null);
   const incidentPhotoInputRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
   const initializedSessionRef = useRef(false);
   const contextualPromptSentRef = useRef("");
   const lastFailedInputRef = useRef({
@@ -1092,6 +1104,20 @@ export default function AssistantChatPage() {
   const [serviceError, setServiceError] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [sessionLocale, setSessionLocale] = useState("");
+  const focusComposerInput = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const inputElement = inputRef.current;
+      if (!inputElement) {
+        return;
+      }
+      inputElement.focus({ preventScroll: true });
+      const cursorPosition = inputElement.value.length;
+      inputElement.setSelectionRange(cursorPosition, cursorPosition);
+    });
+  }, []);
 
   useEffect(() => {
     if (initializedSessionRef.current) {
@@ -1155,17 +1181,50 @@ export default function AssistantChatPage() {
     safeSetLocalStorageItem(CHATBOT_MESSAGES_STORAGE_KEY, buildPersistedMessagesPayload(messages));
   }, [messages]);
 
+  const handleThreadScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+    shouldAutoScrollRef.current = isNearBottom(container);
+  }, []);
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) {
       return;
     }
-
+    const shouldStickToBottom = shouldAutoScrollRef.current || isSending;
+    if (!shouldStickToBottom) {
+      return;
+    }
     container.scrollTo({
       top: container.scrollHeight,
-      behavior: "smooth",
+      behavior: messages.length <= 1 ? "auto" : "smooth",
     });
   }, [messages, isSending]);
+
+  useEffect(() => {
+    const cardElement = chatCardRef.current;
+    const composerElement = composerRef.current;
+    if (!cardElement || !composerElement || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+    const updateComposerHeightVar = () => {
+      cardElement.style.setProperty(
+        "--assistant-composer-height",
+        `${Math.ceil(composerElement.getBoundingClientRect().height)}px`
+      );
+    };
+    updateComposerHeightVar();
+    const resizeObserver = new ResizeObserver(() => {
+      updateComposerHeightVar();
+    });
+    resizeObserver.observe(composerElement);
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const inputElement = inputRef.current;
@@ -1178,8 +1237,8 @@ export default function AssistantChatPage() {
   }, [inputValue]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    focusComposerInput();
+  }, [focusComposerInput]);
 
   useEffect(() => {
     if (restartKey !== "1") {
@@ -1220,6 +1279,7 @@ export default function AssistantChatPage() {
     commandField = null,
     appendUserMessage,
     contextEntry = null,
+    restoreComposerFocus = false,
   }) => {
     const text = normalizeInput(rawValue);
     if ((!text && command === DEFAULT_CHAT_COMMAND) || isSending) {
@@ -1242,6 +1302,9 @@ export default function AssistantChatPage() {
     setServiceError(false);
     if (appendUserMessage && text) {
       setInputValue("");
+      if (restoreComposerFocus) {
+        focusComposerInput();
+      }
       setMessages((previousMessages) => [
         ...previousMessages,
         createLocalMessage({ sender: "user", text }),
@@ -1337,8 +1400,19 @@ export default function AssistantChatPage() {
       setServiceError(true);
     } finally {
       setIsSending(false);
+      if (restoreComposerFocus) {
+        focusComposerInput();
+      }
     }
-  }, [isSending, locale, sessionId, sessionLocale, uiCopy.fallbackReply, uiCopy.networkError]);
+  }, [
+    focusComposerInput,
+    isSending,
+    locale,
+    sessionId,
+    sessionLocale,
+    uiCopy.fallbackReply,
+    uiCopy.networkError,
+  ]);
 
   useEffect(() => {
     const shouldResume = safeGetLocalStorageItem(CHATBOT_RESUME_PENDING_KEY);
@@ -1373,10 +1447,12 @@ export default function AssistantChatPage() {
 
   const handleSendMessage = async (rawValue) => {
     setComposerLocationMenuOpen(false);
+    shouldAutoScrollRef.current = true;
     await submitMessage({
       rawValue,
       command: DEFAULT_CHAT_COMMAND,
       appendUserMessage: true,
+      restoreComposerFocus: true,
     });
   };
 
@@ -1785,7 +1861,11 @@ export default function AssistantChatPage() {
   }, [appendControlledComposerMessage, isPhotoActionAvailable, isSending]);
   return (
     <main className="page page--assistant" lang={locale}>
-      <section className="assistant-chat-card" aria-label={uiCopy.conversationAria.section}>
+      <section
+        ref={chatCardRef}
+        className="assistant-chat-card"
+        aria-label={uiCopy.conversationAria.section}
+      >
         <ChatHeader copy={uiCopy} />
 
         <div
@@ -1795,6 +1875,7 @@ export default function AssistantChatPage() {
           aria-label={uiCopy.conversationAria.region}
           aria-describedby="assistant-chat-description"
           role="region"
+          onScroll={handleThreadScroll}
         >
           <p id="assistant-chat-description" className="assistant-chat-composer__sr-only">
             {uiCopy.conversationAria.description}
@@ -1873,6 +1954,7 @@ export default function AssistantChatPage() {
         />
 
         <ChatComposer
+          composerRef={composerRef}
           inputValue={inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleSubmit}

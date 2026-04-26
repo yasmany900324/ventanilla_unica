@@ -1004,6 +1004,7 @@ body {
 }
 
 .app-shell {
+  --mobile-bottom-nav-height: 60px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -3940,6 +3941,8 @@ button:disabled {
 }
 
 .assistant-chat-card {
+  --assistant-composer-height: 0px;
+  --assistant-composer-bottom-offset: 0px;
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -4086,6 +4089,9 @@ button:disabled {
   background: linear-gradient(180deg, #f9fbff 0%, #f4f8ff 100%);
   border-radius: 16px;
   padding: 0.94rem;
+  padding-bottom: calc(
+    0.94rem + var(--assistant-composer-height) + var(--assistant-composer-bottom-offset)
+  );
   flex: 1;
   min-height: 0;
   max-height: none;
@@ -5017,7 +5023,7 @@ button:disabled {
 
 .assistant-chat-composer {
   position: sticky;
-  bottom: 0;
+  bottom: var(--assistant-composer-bottom-offset, 0px);
   z-index: 5;
   display: grid;
   gap: 0.32rem;
@@ -5383,7 +5389,9 @@ textarea:focus-visible {
   }
 
   .app-shell__content {
-    padding-bottom: 5.25rem;
+    padding-bottom: calc(
+      var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 0.8rem
+    );
   }
 
   .page {
@@ -5399,13 +5407,23 @@ textarea:focus-visible {
     gap: 0.5rem;
     max-width: 100%;
     width: 100%;
-    min-height: calc(100dvh - 112px - 5.2rem - env(safe-area-inset-bottom, 0px));
+    min-height: calc(
+      100dvh - 112px - var(--mobile-bottom-nav-height) - env(safe-area-inset-bottom, 0px)
+    );
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
     padding-top: 0.45rem;
     padding-bottom: 0.35rem;
   }
 
   .assistant-chat-card {
-    min-height: calc(100dvh - 112px - 5.2rem - env(safe-area-inset-bottom, 0px));
+    --assistant-composer-bottom-offset: calc(
+      var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 0.45rem
+    );
+    min-height: calc(
+      100dvh - 112px - var(--mobile-bottom-nav-height) - env(safe-area-inset-bottom, 0px)
+    );
+    width: 100%;
     padding: 0.5rem;
     border-radius: 14px;
     gap: 0.5rem;
@@ -5456,6 +5474,9 @@ textarea:focus-visible {
     max-height: none;
     border-radius: 10px;
     padding: 0.56rem;
+    padding-bottom: calc(
+      0.56rem + var(--assistant-composer-height) + var(--assistant-composer-bottom-offset)
+    );
   }
 
   .assistant-message {
@@ -5608,7 +5629,6 @@ textarea:focus-visible {
     border-radius: 12px;
     padding: 0.42rem;
     gap: 0.24rem;
-    bottom: calc(0.08rem + env(safe-area-inset-bottom, 0px));
   }
 
   .assistant-chat-composer__input-wrap {
@@ -5986,7 +6006,7 @@ textarea:focus-visible {
   .mobile-bottom-nav__link,
   .mobile-bottom-nav__button {
     width: 100%;
-    min-height: 60px;
+    min-height: var(--mobile-bottom-nav-height);
     border: none;
     background: transparent;
     color: #1f2937;
