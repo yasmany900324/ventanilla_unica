@@ -1,6 +1,6 @@
 # ventanilla_unica
 
-MVP en Next.js para reportar incidencias y simular su ciclo de estado.
+MVP en Next.js para registrar y gestionar tramites ciudadanos.
 
 ## Ejecutar en local
 
@@ -17,7 +17,7 @@ if [ -f package-lock.json ]; then npm ci --include=dev --no-audit; else npm inst
 
 ## Persistencia de datos (Vercel + Postgres/Neon)
 
-La app usa endpoints en `app/api` y una capa de datos en `lib/incidents.js`.
+La app usa endpoints en `app/api` y una capa de datos principal en `lib/procedureRequests.js`.
 
 Variables de entorno requeridas:
 
@@ -31,9 +31,7 @@ En Vercel estas variables se inyectan automaticamente al conectar una base de da
 
 ## Endpoints
 
-- `GET /api/incidents`: lista incidencias
-- `POST /api/incidents`: crea incidencia con estado inicial `recibido`
-- `PATCH /api/incidents/:id/advance`: avanza estado (`recibido -> en proceso -> resuelto`)
+- `GET /api/ciudadano/procedures/requests`: lista tramites del ciudadano autenticado
 - `POST /api/chatbot/message`: procesa un mensaje del chatbot via backend + LLM (server-side)
 - `GET /api/chatbot/metrics`: metricas de embudo del chatbot (solo administradores)
 
@@ -56,7 +54,7 @@ La integracion del asistente sigue una arquitectura de control en backend:
 
 ### Flujo prioritario implementado
 
-Caso: **Incidencia general**
+Caso: **Trámite ciudadano**
 
 Secuencia:
 1. ubicacion
@@ -65,7 +63,7 @@ Secuencia:
 4. foto opcional (adjuntar o omitir)
 5. resumen
 6. confirmacion
-7. creacion de incidencia
+7. creacion de tramite
 8. cierre
 
 ### Prueba local rapida
@@ -85,16 +83,15 @@ npm run dev
 
 4. Abre `http://localhost:3000/asistente`.
 5. Prueba mensajes como:
-   - "Quiero reportar un problema"
+   - "Quiero iniciar un tramite"
    - "Necesito hacer un tramite"
-   - "Quiero crear una incidencia"
    - "Donde consulto el estado de mi solicitud?"
 
 Si la capa LLM no devuelve una interpretacion valida o falla por timeout/error, el backend aplica fallback deterministico y responde con repregunta controlada.
 
 ## Telemetria del embudo conversacional
 
-El backend registra eventos del flujo conversacional para medir conversion en reporte de incidencias.
+El backend registra eventos del flujo conversacional para medir conversion en creacion de tramites.
 
 - Tabla: `chatbot_telemetry_events` (si hay Postgres disponible).
 - Fallback: buffer en memoria cuando no hay DB.
@@ -105,7 +102,7 @@ El backend registra eventos del flujo conversacional para medir conversion en re
   - `entities_rejected`
   - `low_confidence_reprompt`
   - `confirmation_ready`
-  - `incident_created`
+  - `incident_created` (evento historico: hoy se usa para confirmacion de persistencia de tramite)
   - `llm_fallback_used`
   - `cancelled`
   - `auth_required`
@@ -118,9 +115,9 @@ El backend registra eventos del flujo conversacional para medir conversion en re
 Respuesta:
 - `totals.events`
 - `totals.uniqueSessions`
-- `funnel.enteredIncidentFlow`
+- `funnel.enteredIncidentFlow` (historico)
 - `funnel.readyForConfirmation`
 - `funnel.authRequired`
 - `funnel.confirmed`
-- `funnel.incidentCreated`
-- `funnel.incidentCreationConversion`
+- `funnel.incidentCreated` (historico)
+- `funnel.incidentCreationConversion` (historico)

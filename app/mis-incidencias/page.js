@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import MyIncidentsPageContent from "../../components/MyIncidentsPageContent";
 import {
   getAuthenticatedUserFromToken,
   SESSION_COOKIE_NAME,

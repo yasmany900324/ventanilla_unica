@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "../../../../lib/auth";
-import { persistIncidentPhotoForChatSession } from "../../../../lib/chatbotIncidentPhotoUpload";
+import { persistProcedurePhotoForChatSession } from "../../../../lib/chatbotProcedurePhotoUpload";
 
 export const runtime = "nodejs";
 
@@ -46,7 +46,7 @@ export async function POST(request) {
       : new URL(request.url).origin;
 
   try {
-    const result = await persistIncidentPhotoForChatSession({
+    const result = await persistProcedurePhotoForChatSession({
       sessionId,
       userId: user.id,
       bytes,
@@ -58,7 +58,7 @@ export async function POST(request) {
 
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
-    console.error("[api/chatbot/incident-photo] Error no controlado", error);
+    console.error("[api/chatbot/procedure-photo] Error no controlado", error);
     return NextResponse.json(
       {
         error:

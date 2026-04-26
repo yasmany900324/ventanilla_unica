@@ -2,8 +2,8 @@ node_modules
 .next
 out
 coverage
-data/chatbot-incident-photos/
-data/incident-attachments/
+data/chatbot-procedure-photos/
+data/procedure-attachments/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

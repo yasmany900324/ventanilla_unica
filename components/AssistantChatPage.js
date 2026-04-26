@@ -1425,7 +1425,7 @@ export default function AssistantChatPage() {
         formData.append("file", file);
         formData.append("preferredLocale", sessionLocale || locale || "es");
 
-        const response = await fetch("/api/chatbot/incident-photo", {
+        const response = await fetch("/api/chatbot/procedure-photo", {
           method: "POST",
           body: formData,
           ...(clientDebugEnabled ? { headers: { "x-chatbot-debug": "1" } } : {}),
