@@ -635,6 +635,54 @@ function HelpPanelIcon({ type }) {
 }
 
 function StepIcon({ iconKey }) {
+  if (iconKey === "document") {
+    return (
+      <svg
+        width="64"
+        height="64"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <path
+          d="M14 3H7C5.89543 3 5 3.89543 5 5V19C5 20.1046 5.89543 21 7 21H11"
+          stroke="#0F3D8A"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M14 3L19 8"
+          stroke="#0F3D8A"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M14 3V7C14 7.55228 14.4477 8 15 8H19"
+          stroke="#0F3D8A"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M16 14V21"
+          stroke="#0F3D8A"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M12.5 17.5H19.5"
+          stroke="#0F3D8A"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    );
+  }
   if (iconKey === "inbox") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -661,9 +709,7 @@ function StepIcon({ iconKey }) {
   }
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 4h8l2 2v14H7z" />
-      <path d="M9 10h6M9 13h5" />
-      <path d="m11 16 1 1 2-2" />
+      <circle cx="12" cy="12" r="6" />
     </svg>
   );
 }
@@ -917,25 +963,47 @@ export default function HomePageClient() {
           <p>{content.flowSubtitle}</p>
         </header>
         <ol className="home-onify-flow__steps">
-          {content.flow.map((step, index) => (
-            <li key={step.title} className="home-onify-flow__step">
-              <div className="home-onify-flow__step-head">
-                <span className="home-onify-flow__step-number" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="home-onify-flow__step-icon" aria-hidden="true">
-                  <StepIcon iconKey={step.iconKey} />
-                </span>
-              </div>
-              <div className="home-onify-flow__step-copy">
-                <h3>{step.title}</h3>
-                <p>{step.description}</p>
-              </div>
-              {index < content.flow.length - 1 ? (
-                <span className="home-onify-flow__connector" aria-hidden="true" />
-              ) : null}
-            </li>
-          ))}
+          {content.flow.map((step, index) => {
+            const isFirst = index === 0;
+            const isLast = index === content.flow.length - 1;
+            return (
+              <li key={step.title} className="home-onify-flow__step">
+                <div className="home-onify-flow__step-head">
+                  <span
+                    className={`home-onify-flow__step-number${isLast ? " home-onify-flow__step-number--final" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {isLast ? (
+                      <svg className="home-onify-flow__step-check" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M6.5 12.5l3.2 3.2L16.5 8"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.25"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      index + 1
+                    )}
+                  </span>
+                  {isFirst ? (
+                    <span className="home-onify-flow__step-icon" aria-hidden="true">
+                      <StepIcon iconKey={step.iconKey} />
+                    </span>
+                  ) : null}
+                </div>
+                <div className="home-onify-flow__step-copy">
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                </div>
+                {index < content.flow.length - 1 ? (
+                  <span className="home-onify-flow__connector" aria-hidden="true" />
+                ) : null}
+              </li>
+            );
+          })}
         </ol>
       </section>
     </main>
