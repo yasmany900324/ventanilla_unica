@@ -809,9 +809,7 @@ export default function FuncionarioBandejaExpedientesPage() {
                 onClick={() => {
                   const row = openActionsItem;
                   setOpenActionsMenuId(null);
-                  window.setTimeout(() => {
-                    void handleDeleteExpediente(row);
-                  }, 0);
+                  void handleDeleteExpediente(row);
                 }}
               >
                 {deletingId === String(openActionsItem.procedureRequestId || openActionsItem.id)
