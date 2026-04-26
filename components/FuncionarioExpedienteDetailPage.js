@@ -181,6 +181,16 @@ function resolveContactEmail(procedureRequest, collectedData) {
   return candidates.find((item) => typeof item === "string" && item.trim()) || null;
 }
 
+function isPendingCamundaSyncStatus(status) {
+  const key = String(status || "").trim().toUpperCase();
+  return key === "PENDING_CAMUNDA_SYNC";
+}
+
+function isFailedCamundaSyncStatus(status) {
+  const key = String(status || "").trim().toUpperCase();
+  return key === "ERROR_CAMUNDA_SYNC" || key === "CAMUNDA_SYNC_FAILED";
+}
+
 function ProcedureFieldVariables({ requiredVariables }) {
   if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
     return null;
@@ -217,7 +227,7 @@ function BackToBandejaLink() {
 
 function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariablesJson, setCompleteVariablesJson, internalObservation, setInternalObservation, nextStatus, setNextStatus }) {
   if (!actions.length) {
-    return <p className="empty-message">No hay acciones operativas pendientes para este expediente.</p>;
+    return null;
   }
   return actions.map((action) => {
     const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
@@ -356,10 +366,35 @@ export default function FuncionarioExpedienteDetailPage() {
 
   const procedureRequest = detail?.procedureRequest || null;
   const isAvailable = procedureRequest?.assignmentScope === "available";
+  const isAssignedToMe = procedureRequest?.assignmentScope === "assigned_to_me";
   const claimAction = availableActions.find((action) => action?.actionKey === "claim_task") || null;
+  const retrySyncActionFromApi =
+    availableActions.find((action) => action?.actionKey === "retry_camunda_sync") || null;
+  const shouldShowPendingSyncAction = Boolean(
+    isAssignedToMe &&
+      isPendingCamundaSyncStatus(procedureRequest?.status) &&
+      !procedureRequest?.camundaProcessInstanceKey
+  );
+  const shouldShowFailedSyncAction = Boolean(
+    isAssignedToMe &&
+      (isFailedCamundaSyncStatus(procedureRequest?.status) || procedureRequest?.camundaError)
+  );
+  const syntheticSyncAction =
+    !retrySyncActionFromApi && (shouldShowPendingSyncAction || shouldShowFailedSyncAction)
+      ? {
+          actionKey: "retry_camunda_sync",
+          displayLabel: shouldShowFailedSyncAction ? "Reintentar sincronización" : "Sincronizar con Camunda",
+          endpoint: `/api/funcionario/procedures/requests/${encodeURIComponent(
+            procedureRequestId
+          )}/retry-camunda-sync`,
+          method: "POST",
+        }
+      : null;
+  const retrySyncAction = retrySyncActionFromApi || syntheticSyncAction;
+
   const operationalActions = isAvailable
     ? availableActions.filter((action) => action?.actionKey !== "claim_task")
-    : availableActions;
+    : availableActions.filter((action) => action?.actionKey !== "retry_camunda_sync");
 
   const runAction = async (action) => {
     if (!action?.endpoint || !procedureRequestId) {
@@ -402,10 +437,15 @@ export default function FuncionarioExpedienteDetailPage() {
           setDetail(null);
           return;
         }
+        if (action.actionKey === "retry_camunda_sync") {
+          message = data?.error || "No se pudo sincronizar con Camunda. Intenta nuevamente.";
+        }
         throw new Error(message);
       }
       if (action.actionKey === "claim_task") {
         setSuccessMessage("Expediente tomado correctamente.");
+      } else if (action.actionKey === "retry_camunda_sync") {
+        setSuccessMessage("Sincronización solicitada correctamente.");
       } else {
         setSuccessMessage("Acción ejecutada correctamente.");
       }
@@ -551,6 +591,45 @@ export default function FuncionarioExpedienteDetailPage() {
             </section>
           ) : null}
 
+          {!isAvailable && retrySyncAction && shouldShowPendingSyncAction ? (
+            <section className="card dashboard-section admin-procedure-fields">
+              <h3>Sincronización pendiente</h3>
+              <p className="small">
+                Este expediente todavía no está sincronizado con Camunda. Puedes intentar sincronizarlo para habilitar
+                las tareas del proceso.
+              </p>
+              <button
+                type="button"
+                className="button-inline"
+                onClick={() => runAction(retrySyncAction)}
+                disabled={actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`}
+              >
+                {actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`
+                  ? "Sincronizando..."
+                  : "Sincronizar con Camunda"}
+              </button>
+            </section>
+          ) : null}
+
+          {!isAvailable && retrySyncAction && shouldShowFailedSyncAction ? (
+            <section className="card dashboard-section admin-procedure-fields">
+              <h3>Error de sincronización</h3>
+              <p className="small">
+                Ocurrió un problema al sincronizar el expediente con Camunda.
+              </p>
+              <button
+                type="button"
+                className="button-inline"
+                onClick={() => runAction(retrySyncAction)}
+                disabled={actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`}
+              >
+                {actionLoadingKey === `${retrySyncAction.actionKey}:${retrySyncAction.endpoint}`
+                  ? "Sincronizando..."
+                  : "Reintentar sincronización"}
+              </button>
+            </section>
+          ) : null}
+
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Resumen del caso</h3>
             <p className="small">
@@ -634,6 +713,23 @@ export default function FuncionarioExpedienteDetailPage() {
               nextStatus={nextStatus}
               setNextStatus={setNextStatus}
             />
+            {!isAvailable && !retrySyncAction && operationalActions.length === 0 ? (
+              detail?.activeTask?.taskDefinitionKey ? (
+                <p className="empty-message">No hay acciones operativas pendientes para este expediente.</p>
+              ) : (
+                <p className="small">
+                  No hay una tarea activa disponible todavía. Cuando el proceso habilite una tarea, aparecerá aquí.
+                </p>
+              )
+            ) : null}
+            {!isAvailable &&
+            !retrySyncAction &&
+            operationalActions.length === 0 &&
+            !detail?.activeTask?.taskDefinitionKey ? (
+              <p className="small">
+                No hay una tarea activa disponible todavía. Cuando el proceso habilite una tarea, aparecerá aquí.
+              </p>
+            ) : null}
           </section>
 
           <section className="card dashboard-section admin-procedure-fields">
