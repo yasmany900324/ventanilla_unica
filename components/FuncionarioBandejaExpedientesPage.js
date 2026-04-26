@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
@@ -58,25 +59,6 @@ function getLocalStatusLabel(value) {
 function getCamundaStatusLabel(value) {
   const key = String(value || "").trim().toUpperCase();
   return CAMUNDA_STATUS_LABELS[key] || value || "-";
-}
-
-function buildPendingLabel(item) {
-  if (!item) {
-    return "-";
-  }
-  if (item.assignmentScope === "available") {
-    return "Tomar expediente";
-  }
-  if (item.hasCamundaError || item.camundaStatus === "ERROR_SYNC") {
-    return "Error de sincronización";
-  }
-  if (item.activeTask?.taskDefinitionKey || item.camundaStatus === "TASK_ACTIVE") {
-    return "Pendiente de revisión";
-  }
-  if (item.camundaStatus === "PROCESS_RUNNING") {
-    return "En proceso";
-  }
-  return "Sin tarea activa";
 }
 
 function isPendingItem(item) {
@@ -262,18 +244,22 @@ function IconInfo() {
   );
 }
 
-function IconChevronRight() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M7.5 5.5 12.5 10 7.5 14.5"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+const ACTIONS_MENU_PANEL_ID = "funcionario-bandeja-actions-menu";
+
+function computeActionsMenuPlacement(anchorEl) {
+  if (!anchorEl || typeof window === "undefined") {
+    return { top: 0, right: 0 };
+  }
+  const rect = anchorEl.getBoundingClientRect();
+  const gap = 4;
+  return {
+    top: rect.bottom + gap,
+    right: window.innerWidth - rect.right,
+  };
+}
+
+function getRowActionsMenuId(item) {
+  return String(item?.procedureRequestId || item?.id || "");
 }
 
 export default function FuncionarioBandejaExpedientesPage() {
@@ -286,6 +272,9 @@ export default function FuncionarioBandejaExpedientesPage() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [openActionsMenuId, setOpenActionsMenuId] = useState(null);
+  const [actionsMenuPlacement, setActionsMenuPlacement] = useState({ top: 0, right: 0 });
+  const actionsMenuAnchorRef = useRef(null);
   const [channelFilter, setChannelFilter] = useState("all");
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const [camundaStatusFilter, setCamundaStatusFilter] = useState("all");
@@ -362,6 +351,75 @@ export default function FuncionarioBandejaExpedientesPage() {
       return true;
     });
   }, [camundaStatusFilter, channelFilter, list, localStatusFilter, workFilter]);
+
+  const openActionsItem = useMemo(
+    () =>
+      openActionsMenuId
+        ? filteredList.find((row) => getRowActionsMenuId(row) === openActionsMenuId) || null
+        : null,
+    [filteredList, openActionsMenuId]
+  );
+
+  useEffect(() => {
+    if (openActionsMenuId && !openActionsItem) {
+      setOpenActionsMenuId(null);
+    }
+  }, [openActionsMenuId, openActionsItem]);
+
+  const syncActionsMenuPlacement = useCallback(() => {
+    if (!openActionsMenuId) {
+      return;
+    }
+    const el = actionsMenuAnchorRef.current;
+    if (!el) {
+      return;
+    }
+    setActionsMenuPlacement(computeActionsMenuPlacement(el));
+  }, [openActionsMenuId]);
+
+  useLayoutEffect(() => {
+    if (!openActionsMenuId) {
+      return undefined;
+    }
+    syncActionsMenuPlacement();
+    window.addEventListener("scroll", syncActionsMenuPlacement, true);
+    window.addEventListener("resize", syncActionsMenuPlacement);
+    return () => {
+      window.removeEventListener("scroll", syncActionsMenuPlacement, true);
+      window.removeEventListener("resize", syncActionsMenuPlacement);
+    };
+  }, [openActionsMenuId, syncActionsMenuPlacement]);
+
+  useEffect(() => {
+    if (!openActionsMenuId) {
+      return undefined;
+    }
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (target.closest?.("[data-funcionario-actions-menu]")) {
+        return;
+      }
+      const triggerEl = target.closest?.("[data-funcionario-actions-trigger]");
+      if (triggerEl?.getAttribute("data-funcionario-actions-trigger") === openActionsMenuId) {
+        return;
+      }
+      setOpenActionsMenuId(null);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setOpenActionsMenuId(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openActionsMenuId]);
 
   const pendingCount = useMemo(() => filteredList.filter((item) => isPendingItem(item)).length, [filteredList]);
 
@@ -624,9 +682,10 @@ export default function FuncionarioBandejaExpedientesPage() {
               <tbody>
                 {filteredList.map((item) => {
                   const rowPending = isPendingItem(item);
-                  const pendingLabel = buildPendingLabel(item);
                   const camundaDisplay = item.camundaStatusLabel || getCamundaStatusLabel(item.camundaStatus);
                   const createdAtParts = formatCreatedAtParts(item.createdAt, locale);
+                  const rowActionsId = getRowActionsMenuId(item);
+                  const isActionsMenuOpen = openActionsMenuId === rowActionsId;
                   return (
                     <tr
                       key={item.id}
@@ -667,66 +726,33 @@ export default function FuncionarioBandejaExpedientesPage() {
                       </td>
                       <td className="funcionario-bandeja__cell">
                         <div className="funcionario-bandeja__pending-wrap">
-                          {/* <div className="funcionario-bandeja__pending-line">
-                            <span
-                              className={
-                                pendingLabel === "Tomar expediente"
-                                  ? "funcionario-bandeja__pending funcionario-bandeja__pending--take"
-                                  : "funcionario-bandeja__pending"
-                              }
-                            >
-                              {pendingLabel}
-                            </span>
-                            {pendingLabel === "Tomar expediente" ? (
-                              <span className="funcionario-bandeja__take-chevron" aria-hidden="true">
-                                <IconChevronRight />
-                              </span>
-                            ) : null}
-                          </div> */}
                           <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
                         </div>
                       </td>
                       <td className="funcionario-bandeja__cell funcionario-bandeja__cell--actions">
                         <div className="funcionario-bandeja__actions">
-                          <details className="funcionario-bandeja__menu">
-                            <summary
-                              className="funcionario-bandeja__menu-trigger"
-                              aria-label={`Abrir acciones para expediente ${item.requestCode || item.id}`}
-                            >
-                              <span aria-hidden="true">⋮</span>
-                            </summary>
-                            <div className="funcionario-bandeja__menu-panel" role="menu">
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="funcionario-bandeja__menu-item"
-                                onClick={(event) => {
-                                  const detailsElement = event.currentTarget.closest("details");
-                                  if (detailsElement) {
-                                    detailsElement.removeAttribute("open");
-                                  }
-                                  goToExpedienteDetail(item);
-                                }}
-                              >
-                                Ver detalle
-                              </button>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="funcionario-bandeja__menu-item funcionario-bandeja__menu-item--danger"
-                                disabled={deletingId === String(item.procedureRequestId || item.id)}
-                                onClick={(event) => {
-                                  const detailsElement = event.currentTarget.closest("details");
-                                  if (detailsElement) {
-                                    detailsElement.removeAttribute("open");
-                                  }
-                                  handleDeleteExpediente(item);
-                                }}
-                              >
-                                {deletingId === String(item.procedureRequestId || item.id) ? "Eliminando..." : "Eliminar"}
-                              </button>
-                            </div>
-                          </details>
+                          <button
+                            type="button"
+                            ref={isActionsMenuOpen ? actionsMenuAnchorRef : undefined}
+                            className="funcionario-bandeja__menu-trigger"
+                            data-funcionario-actions-trigger={rowActionsId}
+                            aria-label={`Abrir acciones para expediente ${item.requestCode || item.id}`}
+                            aria-haspopup="menu"
+                            aria-expanded={isActionsMenuOpen}
+                            aria-controls={isActionsMenuOpen ? ACTIONS_MENU_PANEL_ID : undefined}
+                            id={`funcionario-bandeja-actions-trigger-${rowActionsId}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (isActionsMenuOpen) {
+                                setOpenActionsMenuId(null);
+                                return;
+                              }
+                              setActionsMenuPlacement(computeActionsMenuPlacement(event.currentTarget));
+                              setOpenActionsMenuId(rowActionsId);
+                            }}
+                          >
+                            <span aria-hidden="true">⋮</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -750,6 +776,52 @@ export default function FuncionarioBandejaExpedientesPage() {
         </p>
       </div>
       </div>
+
+      {openActionsMenuId && openActionsItem && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              id={ACTIONS_MENU_PANEL_ID}
+              className="funcionario-bandeja funcionario-bandeja__actions-dropdown"
+              data-funcionario-actions-menu
+              role="menu"
+              aria-labelledby={`funcionario-bandeja-actions-trigger-${openActionsMenuId}`}
+              style={{
+                top: actionsMenuPlacement.top,
+                right: actionsMenuPlacement.right,
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="funcionario-bandeja__menu-item"
+                onClick={() => {
+                  setOpenActionsMenuId(null);
+                  goToExpedienteDetail(openActionsItem);
+                }}
+              >
+                Ver detalle
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="funcionario-bandeja__menu-item funcionario-bandeja__menu-item--danger"
+                disabled={deletingId === String(openActionsItem.procedureRequestId || openActionsItem.id)}
+                onClick={() => {
+                  const row = openActionsItem;
+                  setOpenActionsMenuId(null);
+                  window.setTimeout(() => {
+                    void handleDeleteExpediente(row);
+                  }, 0);
+                }}
+              >
+                {deletingId === String(openActionsItem.procedureRequestId || openActionsItem.id)
+                  ? "Eliminando..."
+                  : "Eliminar"}
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </main>
   );
 }

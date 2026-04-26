@@ -7591,13 +7591,9 @@ a.dashboard-onify-detail-btn {
   gap: 0.35rem;
 }
 
-.funcionario-bandeja__menu {
-  position: relative;
-  display: inline-flex;
-}
-
-.funcionario-bandeja__menu-trigger {
-  list-style: none;
+.funcionario-bandeja button.funcionario-bandeja__menu-trigger {
+  margin: 0;
+  padding: 0;
   cursor: pointer;
   width: 2rem;
   height: 2rem;
@@ -7613,25 +7609,19 @@ a.dashboard-onify-detail-btn {
   user-select: none;
 }
 
-.funcionario-bandeja__menu-trigger::-webkit-details-marker {
-  display: none;
-}
-
-.funcionario-bandeja__menu-trigger:hover {
+.funcionario-bandeja button.funcionario-bandeja__menu-trigger:hover {
   background: #f4f8ff;
   border-color: #b9cde8;
 }
 
-.funcionario-bandeja__menu-trigger:focus-visible {
+.funcionario-bandeja button.funcionario-bandeja__menu-trigger:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.35);
   outline-offset: 2px;
 }
 
-.funcionario-bandeja__menu-panel {
-  position: absolute;
-  top: calc(100% + 0.25rem);
-  right: 0;
-  z-index: 8;
+.funcionario-bandeja.funcionario-bandeja__actions-dropdown {
+  position: fixed;
+  z-index: 12050;
   min-width: 9rem;
   padding: 0.3rem;
   border-radius: 10px;
