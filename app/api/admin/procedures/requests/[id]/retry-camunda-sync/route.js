@@ -55,6 +55,9 @@ export async function POST(request, { params }) {
           { status: 409 }
         );
       }
+      if (reason === "actor_required") {
+        return NextResponse.json({ error: "Actor no válido." }, { status: 403 });
+      }
       return NextResponse.json(
         {
           error: "No se pudo reintentar la sincronización con Camunda.",
@@ -64,7 +67,10 @@ export async function POST(request, { params }) {
       );
     }
     return NextResponse.json({ ok: true, ...result });
-  } catch (_error) {
+  } catch (error) {
+    console.error("[admin/retry-camunda-sync] unexpected error", {
+      message: error?.message || null,
+    });
     return NextResponse.json(
       { error: "No se pudo reintentar la sincronización con Camunda." },
       { status: 500 }
