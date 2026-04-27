@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
-import LocationMapPreview from "./LocationMapPreview";
 import { normalizeImageReference } from "../lib/imageReference";
+
+const LocationMapPreview = dynamic(() => import("./LocationMapPreview"), { ssr: false });
 
 const LOCAL_STATUS_LABELS = {
   DRAFT: "Borrador",
