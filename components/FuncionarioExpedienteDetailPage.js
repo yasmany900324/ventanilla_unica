@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
@@ -33,6 +33,41 @@ const CAMUNDA_STATUS_LABELS = {
   PROCESS_COMPLETED: "Finalizado",
   NOT_SYNCED: "No sincronizado",
 };
+
+const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
+
+class MapRenderErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    if (IS_DEVELOPMENT) {
+      console.warn("[quick-preview:location] map render error", error);
+    }
+    if (typeof this.props.onError === "function") {
+      this.props.onError(error);
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
 
 function hasRole(user, targetRole) {
   const normalizedTarget = String(targetRole || "").trim().toLowerCase();
@@ -189,6 +224,30 @@ function parseCoordinatesCandidate(latitude, longitude) {
   return { lat, lng };
 }
 
+function extractCoordinatesFromMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+  const direct = parseCoordinatesCandidate(
+    metadata.latitude ?? metadata.lat ?? metadata?.coords?.latitude ?? metadata?.location?.latitude,
+    metadata.longitude ??
+      metadata.lng ??
+      metadata.lon ??
+      metadata?.coords?.longitude ??
+      metadata?.location?.longitude
+  );
+  if (direct) {
+    return direct;
+  }
+  if (Array.isArray(metadata.coordinates) && metadata.coordinates.length >= 2) {
+    const fromArray = parseCoordinatesCandidate(metadata.coordinates[1], metadata.coordinates[0]);
+    if (fromArray) {
+      return fromArray;
+    }
+  }
+  return null;
+}
+
 function extractCoordinatesFromLocationText(value) {
   const text = String(value || "").trim();
   if (!text) {
@@ -207,7 +266,7 @@ function extractCoordinatesFromLocationText(value) {
   return null;
 }
 
-function extractCoordinatesFromLocationValue(rawLocation, collectedData) {
+function extractCoordinatesFromLocationValue(rawLocation, collectedData, metadata) {
   if (rawLocation && typeof rawLocation === "object") {
     const fromObject = parseCoordinatesCandidate(
       rawLocation.latitude ?? rawLocation.lat ?? rawLocation?.coords?.latitude,
@@ -227,7 +286,14 @@ function extractCoordinatesFromLocationValue(rawLocation, collectedData) {
   if (fromText) {
     return fromText;
   }
-  return parseCoordinatesCandidate(collectedData?.locationLatitude, collectedData?.locationLongitude);
+  const fromCommonFields =
+    parseCoordinatesCandidate(collectedData?.locationLatitude, collectedData?.locationLongitude) ||
+    parseCoordinatesCandidate(collectedData?.lat, collectedData?.lng) ||
+    parseCoordinatesCandidate(collectedData?.latitude, collectedData?.longitude);
+  if (fromCommonFields) {
+    return fromCommonFields;
+  }
+  return extractCoordinatesFromMetadata(metadata);
 }
 
 function resolveLocationValue(collectedData) {
@@ -268,11 +334,43 @@ function formatLocationForDisplay(rawLocation) {
 
 function formatAttachmentForDisplay(rawAttachment) {
   const normalized = normalizeImageReference(rawAttachment);
+  let previewReason = "no_image_reference";
+  if (rawAttachment) {
+    if (!normalized.isValid) {
+      previewReason = "unsupported_or_unresolved";
+    } else if (normalized.url) {
+      previewReason = "preview_ready";
+    } else {
+      previewReason = "filename_without_public_url";
+    }
+  }
   return {
     isValid: normalized.isValid,
     url: normalized.url,
     label: normalized.displayName || "",
+    previewReason,
   };
+}
+
+function buildImagePreviewReasonText(previewReason) {
+  if (previewReason === "filename_without_public_url") {
+    return "Imagen registrada, pero no hay URL pública disponible para previsualizar.";
+  }
+  if (previewReason === "unsupported_or_unresolved") {
+    return "Referencia de imagen no compatible para vista previa.";
+  }
+  if (previewReason === "preview_ready") {
+    return "Vista previa disponible.";
+  }
+  return "No se adjuntó imagen.";
+}
+
+function buildLocationSearchUrl(value) {
+  const query = String(value || "").trim();
+  if (!query) {
+    return "";
+  }
+  return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
 }
 
 function deriveCamundaStatus(procedureRequest, detail) {
@@ -454,6 +552,10 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
 
   const collectedData = procedureRequest?.collectedData || {};
   const fieldDefinitions = getProcedureFieldDefinitions(detail);
+  const imageFields = fieldDefinitions.filter((field) => isImageFieldType(field?.type));
+  const locationFields = fieldDefinitions.filter((field) => isLocationFieldType(field?.type));
+  const imageFieldKey = imageFields[0]?.key || null;
+  const locationFieldKey = locationFields[0]?.key || null;
   const hasImageTypeConfigured = fieldDefinitions.some((field) => isImageFieldType(field?.type));
   const hasLocationTypeConfigured = fieldDefinitions.some((field) => isLocationFieldType(field?.type));
   const typedLocation = resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, isLocationFieldType);
@@ -465,20 +567,45 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   const hasPhotoSkipped = ["skipped", "not_requested"].includes(
     String(collectedData?.photoStatus || "").trim().toLowerCase()
   );
+  const imagePreviewReason = hasPhotoSkipped
+    ? "no_image_reference"
+    : attachmentDisplay.previewReason;
   const attachmentSummaryText = hasPhotoSkipped
     ? "No se adjuntó imagen"
-    : attachmentDisplay.isValid
-      ? attachmentDisplay.label || "Sí"
-      : hasPhotoProvided && rawAttachment
-        ? attachmentDisplay.label || String(rawAttachment || "").trim() || "Imagen adjunta registrada"
-        : rawAttachment
-          ? "Formato inválido"
-          : "No se adjuntó imagen";
+    : imagePreviewReason === "preview_ready"
+      ? attachmentDisplay.label || "Imagen previsualizable"
+      : imagePreviewReason === "filename_without_public_url"
+        ? "Imagen registrada, pero no hay URL pública disponible para previsualizar."
+        : imagePreviewReason === "unsupported_or_unresolved"
+          ? "Referencia de imagen no compatible para vista previa."
+          : hasPhotoProvided
+            ? "Imagen registrada"
+            : "No se adjuntó imagen";
   const rawLocation =
     typedLocation ?? collectedData.location ?? collectedData.address ?? resolveLocationValue(collectedData);
   const locationValue = formatLocationForDisplay(rawLocation);
-  const locationCoordinates = extractCoordinatesFromLocationValue(rawLocation, collectedData);
+  const locationCoordinates = extractCoordinatesFromLocationValue(
+    rawLocation,
+    collectedData,
+    procedureRequest?.metadata ?? procedureRequest?.camundaMetadata
+  );
   const canPreviewLocationMap = Boolean(locationCoordinates);
+  const locationPreviewReason = !rawLocation
+    ? "no_location_field_found"
+    : canPreviewLocationMap
+      ? "coordinates_resolved"
+      : "location_text_without_coordinates";
+  const locationSearchUrl = buildLocationSearchUrl(locationValue);
+  const imageActionLabel = canPreviewAttachment
+    ? "Ver imagen"
+    : rawAttachment
+      ? "Ver datos de imagen"
+      : "Sin imagen";
+  const locationActionLabel = canPreviewLocationMap
+    ? "Ver mapa"
+    : locationSearchUrl
+      ? "Buscar ubicación"
+      : "Ver ubicación registrada";
   const showQuickImageCard = Boolean(hasImageTypeConfigured || rawAttachment || hasPhotoProvided);
   const showQuickLocationCard = Boolean(hasLocationTypeConfigured || rawLocation || locationCoordinates);
   const quickPreviewCards = [
@@ -487,9 +614,9 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
           {
             id: "image",
             title: "Imagen",
-            canOpenModal: canPreviewAttachment,
+            canOpenModal: canPreviewAttachment || Boolean(rawAttachment),
             buttonLabel: "Ampliar",
-            placeholderText: "Imagen adjunta registrada",
+            placeholderText: buildImagePreviewReasonText(imagePreviewReason),
           },
         ]
       : []),
@@ -498,9 +625,11 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
           {
             id: "location",
             title: "Ubicación",
-            canOpenModal: canPreviewLocationMap,
+            canOpenModal: canPreviewLocationMap || Boolean(locationSearchUrl || locationValue),
             buttonLabel: "Ampliar",
-            placeholderText: "Ubicación registrada",
+            placeholderText: canPreviewLocationMap
+              ? "Ubicación registrada"
+              : "Ubicación registrada sin coordenadas para mapa.",
           },
         ]
       : []),
@@ -574,10 +703,22 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     claimAction,
     operationalActions,
     collectedData,
+    fieldDefinitions,
+    imageFields,
+    locationFields,
+    imageFieldKey,
+    locationFieldKey,
+    rawAttachment,
+    rawLocation,
     attachmentDisplay,
+    imagePreviewReason,
     attachmentSummaryText,
     locationValue,
     locationCoordinates,
+    locationPreviewReason,
+    locationSearchUrl,
+    imageActionLabel,
+    locationActionLabel,
     canPreviewAttachment,
     canPreviewLocationMap,
     showQuickImageCard,
@@ -685,7 +826,14 @@ function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariables
   });
 }
 
-function CaseQuickPreviewModal({ previewState, onClose }) {
+function CaseQuickPreviewModal({
+  previewState,
+  imageLoadError,
+  mapRenderError,
+  onImageLoadError,
+  onMapRenderError,
+  onClose,
+}) {
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -752,28 +900,102 @@ function CaseQuickPreviewModal({ previewState, onClose }) {
         </header>
         <div className="expediente-preview-modal__content">
           {previewState.type === "image" ? (
-            previewState.imageUrl ? (
+            previewState.imageUrl && !imageLoadError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewState.imageUrl}
                 alt={previewState.imageAlt || "Imagen adjunta del expediente"}
                 className="expediente-preview-modal__image"
+                onError={() => {
+                  onImageLoadError();
+                  if (IS_DEVELOPMENT) {
+                    console.warn("[quick-preview:image] image load error", {
+                      src: previewState.imageUrl,
+                      fieldKey: previewState.imageFieldKey || null,
+                      value: previewState.imageReference,
+                    });
+                  }
+                }}
               />
             ) : (
-              <p className="small">No hay vista previa disponible para esta imagen.</p>
+              <>
+                <p className="small">No se pudo cargar la imagen.</p>
+                {previewState.imageReference ? (
+                  <p className="small">
+                    Referencia técnica:{" "}
+                    <span className="admin-procedure-table__mono">{previewState.imageReference}</span>
+                  </p>
+                ) : null}
+              </>
             )
+          ) : previewState.type === "image_info" ? (
+            <>
+              <p className="small">Imagen registrada, pero no hay URL pública disponible para previsualizar.</p>
+              {previewState.imageReference ? (
+                <p className="small">
+                  Referencia técnica:{" "}
+                  <span className="admin-procedure-table__mono">{previewState.imageReference}</span>
+                </p>
+              ) : null}
+            </>
           ) : previewState.type === "map" ? (
             previewState.coordinates ? (
-              <div className="expediente-preview-modal__map">
-                <LocationMapPreview
-                  latitude={previewState.coordinates.lat}
-                  longitude={previewState.coordinates.lng}
-                  ariaLabel={previewState.mapAriaLabel || "Vista ampliada de ubicación del expediente"}
-                />
-              </div>
+              mapRenderError ? (
+                <p className="small">No se pudo renderizar el mapa con las coordenadas disponibles.</p>
+              ) : (
+                <div className="expediente-preview-modal__map">
+                  <MapRenderErrorBoundary
+                    resetKey={`${previewState.coordinates.lat}-${previewState.coordinates.lng}`}
+                    fallback={<p className="small">No se pudo renderizar el mapa con las coordenadas disponibles.</p>}
+                    onError={onMapRenderError}
+                  >
+                    <LocationMapPreview
+                      latitude={previewState.coordinates.lat}
+                      longitude={previewState.coordinates.lng}
+                      ariaLabel={previewState.mapAriaLabel || "Vista ampliada de ubicación del expediente"}
+                    />
+                  </MapRenderErrorBoundary>
+                </div>
+              )
             ) : (
               <p className="small">No hay coordenadas suficientes para mostrar el mapa.</p>
             )
+          ) : previewState.type === "location_text" ? (
+            <>
+              <p className="small">Ubicación registrada sin coordenadas para mapa.</p>
+              {previewState.locationText ? <p className="small">{previewState.locationText}</p> : null}
+              {previewState.locationSearchUrl ? (
+                <p className="small" style={{ marginTop: "0.5rem" }}>
+                  <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
+                    Buscar ubicación
+                  </a>
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          {previewState.type === "map" && mapRenderError && previewState.locationSearchUrl ? (
+            <p className="small" style={{ marginTop: "0.5rem" }}>
+              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
+                Buscar ubicación
+              </a>
+            </p>
+          ) : null}
+          {previewState.type === "map" && mapRenderError && IS_DEVELOPMENT ? (
+            <p className="small">
+              <span className="admin-procedure-table__mono">[quick-preview:location] map render error</span>
+            </p>
+          ) : null}
+          {previewState.type === "map" && !previewState.coordinates && previewState.locationSearchUrl ? (
+            <p className="small" style={{ marginTop: "0.5rem" }}>
+              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
+                Buscar ubicación
+              </a>
+            </p>
+          ) : null}
+          {previewState.type === "image_info" && IS_DEVELOPMENT ? (
+            <p className="small">
+              <span className="admin-procedure-table__mono">[quick-preview:image] filename found but public URL missing</span>
+            </p>
           ) : null}
         </div>
       </section>
@@ -815,7 +1037,15 @@ export default function FuncionarioExpedienteDetailPage() {
     imageAlt: "",
     coordinates: null,
     mapAriaLabel: "",
+    imageReference: "",
+    imageFieldKey: "",
+    locationText: "",
+    locationSearchUrl: "",
   });
+  const [quickImageLoadError, setQuickImageLoadError] = useState(false);
+  const [quickModalImageLoadError, setQuickModalImageLoadError] = useState(false);
+  const [quickMapRenderError, setQuickMapRenderError] = useState(false);
+  const [quickModalMapRenderError, setQuickModalMapRenderError] = useState(false);
   const quickPreviewTriggerRef = useRef(null);
 
   const isFuncionario = hasRole(user, "agente");
@@ -954,10 +1184,22 @@ export default function FuncionarioExpedienteDetailPage() {
     claimAction,
     operationalActions,
     collectedData,
+    fieldDefinitions,
+    imageFields,
+    locationFields,
+    imageFieldKey,
+    locationFieldKey,
+    rawAttachment,
+    rawLocation,
     attachmentDisplay,
+    imagePreviewReason,
     attachmentSummaryText,
     locationValue,
     locationCoordinates,
+    locationPreviewReason,
+    locationSearchUrl,
+    imageActionLabel,
+    locationActionLabel,
     canPreviewAttachment,
     canPreviewLocationMap,
     showQuickImageCard,
@@ -979,12 +1221,150 @@ export default function FuncionarioExpedienteDetailPage() {
     retrySyncAction,
   } = expedienteViewModel;
 
+  useEffect(() => {
+    if (!IS_DEVELOPMENT || !procedureRequestId) {
+      return;
+    }
+    console.groupCollapsed("[FuncionarioExpedienteDetail] quick preview diagnostics");
+    console.log("requestId", procedureRequestId);
+    console.log("fieldDefinitions", fieldDefinitions);
+    console.log("caseData", collectedData);
+    console.log("imageFields", imageFields);
+    console.log("locationFields", locationFields);
+    console.log("resolvedImagePreview", {
+      rawAttachment,
+      imageFieldKey,
+      display: attachmentDisplay,
+      canPreviewAttachment,
+    });
+    console.log("resolvedLocationPreview", {
+      rawLocation,
+      locationFieldKey,
+      locationValue,
+      locationCoordinates,
+      canPreviewLocationMap,
+      locationSearchUrl,
+    });
+    console.log("imagePreviewReason", imagePreviewReason);
+    console.log("locationPreviewReason", locationPreviewReason);
+    console.groupEnd();
+  }, [
+    attachmentDisplay,
+    canPreviewAttachment,
+    canPreviewLocationMap,
+    collectedData,
+    fieldDefinitions,
+    imageFields,
+    imageFieldKey,
+    imagePreviewReason,
+    locationCoordinates,
+    locationFields,
+    locationPreviewReason,
+    locationFieldKey,
+    locationSearchUrl,
+    locationValue,
+    procedureRequestId,
+    rawAttachment,
+    rawLocation,
+  ]);
+
+  useEffect(() => {
+    if (!IS_DEVELOPMENT) {
+      return;
+    }
+    if (!rawAttachment) {
+      console.warn("[quick-preview:image] no image field found");
+      return;
+    }
+    if (imagePreviewReason === "filename_without_public_url") {
+      console.warn("[quick-preview:image] filename found but public URL missing", {
+        rawAttachment,
+        fieldKey: imageFieldKey,
+        displayName: attachmentDisplay.label,
+      });
+      return;
+    }
+    if (imagePreviewReason === "unsupported_or_unresolved") {
+      console.warn("[quick-preview:image] unsupported or unresolved image reference", {
+        rawAttachment,
+        fieldKey: imageFieldKey,
+      });
+      return;
+    }
+    if (!canPreviewAttachment) {
+      console.warn("[quick-preview:image] image reference exists but no public URL could be resolved", {
+        rawAttachment,
+        fieldKey: imageFieldKey,
+      });
+    }
+  }, [attachmentDisplay.label, canPreviewAttachment, imageFieldKey, imagePreviewReason, rawAttachment]);
+
+  useEffect(() => {
+    if (!IS_DEVELOPMENT) {
+      return;
+    }
+    if (!rawLocation) {
+      console.warn("[quick-preview:location] no location field found");
+      return;
+    }
+    if (locationCoordinates) {
+      console.log("[quick-preview:location] coordinates resolved", locationCoordinates);
+      return;
+    }
+    console.warn("[quick-preview:location] location text found but coordinates missing", {
+      rawLocation,
+      locationValue,
+    });
+    console.warn("[quick-preview:location] map render skipped because coordinates are missing");
+  }, [locationCoordinates, locationValue, rawLocation]);
+
+  useEffect(() => {
+    if (!IS_DEVELOPMENT || !quickPreviewModal?.isOpen) {
+      return;
+    }
+    if (quickPreviewModal.type === "image" && !quickPreviewModal.imageUrl) {
+      console.warn("[quick-preview:image] modal opened with incomplete image data", quickPreviewModal);
+    }
+    if (quickPreviewModal.type === "map" && !quickPreviewModal.coordinates) {
+      console.warn("[quick-preview:location] modal opened with incomplete map data", quickPreviewModal);
+    }
+  }, [quickPreviewModal]);
+
+  useEffect(() => {
+    setQuickImageLoadError(false);
+  }, [attachmentDisplay.url]);
+
+  useEffect(() => {
+    setQuickMapRenderError(false);
+  }, [locationCoordinates?.lat, locationCoordinates?.lng]);
+
+  useEffect(() => {
+    if (!quickPreviewModal?.isOpen) {
+      setQuickModalImageLoadError(false);
+      setQuickModalMapRenderError(false);
+    }
+  }, [quickPreviewModal?.isOpen]);
+
   const handleRetryCamundaSync = () => {
     if (!retrySyncAction || isRetrySyncLoading) {
       return;
     }
     void runAction(retrySyncAction);
   };
+
+  const handleQuickMapRenderError = useCallback((error) => {
+    setQuickMapRenderError(true);
+    if (IS_DEVELOPMENT) {
+      console.warn("[quick-preview:location] map render error", error);
+    }
+  }, []);
+
+  const handleQuickModalMapRenderError = useCallback((error) => {
+    setQuickModalMapRenderError(true);
+    if (IS_DEVELOPMENT) {
+      console.warn("[quick-preview:location] map render error", error);
+    }
+  }, []);
 
   const openQuickPreview = (event, previewType) => {
     if (event?.currentTarget instanceof HTMLElement) {
@@ -993,32 +1373,42 @@ export default function FuncionarioExpedienteDetailPage() {
       quickPreviewTriggerRef.current = null;
     }
     if (previewType === "image") {
-      if (!canPreviewAttachment || !attachmentDisplay.url) {
+      if (!rawAttachment) {
         return;
       }
+      const modalType = canPreviewAttachment && attachmentDisplay.url ? "image" : "image_info";
       setQuickPreviewModal({
         isOpen: true,
-        type: "image",
+        type: modalType,
         title: "Imagen adjunta",
-        imageUrl: attachmentDisplay.url,
+        imageUrl: attachmentDisplay.url || "",
         imageAlt: attachmentSummaryText || "Imagen adjunta del expediente",
         coordinates: null,
         mapAriaLabel: "",
+        imageReference: attachmentDisplay.label || String(rawAttachment || "").trim(),
+        imageFieldKey: imageFieldKey || "",
+        locationText: "",
+        locationSearchUrl: "",
       });
       return;
     }
     if (previewType === "location") {
-      if (!canPreviewLocationMap || !locationCoordinates) {
+      if (!locationValue && !locationSearchUrl && !locationCoordinates) {
         return;
       }
+      const modalType = canPreviewLocationMap && locationCoordinates ? "map" : "location_text";
       setQuickPreviewModal({
         isOpen: true,
-        type: "map",
+        type: modalType,
         title: "Ubicación en mapa",
         imageUrl: "",
         imageAlt: "",
         coordinates: locationCoordinates,
         mapAriaLabel: locationValue || "Vista de ubicación registrada",
+        imageReference: "",
+        imageFieldKey: "",
+        locationText: locationValue || "",
+        locationSearchUrl: locationSearchUrl || "",
       });
     }
   };
@@ -1032,6 +1422,10 @@ export default function FuncionarioExpedienteDetailPage() {
       imageAlt: "",
       coordinates: null,
       mapAriaLabel: "",
+      imageReference: "",
+      imageFieldKey: "",
+      locationText: "",
+      locationSearchUrl: "",
     });
     if (quickPreviewTriggerRef.current instanceof HTMLElement) {
       quickPreviewTriggerRef.current.focus();
@@ -1214,14 +1608,16 @@ export default function FuncionarioExpedienteDetailPage() {
                         type="button"
                         className="button-inline button-inline--compact"
                         onClick={(event) => openQuickPreview(event, "location")}
-                        disabled={!canPreviewLocationMap}
+                        disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
                         title={
                           canPreviewLocationMap
                             ? "Ver mapa"
-                            : "Ubicación registrada sin coordenadas para mapa"
+                            : locationSearchUrl
+                              ? "Buscar ubicación textual"
+                              : "Ubicación registrada sin coordenadas para mapa"
                         }
                       >
-                        Ver mapa
+                        {locationActionLabel}
                       </button>
                     </>
                   ) : null}
@@ -1235,10 +1631,10 @@ export default function FuncionarioExpedienteDetailPage() {
                         type="button"
                         className="button-inline button-inline--compact"
                         onClick={(event) => openQuickPreview(event, "image")}
-                        disabled={!canPreviewAttachment}
-                        title={canPreviewAttachment ? "Ver imagen" : "Imagen registrada sin vista previa"}
+                        disabled={!rawAttachment}
+                        title={canPreviewAttachment ? "Ver imagen" : "Ver datos de imagen registrada"}
                       >
-                        Ver imagen
+                        {imageActionLabel}
                       </button>
                     </>
                   ) : null}
@@ -1257,7 +1653,7 @@ export default function FuncionarioExpedienteDetailPage() {
                     {showQuickImageCard ? (
                       <article className="expediente-summary-card">
                         <p className="small expediente-summary-card__title">Imagen</p>
-                        {canPreviewAttachment && attachmentDisplay.url ? (
+                        {canPreviewAttachment && attachmentDisplay.url && !quickImageLoadError ? (
                           <button
                             type="button"
                             className="expediente-summary-card__preview-button"
@@ -1269,20 +1665,39 @@ export default function FuncionarioExpedienteDetailPage() {
                               src={attachmentDisplay.url}
                               alt={attachmentSummaryText || "Imagen adjunta"}
                               className="expediente-summary-card__image"
+                              onError={() => {
+                                setQuickImageLoadError(true);
+                                if (IS_DEVELOPMENT) {
+                                  console.warn("[quick-preview:image] image load error", {
+                                    src: attachmentDisplay.url,
+                                    fieldKey: imageFieldKey,
+                                    value: rawAttachment,
+                                  });
+                                }
+                              }}
                             />
                           </button>
                         ) : (
                           <div className="expediente-summary-card__placeholder">
-                            <p className="small">Imagen adjunta registrada</p>
+                            <p className="small">
+                              {quickImageLoadError
+                                ? "No se pudo cargar la imagen"
+                                : buildImagePreviewReasonText(imagePreviewReason)}
+                            </p>
+                            {attachmentDisplay.label ? (
+                              <p className="small">
+                                <span className="admin-procedure-table__mono">{attachmentDisplay.label}</span>
+                              </p>
+                            ) : null}
                           </div>
                         )}
                         <button
                           type="button"
                           className="button-inline button-inline--compact"
                           onClick={(event) => openQuickPreview(event, "image")}
-                          disabled={!canPreviewAttachment}
+                          disabled={!rawAttachment}
                         >
-                          Ampliar
+                          {canPreviewAttachment ? "Ampliar" : "Ver datos"}
                         </button>
                       </article>
                     ) : null}
@@ -1290,31 +1705,41 @@ export default function FuncionarioExpedienteDetailPage() {
                     {showQuickLocationCard ? (
                       <article className="expediente-summary-card">
                         <p className="small expediente-summary-card__title">Ubicación</p>
-                        {canPreviewLocationMap && locationCoordinates ? (
+                        {canPreviewLocationMap && locationCoordinates && !quickMapRenderError ? (
                           <button
                             type="button"
                             className="expediente-summary-card__preview-button"
                             onClick={(event) => openQuickPreview(event, "location")}
                             aria-label="Ver mapa ampliado de ubicación"
                           >
-                            <LocationMapPreview
-                              latitude={locationCoordinates.lat}
-                              longitude={locationCoordinates.lng}
-                              ariaLabel={locationValue || "Vista rápida de ubicación"}
-                            />
+                            <MapRenderErrorBoundary
+                              resetKey={`${locationCoordinates.lat}-${locationCoordinates.lng}`}
+                              fallback={<p className="small">No se pudo renderizar el mapa.</p>}
+                              onError={handleQuickMapRenderError}
+                            >
+                              <LocationMapPreview
+                                latitude={locationCoordinates.lat}
+                                longitude={locationCoordinates.lng}
+                                ariaLabel={locationValue || "Vista rápida de ubicación"}
+                              />
+                            </MapRenderErrorBoundary>
                           </button>
                         ) : (
                           <div className="expediente-summary-card__placeholder">
-                            <p className="small">Ubicación registrada</p>
+                            <p className="small">
+                              {quickMapRenderError
+                                ? "No se pudo renderizar el mapa con las coordenadas disponibles."
+                                : "Ubicación registrada sin coordenadas para mapa."}
+                            </p>
                           </div>
                         )}
                         <button
                           type="button"
                           className="button-inline button-inline--compact"
                           onClick={(event) => openQuickPreview(event, "location")}
-                          disabled={!canPreviewLocationMap}
+                          disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
                         >
-                          Ampliar
+                          {canPreviewLocationMap ? "Ampliar" : locationSearchUrl ? "Buscar ubicación" : "Ver datos"}
                         </button>
                       </article>
                     ) : null}
@@ -1503,7 +1928,14 @@ export default function FuncionarioExpedienteDetailPage() {
         </section>
       ) : null}
 
-      <CaseQuickPreviewModal previewState={quickPreviewModal} onClose={closeQuickPreview} />
+      <CaseQuickPreviewModal
+        previewState={quickPreviewModal}
+        imageLoadError={quickModalImageLoadError}
+        mapRenderError={quickModalMapRenderError}
+        onImageLoadError={() => setQuickModalImageLoadError(true)}
+        onMapRenderError={handleQuickModalMapRenderError}
+        onClose={closeQuickPreview}
+      />
 
       {isDeleteConfirmOpen && procedureRequest ? (
         <div
