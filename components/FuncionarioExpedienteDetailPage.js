@@ -366,7 +366,13 @@ function buildImagePreviewReasonText(previewReason) {
 }
 
 function buildLocationSearchUrl(value) {
-  const query = String(value || "").trim();
+  const rawQuery = String(value || "").trim();
+  const query = rawQuery
+    // Remove UI/system prefixes that are useful for chat history but noisy for map search.
+    .replace(/^ubicaci[oó]n\s+confirmada\s*[·:|-]\s*/i, "")
+    .replace(/^location\s+confirmed\s*[·:|-]\s*/i, "")
+    .replace(/^localiza[cç][aã]o\s+confirmada\s*[·:|-]\s*/i, "")
+    .trim();
   if (!query) {
     return "";
   }
