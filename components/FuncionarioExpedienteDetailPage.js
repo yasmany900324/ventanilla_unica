@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
+import LocationMapPreview from "./LocationMapPreview";
 import { normalizeImageReference } from "../lib/imageReference";
 
 const LOCAL_STATUS_LABELS = {
@@ -152,14 +154,78 @@ function getProcedureFieldDefinitions(detail) {
   return fromType.filter((field) => field && typeof field === "object");
 }
 
-function resolveTypedFieldValue(collectedData, fieldDefinitions, expectedType) {
-  const candidate = fieldDefinitions.find(
-    (field) => String(field?.type || "").trim().toLowerCase() === expectedType
-  );
+function normalizeFieldType(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isImageFieldType(type) {
+  const normalized = normalizeFieldType(type);
+  return normalized === "image" || normalized === "photo";
+}
+
+function isLocationFieldType(type) {
+  return normalizeFieldType(type) === "location";
+}
+
+function resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, matcher) {
+  const candidate = fieldDefinitions.find((field) => matcher(field?.type));
   if (!candidate?.key) {
     return null;
   }
   return collectedData?.[candidate.key] ?? null;
+}
+
+function parseCoordinatesCandidate(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return null;
+  }
+  return { lat, lng };
+}
+
+function extractCoordinatesFromLocationText(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+  const coordPair = text.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+  if (coordPair) {
+    return parseCoordinatesCandidate(coordPair[1], coordPair[2]);
+  }
+  const latLonRegex =
+    /lat(?:itud|itude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)[\s,;/|-]*lon(?:gitud|gitude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i;
+  const latLonMatch = text.match(latLonRegex);
+  if (latLonMatch) {
+    return parseCoordinatesCandidate(latLonMatch[1], latLonMatch[2]);
+  }
+  return null;
+}
+
+function extractCoordinatesFromLocationValue(rawLocation, collectedData) {
+  if (rawLocation && typeof rawLocation === "object") {
+    const fromObject = parseCoordinatesCandidate(
+      rawLocation.latitude ?? rawLocation.lat ?? rawLocation?.coords?.latitude,
+      rawLocation.longitude ?? rawLocation.lng ?? rawLocation.lon ?? rawLocation?.coords?.longitude
+    );
+    if (fromObject) {
+      return fromObject;
+    }
+    if (Array.isArray(rawLocation.coordinates) && rawLocation.coordinates.length >= 2) {
+      const fromCoordinates = parseCoordinatesCandidate(rawLocation.coordinates[1], rawLocation.coordinates[0]);
+      if (fromCoordinates) {
+        return fromCoordinates;
+      }
+    }
+  }
+  const fromText = extractCoordinatesFromLocationText(rawLocation);
+  if (fromText) {
+    return fromText;
+  }
+  return parseCoordinatesCandidate(collectedData?.locationLatitude, collectedData?.locationLongitude);
 }
 
 function resolveLocationValue(collectedData) {
@@ -386,12 +452,13 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
 
   const collectedData = procedureRequest?.collectedData || {};
   const fieldDefinitions = getProcedureFieldDefinitions(detail);
-  const typedLocation = resolveTypedFieldValue(collectedData, fieldDefinitions, "location");
-  const typedAttachment =
-    resolveTypedFieldValue(collectedData, fieldDefinitions, "image") ||
-    resolveTypedFieldValue(collectedData, fieldDefinitions, "file");
+  const hasImageTypeConfigured = fieldDefinitions.some((field) => isImageFieldType(field?.type));
+  const hasLocationTypeConfigured = fieldDefinitions.some((field) => isLocationFieldType(field?.type));
+  const typedLocation = resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, isLocationFieldType);
+  const typedAttachment = resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, isImageFieldType);
   const rawAttachment = typedAttachment ?? resolveAttachmentValue(collectedData);
   const attachmentDisplay = formatAttachmentForDisplay(rawAttachment);
+  const canPreviewAttachment = Boolean(attachmentDisplay.url && attachmentDisplay.isValid);
   const hasPhotoProvided = String(collectedData?.photoStatus || "").trim().toLowerCase() === "provided";
   const hasPhotoSkipped = ["skipped", "not_requested"].includes(
     String(collectedData?.photoStatus || "").trim().toLowerCase()
@@ -405,7 +472,37 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
         : rawAttachment
           ? "Formato inválido"
           : "No se adjuntó imagen";
-  const locationValue = formatLocationForDisplay(typedLocation ?? resolveLocationValue(collectedData));
+  const rawLocation =
+    typedLocation ?? collectedData.location ?? collectedData.address ?? resolveLocationValue(collectedData);
+  const locationValue = formatLocationForDisplay(rawLocation);
+  const locationCoordinates = extractCoordinatesFromLocationValue(rawLocation, collectedData);
+  const canPreviewLocationMap = Boolean(locationCoordinates);
+  const showQuickImageCard = Boolean(hasImageTypeConfigured || rawAttachment || hasPhotoProvided);
+  const showQuickLocationCard = Boolean(hasLocationTypeConfigured || rawLocation || locationCoordinates);
+  const quickPreviewCards = [
+    ...(showQuickImageCard
+      ? [
+          {
+            id: "image",
+            title: "Imagen",
+            canOpenModal: canPreviewAttachment,
+            buttonLabel: "Ampliar",
+            placeholderText: "Imagen adjunta registrada",
+          },
+        ]
+      : []),
+    ...(showQuickLocationCard
+      ? [
+          {
+            id: "location",
+            title: "Ubicación",
+            canOpenModal: canPreviewLocationMap,
+            buttonLabel: "Ampliar",
+            placeholderText: "Ubicación registrada",
+          },
+        ]
+      : []),
+  ];
   const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
   const contactEmail = resolveContactEmail(procedureRequest, collectedData);
   const activeTaskLabel =
@@ -478,6 +575,12 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     attachmentDisplay,
     attachmentSummaryText,
     locationValue,
+    locationCoordinates,
+    canPreviewAttachment,
+    canPreviewLocationMap,
+    showQuickImageCard,
+    showQuickLocationCard,
+    quickPreviewCards,
     caseDescription,
     contactEmail,
     activeTaskDescription,
@@ -580,6 +683,103 @@ function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariables
   });
 }
 
+function CaseQuickPreviewModal({ previewState, onClose }) {
+  const closeButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (!previewState?.isOpen) {
+      return undefined;
+    }
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose, previewState?.isOpen]);
+
+  useEffect(() => {
+    if (!previewState?.isOpen || !closeButtonRef.current) {
+      return;
+    }
+    closeButtonRef.current.focus();
+  }, [previewState?.isOpen]);
+
+  useEffect(() => {
+    if (!previewState?.isOpen || typeof document === "undefined") {
+      return undefined;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewState?.isOpen]);
+
+  if (!previewState?.isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="admin-roles-confirm-dialog expediente-preview-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="expediente-preview-modal-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="admin-roles-confirm-dialog__panel expediente-preview-modal__panel">
+        <header className="admin-roles-confirm-dialog__header expediente-preview-modal__header">
+          <h2 id="expediente-preview-modal-title" className="admin-roles-confirm-dialog__title">
+            {previewState.title}
+          </h2>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="admin-roles-confirm-dialog__button admin-roles-confirm-dialog__button--ghost"
+            onClick={onClose}
+          >
+            Cerrar
+          </button>
+        </header>
+        <div className="expediente-preview-modal__content">
+          {previewState.type === "image" ? (
+            previewState.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewState.imageUrl}
+                alt={previewState.imageAlt || "Imagen adjunta del expediente"}
+                className="expediente-preview-modal__image"
+              />
+            ) : (
+              <p className="small">No hay vista previa disponible para esta imagen.</p>
+            )
+          ) : previewState.type === "map" ? (
+            previewState.coordinates ? (
+              <div className="expediente-preview-modal__map">
+                <LocationMapPreview
+                  latitude={previewState.coordinates.lat}
+                  longitude={previewState.coordinates.lng}
+                  ariaLabel={previewState.mapAriaLabel || "Vista ampliada de ubicación del expediente"}
+                />
+              </div>
+            ) : (
+              <p className="small">No hay coordenadas suficientes para mostrar el mapa.</p>
+            )
+          ) : null}
+        </div>
+      </section>
+    </div>,
+    document.body
+  );
+}
+
 export default function FuncionarioExpedienteDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -605,6 +805,16 @@ export default function FuncionarioExpedienteDetailPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteTechnicalDetail, setDeleteTechnicalDetail] = useState("");
+  const [quickPreviewModal, setQuickPreviewModal] = useState({
+    isOpen: false,
+    type: null,
+    title: "",
+    imageUrl: "",
+    imageAlt: "",
+    coordinates: null,
+    mapAriaLabel: "",
+  });
+  const quickPreviewTriggerRef = useRef(null);
 
   const isFuncionario = hasRole(user, "agente");
   const isAdmin = hasRole(user, "administrador");
@@ -745,6 +955,12 @@ export default function FuncionarioExpedienteDetailPage() {
     attachmentDisplay,
     attachmentSummaryText,
     locationValue,
+    locationCoordinates,
+    canPreviewAttachment,
+    canPreviewLocationMap,
+    showQuickImageCard,
+    showQuickLocationCard,
+    quickPreviewCards,
     caseDescription,
     contactEmail,
     activeTaskDescription,
@@ -767,6 +983,58 @@ export default function FuncionarioExpedienteDetailPage() {
     }
     void runAction(retrySyncAction);
   };
+
+  const openQuickPreview = (event, previewType) => {
+    if (event?.currentTarget instanceof HTMLElement) {
+      quickPreviewTriggerRef.current = event.currentTarget;
+    } else {
+      quickPreviewTriggerRef.current = null;
+    }
+    if (previewType === "image") {
+      if (!canPreviewAttachment || !attachmentDisplay.url) {
+        return;
+      }
+      setQuickPreviewModal({
+        isOpen: true,
+        type: "image",
+        title: "Imagen adjunta",
+        imageUrl: attachmentDisplay.url,
+        imageAlt: attachmentSummaryText || "Imagen adjunta del expediente",
+        coordinates: null,
+        mapAriaLabel: "",
+      });
+      return;
+    }
+    if (previewType === "location") {
+      if (!canPreviewLocationMap || !locationCoordinates) {
+        return;
+      }
+      setQuickPreviewModal({
+        isOpen: true,
+        type: "map",
+        title: "Ubicación en mapa",
+        imageUrl: "",
+        imageAlt: "",
+        coordinates: locationCoordinates,
+        mapAriaLabel: locationValue || "Vista de ubicación registrada",
+      });
+    }
+  };
+
+  const closeQuickPreview = useCallback(() => {
+    setQuickPreviewModal({
+      isOpen: false,
+      type: null,
+      title: "",
+      imageUrl: "",
+      imageAlt: "",
+      coordinates: null,
+      mapAriaLabel: "",
+    });
+    if (quickPreviewTriggerRef.current instanceof HTMLElement) {
+      quickPreviewTriggerRef.current.focus();
+    }
+  }, []);
 
   const handleDeleteExpediente = async () => {
     if (!procedureRequest?.id || deleteLoading) {
@@ -926,35 +1194,134 @@ export default function FuncionarioExpedienteDetailPage() {
 
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Resumen del caso</h3>
-            <p className="small">
-              <strong>Tipo de procedimiento:</strong>{" "}
-              {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}
-            </p>
-            <p className="small">
-              <strong>Descripción:</strong> {caseDescription || "Sin descripción informada."}
-            </p>
-            <p className="small">
-              <strong>Ubicación:</strong> {locationValue || "No informada"}
-            </p>
-            <p className="small">
-              <strong>Imagen adjunta:</strong>{" "}
-              {attachmentDisplay.url && attachmentDisplay.isValid ? (
-                <>
-                  {attachmentSummaryText} ·{" "}
-                  <a href={attachmentDisplay.url} target="_blank" rel="noopener noreferrer">
-                    Ver imagen
-                  </a>
-                </>
-              ) : (
-                attachmentSummaryText
-              )}
-            </p>
-            <p className="small">
-              <strong>Canal de origen:</strong> {procedureRequest.channel || "-"}
-            </p>
-            <p className="small">
-              <strong>Fecha de creación:</strong> {formatDateTime(procedureRequest.createdAt, locale)}
-            </p>
+            <div className="expediente-summary-layout">
+              <div className="expediente-summary-layout__main">
+                <p className="small">
+                  <strong>Tipo de procedimiento:</strong>{" "}
+                  {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}
+                </p>
+                <p className="small">
+                  <strong>Descripción:</strong> {caseDescription || "Sin descripción informada."}
+                </p>
+                <p className="small">
+                  <strong>Ubicación:</strong> {locationValue || "No informada"}
+                  {showQuickLocationCard ? (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="button-inline button-inline--compact"
+                        onClick={(event) => openQuickPreview(event, "location")}
+                        disabled={!canPreviewLocationMap}
+                        title={
+                          canPreviewLocationMap
+                            ? "Ver mapa"
+                            : "Ubicación registrada sin coordenadas para mapa"
+                        }
+                      >
+                        Ver mapa
+                      </button>
+                    </>
+                  ) : null}
+                </p>
+                <p className="small">
+                  <strong>Imagen adjunta:</strong> {attachmentSummaryText}
+                  {showQuickImageCard ? (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="button-inline button-inline--compact"
+                        onClick={(event) => openQuickPreview(event, "image")}
+                        disabled={!canPreviewAttachment}
+                        title={canPreviewAttachment ? "Ver imagen" : "Imagen registrada sin vista previa"}
+                      >
+                        Ver imagen
+                      </button>
+                    </>
+                  ) : null}
+                </p>
+                <p className="small">
+                  <strong>Canal de origen:</strong> {procedureRequest.channel || "-"}
+                </p>
+                <p className="small">
+                  <strong>Fecha de creación:</strong> {formatDateTime(procedureRequest.createdAt, locale)}
+                </p>
+              </div>
+              <aside className="expediente-summary-layout__quick">
+                <h4>Vista rápida</h4>
+                {quickPreviewCards.length ? (
+                  <div className="expediente-summary-layout__quick-list">
+                    {showQuickImageCard ? (
+                      <article className="expediente-summary-card">
+                        <p className="small expediente-summary-card__title">Imagen</p>
+                        {canPreviewAttachment && attachmentDisplay.url ? (
+                          <button
+                            type="button"
+                            className="expediente-summary-card__preview-button"
+                            onClick={(event) => openQuickPreview(event, "image")}
+                            aria-label="Ver imagen adjunta ampliada"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={attachmentDisplay.url}
+                              alt={attachmentSummaryText || "Imagen adjunta"}
+                              className="expediente-summary-card__image"
+                            />
+                          </button>
+                        ) : (
+                          <div className="expediente-summary-card__placeholder">
+                            <p className="small">Imagen adjunta registrada</p>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="button-inline button-inline--compact"
+                          onClick={(event) => openQuickPreview(event, "image")}
+                          disabled={!canPreviewAttachment}
+                        >
+                          Ampliar
+                        </button>
+                      </article>
+                    ) : null}
+
+                    {showQuickLocationCard ? (
+                      <article className="expediente-summary-card">
+                        <p className="small expediente-summary-card__title">Ubicación</p>
+                        {canPreviewLocationMap && locationCoordinates ? (
+                          <button
+                            type="button"
+                            className="expediente-summary-card__preview-button"
+                            onClick={(event) => openQuickPreview(event, "location")}
+                            aria-label="Ver mapa ampliado de ubicación"
+                          >
+                            <LocationMapPreview
+                              latitude={locationCoordinates.lat}
+                              longitude={locationCoordinates.lng}
+                              ariaLabel={locationValue || "Vista rápida de ubicación"}
+                            />
+                          </button>
+                        ) : (
+                          <div className="expediente-summary-card__placeholder">
+                            <p className="small">Ubicación registrada</p>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="button-inline button-inline--compact"
+                          onClick={(event) => openQuickPreview(event, "location")}
+                          disabled={!canPreviewLocationMap}
+                        >
+                          Ampliar
+                        </button>
+                      </article>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="small">No hay adjuntos o ubicaciones para vista rápida.</p>
+                )}
+              </aside>
+            </div>
           </section>
 
           <section className="card dashboard-section admin-procedure-fields">
@@ -1133,6 +1500,8 @@ export default function FuncionarioExpedienteDetailPage() {
           </details>
         </section>
       ) : null}
+
+      <CaseQuickPreviewModal previewState={quickPreviewModal} onClose={closeQuickPreview} />
 
       {isDeleteConfirmOpen && procedureRequest ? (
         <div

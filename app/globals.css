@@ -2998,6 +2998,11 @@ button:disabled {
   background: #1e40af;
 }
 
+.button-inline--compact {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+}
+
 .button-link--compact {
   width: auto;
   padding: 0.45rem 0.8rem;
@@ -3321,6 +3326,92 @@ button:disabled {
   gap: 0.42rem 0.55rem;
 }
 
+.expediente-summary-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.expediente-summary-layout__main {
+  min-width: 0;
+}
+
+.expediente-summary-layout__quick {
+  border: 1px solid #d6e1f1;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.expediente-summary-layout__quick h4 {
+  margin: 0;
+  color: #1d3f78;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.expediente-summary-layout__quick-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.expediente-summary-card {
+  border: 1px solid #d4e0f1;
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 0.52rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.expediente-summary-card__title {
+  margin: 0;
+  font-weight: 700;
+  color: #1f3559;
+}
+
+.expediente-summary-card__preview-button {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.expediente-summary-card__preview-button:focus-visible {
+  outline: 2px solid #2b6ccf;
+  outline-offset: 2px;
+}
+
+.expediente-summary-card__image {
+  display: block;
+  width: 100%;
+  height: 136px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #d3def0;
+  background: #eef4ff;
+}
+
+.expediente-summary-card__placeholder {
+  min-height: 108px;
+  border: 1px dashed #b7cae4;
+  border-radius: 10px;
+  background: #f6f9ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.6rem;
+}
+
 .admin-procedure-channels {
   display: flex;
   flex-wrap: wrap;
@@ -3496,6 +3587,10 @@ button:disabled {
   }
 
   .admin-assignments-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .expediente-summary-layout {
     grid-template-columns: 1fr;
   }
 
@@ -5025,6 +5120,37 @@ button:disabled {
 .admin-roles-confirm-dialog__button:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.expediente-preview-modal__panel {
+  width: min(100%, 880px);
+  max-height: min(92vh, 760px);
+}
+
+.expediente-preview-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.expediente-preview-modal__content {
+  min-height: 200px;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.expediente-preview-modal__image {
+  width: 100%;
+  max-height: min(72vh, 620px);
+  object-fit: contain;
+  border: 1px solid #cddcf1;
+  border-radius: 12px;
+  background: #f6f9ff;
+}
+
+.expediente-preview-modal__map .assistant-location-preview-map {
+  height: min(70vh, 560px);
 }
 
 @media (max-width: 520px) {
