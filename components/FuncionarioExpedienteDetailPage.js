@@ -371,6 +371,130 @@ function buildFallbackRetryCamundaSyncAction(procedureRequestId, displayLabel) {
   };
 }
 
+/** Pure view-model for expediente detail; keeps SSR/minifier from reordering TDZ-prone const chains in the component. */
+function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, actionLoadingKey, isAdmin) {
+  const availableActions = Array.isArray(detail?.availableActions) ? detail.availableActions : [];
+  const procedureRequest = detail?.procedureRequest || null;
+  const isAvailable = procedureRequest?.assignmentScope === "available";
+  const isAssignedToMe = procedureRequest?.assignmentScope === "assigned_to_me";
+  const claimAction = availableActions.find((action) => action?.actionKey === "claim_task") || null;
+  const retrySyncActionFromApi =
+    availableActions.find((action) => action?.actionKey === "retry_camunda_sync") || null;
+  const operationalActions = isAvailable
+    ? availableActions.filter((action) => action?.actionKey !== "claim_task")
+    : availableActions.filter((action) => action?.actionKey !== "retry_camunda_sync");
+
+  const collectedData = procedureRequest?.collectedData || {};
+  const fieldDefinitions = getProcedureFieldDefinitions(detail);
+  const typedLocation = resolveTypedFieldValue(collectedData, fieldDefinitions, "location");
+  const typedAttachment =
+    resolveTypedFieldValue(collectedData, fieldDefinitions, "image") ||
+    resolveTypedFieldValue(collectedData, fieldDefinitions, "file");
+  const rawAttachment = typedAttachment ?? resolveAttachmentValue(collectedData);
+  const attachmentDisplay = formatAttachmentForDisplay(rawAttachment);
+  const hasPhotoProvided = String(collectedData?.photoStatus || "").trim().toLowerCase() === "provided";
+  const hasPhotoSkipped = ["skipped", "not_requested"].includes(
+    String(collectedData?.photoStatus || "").trim().toLowerCase()
+  );
+  const attachmentSummaryText = hasPhotoSkipped
+    ? "No se adjuntó imagen"
+    : attachmentDisplay.isValid
+      ? attachmentDisplay.label || "Sí"
+      : hasPhotoProvided && rawAttachment
+        ? attachmentDisplay.label || String(rawAttachment || "").trim() || "Imagen adjunta registrada"
+        : rawAttachment
+          ? "Formato inválido"
+          : "No se adjuntó imagen";
+  const locationValue = formatLocationForDisplay(typedLocation ?? resolveLocationValue(collectedData));
+  const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
+  const contactEmail = resolveContactEmail(procedureRequest, collectedData);
+  const activeTaskLabel =
+    detail?.activeTaskDisplay?.title ||
+    detail?.activeTask?.taskDefinitionName ||
+    humanizeTaskKey(detail?.activeTask?.taskDefinitionKey);
+  const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
+  const trackingCode = procedureRequest?.requestCode || null;
+  const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
+  const camundaStatusLabel =
+    procedureRequest?.camundaStatusLabel || getCamundaStatusLabel(camundaStatusKey);
+  const canManageDeletion = Boolean(procedureRequest && (isAssignedToMe || isAdmin));
+  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
+  const isInitialCamundaSyncPending = Boolean(
+    isPendingCamundaSyncStatus(procedureRequest?.status) && !procedureRequest?.camundaProcessInstanceKey
+  );
+  const requiresCamundaRetry = computeRequiresCamundaRetry({
+    procedureRequest,
+    camundaStatusKey,
+    camundaStatusLabel,
+    hasActiveTask,
+    isAvailable,
+  });
+  const retrySyncAction =
+    retrySyncActionFromApi ||
+    (!isAvailable && (requiresCamundaRetry || isInitialCamundaSyncPending)
+      ? buildFallbackRetryCamundaSyncAction(
+          procedureRequestId,
+          requiresCamundaRetry ? "Reintentar sincronización" : "Sincronizar con Camunda"
+        )
+      : null);
+  const showCamundaSyncAlert = Boolean(
+    !isAvailable && retrySyncAction && (requiresCamundaRetry || isInitialCamundaSyncPending)
+  );
+  const syncPrimaryButtonLabel =
+    isInitialCamundaSyncPending && !requiresCamundaRetry
+      ? "Sincronizar con Camunda"
+      : "Reintentar sincronización con Camunda";
+  const syncSecondaryButtonLabel =
+    isInitialCamundaSyncPending && !requiresCamundaRetry
+      ? "Sincronizar con Camunda"
+      : "Reintentar sincronización";
+  const retrySyncLoadingKey = retrySyncAction
+    ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
+    : "";
+  const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
+  const operationalSituation = buildOperationalSituation({
+    procedureRequest,
+    camundaStatusKey,
+    hasActiveTask,
+    requiresCamundaRetry,
+    isInitialCamundaSyncPending,
+  });
+  const responsibleLabel = procedureRequest?.assignedToUserId
+    ? "Funcionario asignado"
+    : "Sin funcionario asignado";
+  const relationLabel =
+    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
+      ? "No asignado a mi bandeja"
+      : getAssignmentScopeLabel(procedureRequest);
+  const activeTaskOperationalLabel =
+    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+
+  return {
+    procedureRequest,
+    isAvailable,
+    claimAction,
+    operationalActions,
+    collectedData,
+    attachmentDisplay,
+    attachmentSummaryText,
+    locationValue,
+    caseDescription,
+    contactEmail,
+    activeTaskDescription,
+    trackingCode,
+    canManageDeletion,
+    showCamundaSyncAlert,
+    syncPrimaryButtonLabel,
+    syncSecondaryButtonLabel,
+    isRetrySyncLoading,
+    operationalSituation,
+    responsibleLabel,
+    relationLabel,
+    activeTaskOperationalLabel,
+    retrySyncAction,
+  };
+}
+
 function ProcedureFieldVariables({ requiredVariables }) {
   if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
     return null;
@@ -545,21 +669,10 @@ export default function FuncionarioExpedienteDetailPage() {
     loadDetail(procedureRequestId);
   }, [isBackofficeManager, isLoadingAuth, loadDetail, procedureRequestId, user]);
 
-  const availableActions = useMemo(
-    () => (Array.isArray(detail?.availableActions) ? detail.availableActions : []),
-    [detail?.availableActions]
+  const expedienteViewModel = useMemo(
+    () => buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, actionLoadingKey, isAdmin),
+    [actionLoadingKey, detail, isAdmin, procedureRequestId]
   );
-
-  const procedureRequest = detail?.procedureRequest || null;
-  const isAvailable = procedureRequest?.assignmentScope === "available";
-  const isAssignedToMe = procedureRequest?.assignmentScope === "assigned_to_me";
-  const claimAction = availableActions.find((action) => action?.actionKey === "claim_task") || null;
-  const retrySyncActionFromApi =
-    availableActions.find((action) => action?.actionKey === "retry_camunda_sync") || null;
-
-  const operationalActions = isAvailable
-    ? availableActions.filter((action) => action?.actionKey !== "claim_task")
-    : availableActions.filter((action) => action?.actionKey !== "retry_camunda_sync");
 
   const runAction = async (action) => {
     if (!action?.endpoint || !procedureRequestId) {
@@ -623,86 +736,31 @@ export default function FuncionarioExpedienteDetailPage() {
     }
   };
 
-  const collectedData = procedureRequest?.collectedData || {};
-  const fieldDefinitions = getProcedureFieldDefinitions(detail);
-  const typedLocation = resolveTypedFieldValue(collectedData, fieldDefinitions, "location");
-  const typedAttachment =
-    resolveTypedFieldValue(collectedData, fieldDefinitions, "image") ||
-    resolveTypedFieldValue(collectedData, fieldDefinitions, "file");
-  const rawAttachment = typedAttachment ?? resolveAttachmentValue(collectedData);
-  const attachmentDisplay = formatAttachmentForDisplay(rawAttachment);
-  const hasPhotoProvided = String(collectedData?.photoStatus || "").trim().toLowerCase() === "provided";
-  const hasPhotoSkipped = ["skipped", "not_requested"].includes(
-    String(collectedData?.photoStatus || "").trim().toLowerCase()
-  );
-  const attachmentSummaryText = hasPhotoSkipped
-    ? "No se adjuntó imagen"
-    : attachmentDisplay.isValid
-      ? attachmentDisplay.label || "Sí"
-      : hasPhotoProvided && rawAttachment
-        ? attachmentDisplay.label || String(rawAttachment || "").trim() || "Imagen adjunta registrada"
-        : rawAttachment
-          ? "Formato inválido"
-          : "No se adjuntó imagen";
-  const locationValue = formatLocationForDisplay(typedLocation ?? resolveLocationValue(collectedData));
-  const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
-  const contactEmail = resolveContactEmail(procedureRequest, collectedData);
-  const activeTaskLabel =
-    detail?.activeTaskDisplay?.title ||
-    detail?.activeTask?.taskDefinitionName ||
-    humanizeTaskKey(detail?.activeTask?.taskDefinitionKey);
-  const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
-  const trackingCode = procedureRequest?.requestCode || null;
-  const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
-  const camundaStatusLabel =
-    procedureRequest?.camundaStatusLabel || getCamundaStatusLabel(camundaStatusKey);
-  const canManageDeletion = Boolean(procedureRequest && (isAssignedToMe || isAdmin));
-  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
-  const isInitialCamundaSyncPending = Boolean(
-    isPendingCamundaSyncStatus(procedureRequest?.status) && !procedureRequest?.camundaProcessInstanceKey
-  );
-  const requiresCamundaRetry = computeRequiresCamundaRetry({
+  const {
     procedureRequest,
-    camundaStatusKey,
-    camundaStatusLabel,
-    hasActiveTask,
     isAvailable,
-  });
-  const retrySyncAction =
-    retrySyncActionFromApi ||
-    (!isAvailable && (requiresCamundaRetry || isInitialCamundaSyncPending)
-      ? buildFallbackRetryCamundaSyncAction(
-          procedureRequestId,
-          requiresCamundaRetry ? "Reintentar sincronización" : "Sincronizar con Camunda"
-        )
-      : null);
-  const showCamundaSyncAlert = Boolean(!isAvailable && retrySyncAction && (requiresCamundaRetry || isInitialCamundaSyncPending));
-  const syncPrimaryButtonLabel = isInitialCamundaSyncPending && !requiresCamundaRetry
-    ? "Sincronizar con Camunda"
-    : "Reintentar sincronización con Camunda";
-  const syncSecondaryButtonLabel = isInitialCamundaSyncPending && !requiresCamundaRetry
-    ? "Sincronizar con Camunda"
-    : "Reintentar sincronización";
-  const retrySyncLoadingKey = retrySyncAction
-    ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
-    : "";
-  const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
-  const operationalSituation = buildOperationalSituation({
-    procedureRequest,
-    camundaStatusKey,
-    hasActiveTask,
-    requiresCamundaRetry,
-    isInitialCamundaSyncPending,
-  });
-  const responsibleLabel = procedureRequest?.assignedToUserId
-    ? "Funcionario asignado"
-    : "Sin funcionario asignado";
-  const relationLabel =
-    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
-      ? "No asignado a mi bandeja"
-      : getAssignmentScopeLabel(procedureRequest);
-  const activeTaskOperationalLabel =
-    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+    claimAction,
+    operationalActions,
+    collectedData,
+    attachmentDisplay,
+    attachmentSummaryText,
+    locationValue,
+    caseDescription,
+    contactEmail,
+    activeTaskDescription,
+    trackingCode,
+    canManageDeletion,
+    showCamundaSyncAlert,
+    syncPrimaryButtonLabel,
+    syncSecondaryButtonLabel,
+    isRetrySyncLoading,
+    operationalSituation,
+    responsibleLabel,
+    relationLabel,
+    activeTaskOperationalLabel,
+    retrySyncAction,
+  } = expedienteViewModel;
+
   const handleRetryCamundaSync = () => {
     if (!retrySyncAction || isRetrySyncLoading) {
       return;
