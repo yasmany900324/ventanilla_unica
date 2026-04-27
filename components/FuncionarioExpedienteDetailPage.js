@@ -623,20 +623,6 @@ export default function FuncionarioExpedienteDetailPage() {
     }
   };
 
-  if (isLoadingAuth) {
-    return (
-      <main className="page page--dashboard" lang={locale}>
-        <section className="card dashboard-header">
-          <p className="info-message">Cargando…</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (!user || !isBackofficeManager) {
-    return null;
-  }
-
   const collectedData = procedureRequest?.collectedData || {};
   const fieldDefinitions = getProcedureFieldDefinitions(detail);
   const typedLocation = resolveTypedFieldValue(collectedData, fieldDefinitions, "location");
@@ -758,6 +744,20 @@ export default function FuncionarioExpedienteDetailPage() {
       setDeleteLoading(false);
     }
   };
+
+  if (isLoadingAuth) {
+    return (
+      <main className="page page--dashboard" lang={locale}>
+        <section className="card dashboard-header">
+          <p className="info-message">Cargando…</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!user || !isBackofficeManager) {
+    return null;
+  }
 
   if (fatalError) {
     return (
