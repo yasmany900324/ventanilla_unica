@@ -431,12 +431,24 @@ function deriveCamundaStatus(procedureRequest, detail) {
   if (existing) {
     return existing;
   }
-  const hasTask = Boolean(detail?.activeTask?.taskDefinitionKey || procedureRequest?.currentTaskDefinitionKey);
+  const processState = String(detail?.operationalState?.process?.state || "")
+    .trim()
+    .toUpperCase();
+  const hasTask = Boolean(detail?.activeTask?.taskDefinitionKey);
   if (procedureRequest?.camundaError) {
+    return "ERROR_SYNC";
+  }
+  if ((detail?.operationalState?.errors || []).length > 0) {
     return "ERROR_SYNC";
   }
   if (hasTask) {
     return "TASK_ACTIVE";
+  }
+  if (["COMPLETED", "TERMINATED", "CANCELED", "CANCELLED"].includes(processState)) {
+    return "PROCESS_COMPLETED";
+  }
+  if (processState === "ACTIVE" || processState === "RUNNING") {
+    return "PROCESS_RUNNING";
   }
   if (procedureRequest?.camundaProcessInstanceKey) {
     const localStatus = String(procedureRequest?.status || "").trim().toUpperCase();
@@ -587,6 +599,56 @@ function buildFallbackRetryCamundaSyncAction(procedureRequestId, displayLabel) {
     displayLabel: displayLabel || "Reintentar sincronización",
     endpoint: `/api/funcionario/procedures/requests/${encodeURIComponent(procedureRequestId)}/retry-camunda-sync`,
     method: "POST",
+  };
+}
+
+function normalizeOperationalAction(action) {
+  const normalizedAction = String(action?.action || action?.actionKey || "")
+    .trim()
+    .toUpperCase();
+  const actionKey =
+    normalizedAction === "CLAIM_TASK"
+      ? "claim_task"
+      : normalizedAction === "COMPLETE_TASK"
+        ? "complete_task"
+        : normalizedAction === "RETRY_CAMUNDA_SYNC"
+          ? "retry_camunda_sync"
+          : String(action?.actionKey || "").trim().toLowerCase();
+  return {
+    ...action,
+    action: normalizedAction || null,
+    actionKey: actionKey || null,
+  };
+}
+
+function normalizeDetailResponse(payload) {
+  const localCase = payload?.localCase || payload?.procedureRequest || null;
+  const operationalState = payload?.operationalState || {};
+  const rawActiveTask =
+    operationalState?.activeTask && operationalState.activeTask.exists ? operationalState.activeTask : null;
+  const activeTask = rawActiveTask
+    ? {
+        id: rawActiveTask.id || null,
+        taskId: rawActiveTask.id || null,
+        taskDefinitionKey: rawActiveTask.taskDefinitionKey || null,
+        taskDefinitionName: rawActiveTask.name || null,
+        name: rawActiveTask.name || null,
+        assignee: rawActiveTask.assignee || null,
+        state: rawActiveTask.state || null,
+        createdAt: rawActiveTask.createdAt || null,
+      }
+    : null;
+  const normalizedOperationalActions = Array.isArray(operationalState?.availableActions)
+    ? operationalState.availableActions.map(normalizeOperationalAction)
+    : Array.isArray(payload?.availableActions)
+      ? payload.availableActions.map(normalizeOperationalAction)
+      : [];
+  return {
+    ...payload,
+    procedureRequest: localCase,
+    operationalState,
+    activeTask,
+    availableActions: normalizedOperationalActions,
   };
 }
 
@@ -756,6 +818,10 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
       : getAssignmentScopeLabel(procedureRequest);
   const activeTaskOperationalLabel =
     activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+  const operationalErrors = Array.isArray(detail?.operationalState?.errors)
+    ? detail.operationalState.errors
+    : [];
+  const primaryOperationalError = operationalErrors[0] || null;
 
   return {
     procedureRequest,
@@ -800,6 +866,8 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     relationLabel,
     activeTaskOperationalLabel,
     retrySyncAction,
+    operationalErrors,
+    primaryOperationalError,
   };
 }
 
@@ -851,6 +919,9 @@ function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariables
           <strong>{actionTitle}</strong>
         </p>
         {actionDescription ? <p className="small">{actionDescription}</p> : null}
+        {action.enabled === false && action.reason ? (
+          <p className="small">No disponible: {String(action.reason || "").replace(/_/g, " ").toLowerCase()}</p>
+        ) : null}
         {action.actionKey === "complete_task" ? (
           <>
             <label className="small">Variables para avanzar (JSON)</label>
@@ -879,7 +950,7 @@ function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariables
           type="button"
           className="button-inline"
           onClick={() => onRunAction(action)}
-          disabled={actionLoadingKey === actionKey}
+          disabled={action.enabled === false || actionLoadingKey === actionKey}
         >
           {actionLoadingKey === actionKey ? "Procesando..." : actionTitle}
         </button>
@@ -1200,7 +1271,7 @@ export default function FuncionarioExpedienteDetailPage() {
         setDetail(null);
         return;
       }
-      setDetail(data);
+      setDetail(normalizeDetailResponse(data));
       setCompleteVariablesJson("{}");
       setInternalObservation("");
       setNextStatus("");
@@ -1329,6 +1400,8 @@ export default function FuncionarioExpedienteDetailPage() {
     relationLabel,
     activeTaskOperationalLabel,
     retrySyncAction,
+    operationalErrors,
+    primaryOperationalError,
   } = expedienteViewModel;
 
   useEffect(() => {
@@ -1692,7 +1765,10 @@ export default function FuncionarioExpedienteDetailPage() {
                   type="button"
                   className="button-inline"
                   onClick={() => runAction(claimAction)}
-                  disabled={actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`}
+                  disabled={
+                    claimAction.enabled === false ||
+                    actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`
+                  }
                 >
                   {actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`
                     ? "Procesando..."
@@ -1880,6 +1956,16 @@ export default function FuncionarioExpedienteDetailPage() {
 
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Estado operativo</h3>
+            {primaryOperationalError ? (
+              <div
+                className="admin-roles-confirm-dialog__lead"
+                style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "0.75rem" }}
+              >
+                <p className="small" style={{ margin: 0 }}>
+                  Error operacional de Camunda: {primaryOperationalError.message || "No se pudo obtener snapshot live."}
+                </p>
+              </div>
+            ) : null}
             {showCamundaSyncAlert ? (
               <div
                 className="admin-roles-confirm-dialog__lead"
@@ -1909,12 +1995,20 @@ export default function FuncionarioExpedienteDetailPage() {
                 </dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Estado del proceso (Camunda)</dt>
+                <dd>{detail?.operationalState?.process?.state || "-"}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Situación</dt>
                 <dd>{operationalSituation}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Tarea activa</dt>
                 <dd>{activeTaskOperationalLabel}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Tarea ID (Camunda)</dt>
+                <dd>{detail?.activeTask?.id || detail?.activeTask?.taskId || "-"}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Responsable</dt>
@@ -1928,6 +2022,16 @@ export default function FuncionarioExpedienteDetailPage() {
             {activeTaskDescription ? (
               <p className="small">
                 <strong>Detalle de tarea:</strong> {activeTaskDescription}
+              </p>
+            ) : null}
+            {operationalErrors.length > 1 ? (
+              <p className="small">
+                <strong>Errores operacionales adicionales:</strong>{" "}
+                {operationalErrors
+                  .slice(1)
+                  .map((item) => item?.message)
+                  .filter(Boolean)
+                  .join(" | ")}
               </p>
             ) : null}
           </section>

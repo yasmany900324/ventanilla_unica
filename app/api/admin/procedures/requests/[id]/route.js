@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdministrator } from "../../../../../../lib/auth";
 import { getAppRouteParamString } from "../../../../../../lib/nextAppRouteParams";
-import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActiveTaskForProcedure";
+import { getLiveCamundaTaskSnapshot } from "../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
 import {
   buildAvailableActions,
@@ -12,6 +12,43 @@ import {
   getProcedureRequestById,
   listProcedureRequestEvents,
 } from "../../../../../../lib/procedureRequests";
+
+function mapOperationalActions({ snapshotActions, legacyActions }) {
+  const byLegacyKey = new Map(
+    legacyActions
+      .filter((item) => item?.actionKey)
+      .map((item) => [String(item.actionKey || "").trim().toLowerCase(), item])
+  );
+  return snapshotActions.map((actionItem) => {
+    const action = String(actionItem?.action || "").trim().toUpperCase();
+    const out = {
+      action,
+      enabled: actionItem?.enabled === true,
+      reason: actionItem?.reason || null,
+    };
+    if (action === "CLAIM_TASK") {
+      const legacy = byLegacyKey.get("claim_task");
+      if (legacy?.endpoint) {
+        out.endpoint = legacy.endpoint;
+        out.method = legacy.method || "POST";
+      }
+    }
+    if (action === "COMPLETE_TASK") {
+      const legacy = byLegacyKey.get("complete_task");
+      if (legacy?.endpoint) {
+        out.endpoint = legacy.endpoint;
+        out.method = legacy.method || "POST";
+        out.expectedTaskDefinitionKey = legacy.expectedTaskDefinitionKey || null;
+        out.requiredVariables = Array.isArray(legacy.requiredVariables)
+          ? legacy.requiredVariables
+          : [];
+        out.description = legacy.description || "";
+        out.displayLabel = legacy.displayLabel || "Completar tarea";
+      }
+    }
+    return out;
+  });
+}
 
 export async function GET(request, { params }) {
   try {
@@ -30,30 +67,52 @@ export async function GET(request, { params }) {
         { status: 403 }
       );
     }
-    const [events, activeTask] = await Promise.all([
+    const [events, liveSnapshot] = await Promise.all([
       listProcedureRequestEvents(procedureRequest.id, { limit: 200 }),
-      getActiveTaskForProcedure(procedureRequest.id).catch(() => null),
+      getLiveCamundaTaskSnapshot({
+        procedureRequest,
+        actorId: administrator.id,
+      }),
     ]);
     const procedureType = procedureRequest.procedureTypeId
       ? await getProcedureCatalogEntryById(procedureRequest.procedureTypeId, { includeInactive: true })
       : null;
+    const normalizedActiveTask = liveSnapshot?.activeTask?.exists
+      ? {
+          taskId: liveSnapshot.activeTask.id,
+          taskDefinitionKey: liveSnapshot.activeTask.taskDefinitionKey,
+          name: liveSnapshot.activeTask.name,
+          assignee: liveSnapshot.activeTask.assignee,
+          state: liveSnapshot.activeTask.state,
+          createdAt: liveSnapshot.activeTask.createdAt,
+        }
+      : null;
+    const legacyAvailableActions = buildAvailableActions({
+      procedureRequest,
+      activeTask: normalizedActiveTask,
+      procedureType,
+      actorId: administrator.id,
+      requestsApiSegment: "admin",
+      includeClaimTask: true,
+    });
+    const operationalActions = mapOperationalActions({
+      snapshotActions: Array.isArray(liveSnapshot?.availableActions)
+        ? liveSnapshot.availableActions
+        : [],
+      legacyActions: legacyAvailableActions,
+    });
     return NextResponse.json({
-      procedureRequest: {
+      localCase: {
         ...procedureRequest,
         assignedToUserId: procedureRequest.assignedToUserId || null,
       },
-      activeTask,
-      activeTaskDisplay: resolveTaskDisplayConfig({ activeTask, procedureType }),
+      operationalState: {
+        ...(liveSnapshot || {}),
+        availableActions: operationalActions,
+      },
+      activeTaskDisplay: resolveTaskDisplayConfig({ activeTask: normalizedActiveTask, procedureType }),
       history: events,
       procedureType,
-      availableActions: buildAvailableActions({
-        procedureRequest,
-        activeTask,
-        procedureType,
-        actorId: administrator.id,
-        requestsApiSegment: "admin",
-        includeClaimTask: true,
-      }),
     });
   } catch (_error) {
     return NextResponse.json(

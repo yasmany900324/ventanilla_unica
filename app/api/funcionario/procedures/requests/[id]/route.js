@@ -2,21 +2,65 @@ import { NextResponse } from "next/server";
 import { requireBackofficeUser, userHasRole } from "../../../../../../lib/auth";
 import { ROLES } from "../../../../../../lib/roles";
 import { getAppRouteParamString } from "../../../../../../lib/nextAppRouteParams";
-import { getActiveTaskForProcedure } from "../../../../../../lib/camunda/getActiveTaskForProcedure";
+import { getLiveCamundaTaskSnapshot } from "../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
 import { getProcedureCatalogEntryById } from "../../../../../../lib/procedureCatalog";
 import {
   buildAvailableActions,
   resolveTaskDisplayConfig,
 } from "../../../../../../lib/procedureRequestInboxDetail";
 import {
-  buildCamundaStatus,
-  buildCamundaStatusLabel,
-} from "../../../../../../lib/procedureRequestInboxListHelpers";
-import {
   getProcedureRequestById,
   listProcedureRequestEvents,
   resolveFuncionarioAssignmentScopeForProcedureRequest,
 } from "../../../../../../lib/procedureRequests";
+
+function mapOperationalActions({
+  snapshotActions,
+  legacyActions,
+  requestsApiSegment,
+  procedureRequestId,
+}) {
+  const byLegacyKey = new Map(
+    legacyActions
+      .filter((item) => item?.actionKey)
+      .map((item) => [String(item.actionKey || "").trim().toLowerCase(), item])
+  );
+  const normalizedSegment = String(requestsApiSegment || "funcionario").trim().toLowerCase();
+  return snapshotActions.map((actionItem) => {
+    const action = String(actionItem?.action || "").trim().toUpperCase();
+    const out = {
+      action,
+      enabled: actionItem?.enabled === true,
+      reason: actionItem?.reason || null,
+    };
+    if (action === "CLAIM_TASK") {
+      const legacy = byLegacyKey.get("claim_task");
+      if (legacy?.endpoint) {
+        out.endpoint = legacy.endpoint;
+        out.method = legacy.method || "POST";
+      } else if (normalizedSegment === "funcionario" && procedureRequestId) {
+        out.endpoint = `/api/funcionario/procedures/requests/${encodeURIComponent(
+          procedureRequestId
+        )}/claim-task`;
+        out.method = "POST";
+      }
+    }
+    if (action === "COMPLETE_TASK") {
+      const legacy = byLegacyKey.get("complete_task");
+      if (legacy?.endpoint) {
+        out.endpoint = legacy.endpoint;
+        out.method = legacy.method || "POST";
+        out.expectedTaskDefinitionKey = legacy.expectedTaskDefinitionKey || null;
+        out.requiredVariables = Array.isArray(legacy.requiredVariables)
+          ? legacy.requiredVariables
+          : [];
+        out.description = legacy.description || "";
+        out.displayLabel = legacy.displayLabel || "Completar tarea";
+      }
+    }
+    return out;
+  });
+}
 
 export async function GET(request, { params }) {
   try {
@@ -47,45 +91,58 @@ export async function GET(request, { params }) {
     }
     const [events, activeTask] = await Promise.all([
       listProcedureRequestEvents(procedureRequest.id, { limit: 200 }),
-      getActiveTaskForProcedure(procedureRequest.id).catch(() => null),
+      getLiveCamundaTaskSnapshot({
+        procedureRequest,
+        actorId: actor.id,
+      }),
     ]);
     const procedureType = procedureRequest.procedureTypeId
       ? await getProcedureCatalogEntryById(procedureRequest.procedureTypeId, { includeInactive: true })
       : null;
-    const currentTaskDefinitionKey =
-      activeTask?.taskDefinitionKey || procedureRequest.currentTaskDefinitionKey || null;
-    const camundaStatus = buildCamundaStatus({
-      ...procedureRequest,
-      currentTaskDefinitionKey,
-    });
-    return NextResponse.json({
+    const normalizedActiveTask = activeTask?.activeTask?.exists
+      ? {
+          taskId: activeTask.activeTask.id,
+          taskDefinitionKey: activeTask.activeTask.taskDefinitionKey,
+          name: activeTask.activeTask.name,
+          assignee: activeTask.activeTask.assignee,
+          state: activeTask.activeTask.state,
+          createdAt: activeTask.activeTask.createdAt,
+        }
+      : null;
+    const legacyAvailableActions = buildAvailableActions({
       procedureRequest: {
         ...procedureRequest,
-        assignedToUserId: procedureRequest.assignedToUserId || null,
         assignmentScope,
         isAssignedToMe: assignmentScope === "assigned_to_me",
         isAvailableToClaim: assignmentScope === "available",
-        camundaStatus,
-        camundaStatusLabel: buildCamundaStatusLabel(camundaStatus),
       },
-      activeTask,
-      activeTaskDisplay: resolveTaskDisplayConfig({ activeTask, procedureType }),
+      activeTask: normalizedActiveTask,
+      procedureType,
+      actorId: actor.id,
+      requestsApiSegment: "funcionario",
+      includeClaimTask: false,
+      assignmentScope,
+    });
+    const operationalActions = mapOperationalActions({
+      snapshotActions: Array.isArray(activeTask?.availableActions) ? activeTask.availableActions : [],
+      legacyActions: legacyAvailableActions,
+      requestsApiSegment: "funcionario",
+      procedureRequestId: procedureRequest.id,
+    });
+    return NextResponse.json({
+      localCase: {
+        ...procedureRequest,
+        assignmentScope,
+        isAssignedToMe: assignmentScope === "assigned_to_me",
+        isAvailableToClaim: assignmentScope === "available",
+      },
+      operationalState: {
+        ...(activeTask || {}),
+        availableActions: operationalActions,
+      },
+      activeTaskDisplay: resolveTaskDisplayConfig({ activeTask: normalizedActiveTask, procedureType }),
       history: events,
       procedureType,
-      availableActions: buildAvailableActions({
-        procedureRequest: {
-          ...procedureRequest,
-          assignmentScope,
-          isAssignedToMe: assignmentScope === "assigned_to_me",
-          isAvailableToClaim: assignmentScope === "available",
-        },
-        activeTask,
-        procedureType,
-        actorId: actor.id,
-        requestsApiSegment: "funcionario",
-        includeClaimTask: false,
-        assignmentScope,
-      }),
     });
   } catch (_error) {
     return NextResponse.json(

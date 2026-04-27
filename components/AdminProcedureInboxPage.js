@@ -205,6 +205,56 @@ function ProcedureFieldVariables({ requiredVariables }) {
   );
 }
 
+function normalizeOperationalAction(action) {
+  const normalizedAction = String(action?.action || action?.actionKey || "")
+    .trim()
+    .toUpperCase();
+  const actionKey =
+    normalizedAction === "CLAIM_TASK"
+      ? "claim_task"
+      : normalizedAction === "COMPLETE_TASK"
+        ? "complete_task"
+        : normalizedAction === "RETRY_CAMUNDA_SYNC"
+          ? "retry_camunda_sync"
+          : String(action?.actionKey || "").trim().toLowerCase();
+  return {
+    ...action,
+    action: normalizedAction || null,
+    actionKey: actionKey || null,
+  };
+}
+
+function normalizeDetailResponse(payload) {
+  const localCase = payload?.localCase || payload?.procedureRequest || null;
+  const operationalState = payload?.operationalState || {};
+  const rawActiveTask =
+    operationalState?.activeTask && operationalState.activeTask.exists ? operationalState.activeTask : null;
+  const activeTask = rawActiveTask
+    ? {
+        id: rawActiveTask.id || null,
+        taskId: rawActiveTask.id || null,
+        taskDefinitionKey: rawActiveTask.taskDefinitionKey || null,
+        taskDefinitionName: rawActiveTask.name || null,
+        name: rawActiveTask.name || null,
+        assignee: rawActiveTask.assignee || null,
+        state: rawActiveTask.state || null,
+        createdAt: rawActiveTask.createdAt || null,
+      }
+    : null;
+  const normalizedOperationalActions = Array.isArray(operationalState?.availableActions)
+    ? operationalState.availableActions.map(normalizeOperationalAction)
+    : Array.isArray(payload?.availableActions)
+      ? payload.availableActions.map(normalizeOperationalAction)
+      : [];
+  return {
+    ...payload,
+    procedureRequest: localCase,
+    operationalState,
+    activeTask,
+    availableActions: normalizedOperationalActions,
+  };
+}
+
 export default function AdminProcedureInboxPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -273,7 +323,7 @@ export default function AdminProcedureInboxPage() {
       if (!response.ok) {
         throw new Error(data?.error || "No se pudo cargar el detalle del expediente.");
       }
-      setDetail(data);
+      setDetail(normalizeDetailResponse(data));
       setCompleteVariablesJson("{}");
       setInternalObservation("");
       setNextStatus("");
@@ -616,9 +666,20 @@ export default function AdminProcedureInboxPage() {
 
             <section className="admin-procedure-fields">
               <h4>Estado Camunda</h4>
+              {(detail?.operationalState?.errors || []).length > 0 ? (
+                <p className="error-message">
+                  {(detail?.operationalState?.errors || [])
+                    .map((item) => item?.message)
+                    .filter(Boolean)
+                    .join(" | ")}
+                </p>
+              ) : null}
               <p className="small">
                 <strong>Estado Camunda:</strong>{" "}
                 {getCamundaStatusLabel(procedureRequest.camundaStatus || detail?.activeTask?.taskState)}
+              </p>
+              <p className="small">
+                <strong>Estado del proceso (live):</strong> {detail?.operationalState?.process?.state || "-"}
               </p>
               <p className="small">
                 <strong>Instancia:</strong> {procedureRequest.camundaProcessInstanceKey || "-"}
@@ -628,6 +689,9 @@ export default function AdminProcedureInboxPage() {
               </p>
               <p className="small">
                 <strong>Tarea activa:</strong> {activeTaskLabel}
+              </p>
+              <p className="small">
+                <strong>Tarea ID (live):</strong> {detail?.activeTask?.id || detail?.activeTask?.taskId || "-"}
               </p>
               {activeTaskDescription ? (
                 <p className="small">
@@ -657,6 +721,11 @@ export default function AdminProcedureInboxPage() {
                         <strong>{actionTitle}</strong>
                       </p>
                       {actionDescription ? <p className="small">{actionDescription}</p> : null}
+                      {action.enabled === false && action.reason ? (
+                        <p className="small">
+                          No disponible: {String(action.reason || "").replace(/_/g, " ").toLowerCase()}
+                        </p>
+                      ) : null}
                       {action.actionKey === "complete_task" ? (
                         <>
                           <label className="small">Variables para avanzar (JSON)</label>
@@ -685,7 +754,7 @@ export default function AdminProcedureInboxPage() {
                         type="button"
                         className="button-inline"
                         onClick={() => runAction(action)}
-                        disabled={actionLoadingKey === actionKey}
+                        disabled={action.enabled === false || actionLoadingKey === actionKey}
                       >
                         {actionLoadingKey === actionKey ? "Procesando..." : actionTitle}
                       </button>
