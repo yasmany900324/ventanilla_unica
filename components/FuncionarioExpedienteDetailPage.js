@@ -558,34 +558,6 @@ export default function FuncionarioExpedienteDetailPage() {
     }
   };
 
-  const retrySyncLoadingKey = retrySyncAction
-    ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
-    : "";
-  const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
-  const requiresSyncReview = Boolean(retrySyncAction && (shouldShowPendingSyncAction || shouldShowFailedSyncAction));
-  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
-  const operationalSituation = buildOperationalSituation({
-    procedureRequest,
-    camundaStatusKey,
-    hasActiveTask,
-    requiresSyncReview,
-  });
-  const responsibleLabel = procedureRequest?.assignedToUserId
-    ? "Funcionario asignado"
-    : "Sin funcionario asignado";
-  const relationLabel =
-    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
-      ? "No asignado a mi bandeja"
-      : getAssignmentScopeLabel(procedureRequest);
-  const activeTaskOperationalLabel =
-    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
-  const handleRetryCamundaSync = () => {
-    if (!retrySyncAction || isRetrySyncLoading) {
-      return;
-    }
-    void runAction(retrySyncAction);
-  };
-
   if (isLoadingAuth) {
     return (
       <main className="page page--dashboard" lang={locale}>
@@ -632,6 +604,33 @@ export default function FuncionarioExpedienteDetailPage() {
   const trackingCode = procedureRequest?.requestCode || null;
   const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
   const canManageDeletion = Boolean(procedureRequest && (isAssignedToMe || isAdmin));
+  const retrySyncLoadingKey = retrySyncAction
+    ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
+    : "";
+  const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
+  const requiresSyncReview = Boolean(retrySyncAction && (shouldShowPendingSyncAction || shouldShowFailedSyncAction));
+  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
+  const operationalSituation = buildOperationalSituation({
+    procedureRequest,
+    camundaStatusKey,
+    hasActiveTask,
+    requiresSyncReview,
+  });
+  const responsibleLabel = procedureRequest?.assignedToUserId
+    ? "Funcionario asignado"
+    : "Sin funcionario asignado";
+  const relationLabel =
+    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
+      ? "No asignado a mi bandeja"
+      : getAssignmentScopeLabel(procedureRequest);
+  const activeTaskOperationalLabel =
+    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+  const handleRetryCamundaSync = () => {
+    if (!retrySyncAction || isRetrySyncLoading) {
+      return;
+    }
+    void runAction(retrySyncAction);
+  };
 
   const handleDeleteExpediente = async () => {
     if (!procedureRequest?.id || deleteLoading) {
