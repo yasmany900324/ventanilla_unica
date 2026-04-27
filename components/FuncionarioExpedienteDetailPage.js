@@ -269,9 +269,58 @@ function isFailedCamundaSyncStatus(status) {
   return key === "ERROR_CAMUNDA_SYNC" || key === "CAMUNDA_SYNC_FAILED";
 }
 
-function buildOperationalSituation({ procedureRequest, camundaStatusKey, hasActiveTask, requiresSyncReview }) {
-  if (requiresSyncReview) {
-    return "El expediente fue creado en el sistema, pero no tiene una tarea activa asociada en Camunda.";
+const TERMINAL_PROCEDURE_STATUSES = new Set(["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"]);
+
+function isTerminalProcedureStatus(status) {
+  const key = String(status || "").trim().toUpperCase();
+  return TERMINAL_PROCEDURE_STATUSES.has(key);
+}
+
+function normalizeForSyncHeuristic(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ");
+}
+
+function textIndicatesSyncFailure(value) {
+  const n = normalizeForSyncHeuristic(value);
+  if (!n) {
+    return false;
+  }
+  if (n.includes("error") && (n.includes("sincronizacion") || n.includes("sync"))) {
+    return true;
+  }
+  if (n.includes("sync error") || n.includes("sync_error") || n.includes("camunda sync")) {
+    return true;
+  }
+  if (/\bfailed\b/.test(n) || /\berror\b/.test(n)) {
+    if (n.includes("camunda") || n.includes("sync")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function camundaStatusIndicatesSyncFailure(camundaStatusKey) {
+  const key = String(camundaStatusKey || "").trim().toUpperCase();
+  return key === "ERROR_SYNC";
+}
+
+function buildOperationalSituation({
+  procedureRequest,
+  camundaStatusKey,
+  hasActiveTask,
+  requiresCamundaRetry,
+  isInitialCamundaSyncPending,
+}) {
+  if (requiresCamundaRetry) {
+    return "No hay una tarea activa asociada en Camunda. Se recomienda reintentar la sincronización.";
+  }
+  if (isInitialCamundaSyncPending) {
+    return "El expediente está pendiente de sincronización inicial con Camunda.";
   }
   if (hasActiveTask) {
     return "El expediente está sincronizado y cuenta con una tarea operativa activa.";
@@ -279,10 +328,47 @@ function buildOperationalSituation({ procedureRequest, camundaStatusKey, hasActi
   if (String(camundaStatusKey || "").trim().toUpperCase() === "PROCESS_RUNNING") {
     return "La instancia de Camunda está activa, pero todavía no se generó una tarea operativa.";
   }
-  if (isPendingCamundaSyncStatus(procedureRequest?.status)) {
-    return "El expediente está pendiente de sincronización inicial con Camunda.";
-  }
   return "Estado operativo estable sin alertas de sincronización.";
+}
+
+function computeRequiresCamundaRetry({
+  procedureRequest,
+  camundaStatusKey,
+  camundaStatusLabel,
+  hasActiveTask,
+  isAvailable,
+}) {
+  if (!procedureRequest || isAvailable || isTerminalProcedureStatus(procedureRequest.status)) {
+    return false;
+  }
+  if (procedureRequest?.camundaError) {
+    return true;
+  }
+  if (isFailedCamundaSyncStatus(procedureRequest?.status)) {
+    return true;
+  }
+  if (camundaStatusIndicatesSyncFailure(camundaStatusKey)) {
+    return true;
+  }
+  if (textIndicatesSyncFailure(getLocalStatusLabel(procedureRequest?.status))) {
+    return true;
+  }
+  if (textIndicatesSyncFailure(camundaStatusLabel)) {
+    return true;
+  }
+  if (!hasActiveTask && procedureRequest?.camundaProcessInstanceKey) {
+    return false;
+  }
+  return false;
+}
+
+function buildFallbackRetryCamundaSyncAction(procedureRequestId, displayLabel) {
+  return {
+    actionKey: "retry_camunda_sync",
+    displayLabel: displayLabel || "Reintentar sincronización",
+    endpoint: `/api/funcionario/procedures/requests/${encodeURIComponent(procedureRequestId)}/retry-camunda-sync`,
+    method: "POST",
+  };
 }
 
 function ProcedureFieldVariables({ requiredVariables }) {
@@ -470,27 +556,6 @@ export default function FuncionarioExpedienteDetailPage() {
   const claimAction = availableActions.find((action) => action?.actionKey === "claim_task") || null;
   const retrySyncActionFromApi =
     availableActions.find((action) => action?.actionKey === "retry_camunda_sync") || null;
-  const shouldShowPendingSyncAction = Boolean(
-    isAssignedToMe &&
-      isPendingCamundaSyncStatus(procedureRequest?.status) &&
-      !procedureRequest?.camundaProcessInstanceKey
-  );
-  const shouldShowFailedSyncAction = Boolean(
-    isAssignedToMe &&
-      (isFailedCamundaSyncStatus(procedureRequest?.status) || procedureRequest?.camundaError)
-  );
-  const syntheticSyncAction =
-    !retrySyncActionFromApi && (shouldShowPendingSyncAction || shouldShowFailedSyncAction)
-      ? {
-          actionKey: "retry_camunda_sync",
-          displayLabel: shouldShowFailedSyncAction ? "Reintentar sincronización" : "Sincronizar con Camunda",
-          endpoint: `/api/funcionario/procedures/requests/${encodeURIComponent(
-            procedureRequestId
-          )}/retry-camunda-sync`,
-          method: "POST",
-        }
-      : null;
-  const retrySyncAction = retrySyncActionFromApi || syntheticSyncAction;
 
   const operationalActions = isAvailable
     ? availableActions.filter((action) => action?.actionKey !== "claim_task")
@@ -603,18 +668,45 @@ export default function FuncionarioExpedienteDetailPage() {
   const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
   const trackingCode = procedureRequest?.requestCode || null;
   const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
+  const camundaStatusLabel =
+    procedureRequest?.camundaStatusLabel || getCamundaStatusLabel(camundaStatusKey);
   const canManageDeletion = Boolean(procedureRequest && (isAssignedToMe || isAdmin));
+  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
+  const isInitialCamundaSyncPending = Boolean(
+    isPendingCamundaSyncStatus(procedureRequest?.status) && !procedureRequest?.camundaProcessInstanceKey
+  );
+  const requiresCamundaRetry = computeRequiresCamundaRetry({
+    procedureRequest,
+    camundaStatusKey,
+    camundaStatusLabel,
+    hasActiveTask,
+    isAvailable,
+  });
+  const retrySyncAction =
+    retrySyncActionFromApi ||
+    (!isAvailable && (requiresCamundaRetry || isInitialCamundaSyncPending)
+      ? buildFallbackRetryCamundaSyncAction(
+          procedureRequestId,
+          requiresCamundaRetry ? "Reintentar sincronización" : "Sincronizar con Camunda"
+        )
+      : null);
+  const showCamundaSyncAlert = Boolean(!isAvailable && retrySyncAction && (requiresCamundaRetry || isInitialCamundaSyncPending));
+  const syncPrimaryButtonLabel = isInitialCamundaSyncPending && !requiresCamundaRetry
+    ? "Sincronizar con Camunda"
+    : "Reintentar sincronización con Camunda";
+  const syncSecondaryButtonLabel = isInitialCamundaSyncPending && !requiresCamundaRetry
+    ? "Sincronizar con Camunda"
+    : "Reintentar sincronización";
   const retrySyncLoadingKey = retrySyncAction
     ? `${retrySyncAction.actionKey || "action"}:${retrySyncAction.endpoint}`
     : "";
   const isRetrySyncLoading = Boolean(retrySyncLoadingKey && actionLoadingKey === retrySyncLoadingKey);
-  const requiresSyncReview = Boolean(retrySyncAction && (shouldShowPendingSyncAction || shouldShowFailedSyncAction));
-  const hasActiveTask = Boolean(detail?.activeTask?.taskDefinitionKey);
   const operationalSituation = buildOperationalSituation({
     procedureRequest,
     camundaStatusKey,
     hasActiveTask,
-    requiresSyncReview,
+    requiresCamundaRetry,
+    isInitialCamundaSyncPending,
   });
   const responsibleLabel = procedureRequest?.assignedToUserId
     ? "Funcionario asignado"
@@ -822,7 +914,7 @@ export default function FuncionarioExpedienteDetailPage() {
 
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Estado operativo</h3>
-            {requiresSyncReview ? (
+            {showCamundaSyncAlert ? (
               <div
                 className="admin-roles-confirm-dialog__lead"
                 style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "0.75rem" }}
@@ -837,7 +929,7 @@ export default function FuncionarioExpedienteDetailPage() {
                   disabled={isRetrySyncLoading}
                   style={{ marginTop: "0.65rem" }}
                 >
-                  {isRetrySyncLoading ? "Sincronizando..." : "Reintentar sincronización con Camunda"}
+                  {isRetrySyncLoading ? "Sincronizando..." : syncPrimaryButtonLabel}
                 </button>
               </div>
             ) : null}
@@ -845,7 +937,7 @@ export default function FuncionarioExpedienteDetailPage() {
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Estado del expediente</dt>
                 <dd>
-                  <span className={`badge ${requiresSyncReview ? "badge--en-revision" : "badge--recibido"}`}>
+                  <span className={`badge ${showCamundaSyncAlert ? "badge--en-revision" : "badge--recibido"}`}>
                     {getLocalStatusLabel(procedureRequest.status)}
                   </span>
                 </dd>
@@ -896,7 +988,7 @@ export default function FuncionarioExpedienteDetailPage() {
               nextStatus={nextStatus}
               setNextStatus={setNextStatus}
             />
-            {requiresSyncReview ? (
+            {showCamundaSyncAlert ? (
               <button
                 type="button"
                 className="button-inline"
@@ -904,10 +996,10 @@ export default function FuncionarioExpedienteDetailPage() {
                 disabled={isRetrySyncLoading}
                 style={{ marginTop: "0.4rem" }}
               >
-                {isRetrySyncLoading ? "Sincronizando..." : "Reintentar sincronización"}
+                {isRetrySyncLoading ? "Sincronizando..." : syncSecondaryButtonLabel}
               </button>
             ) : null}
-            {!isAvailable && !requiresSyncReview && operationalActions.length === 0 ? (
+            {!isAvailable && !showCamundaSyncAlert && operationalActions.length === 0 ? (
               <p className="empty-message">No hay acciones operativas disponibles para este expediente.</p>
             ) : null}
           </section>
