@@ -151,6 +151,26 @@ function normalizeCode(value) {
     .slice(0, 120);
 }
 
+const TECHNICAL_FIELD_KEY_REGEX = /^[A-Za-z0-9_]{1,60}$/;
+
+function normalizeTechnicalFieldKeyDraft(value, maxLength = 60) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().slice(0, maxLength);
+}
+
+function isSafeTechnicalFieldKey(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  return TECHNICAL_FIELD_KEY_REGEX.test(value.trim());
+}
+
+function buildDefaultTechnicalFieldKeyFromLabel(label, fallback = "field") {
+  return normalizeCode(label || fallback).slice(0, 60);
+}
+
 function formatProcedureUpdatedAt(updatedAt, locale) {
   if (!updatedAt) {
     return "-";
@@ -243,7 +263,9 @@ function createProcedureFormState(procedure = null) {
       ? procedure.requiredFields
     : DEFAULT_REQUIRED_FIELDS;
   const normalizedFields = fieldDefinitions.map((field, index) => ({
-    key: normalizeCode(field?.key || field?.label || `field_${index + 1}`),
+    key:
+      normalizeTechnicalFieldKeyDraft(field?.key || "", 60) ||
+      buildDefaultTechnicalFieldKeyFromLabel(field?.label || `field_${index + 1}`),
     label: normalizeSimpleText(field?.label || `Campo ${index + 1}`, 80),
     type: normalizeSimpleText(field?.type || "text", 24).toLowerCase() || "text",
     required: field?.required !== false,
@@ -669,11 +691,15 @@ export default function AdminDashboardPage() {
         }
         const nextLabel =
           patch.label !== undefined ? normalizeSimpleText(patch.label, 80) : field.label;
-        const nextKey = normalizeCode(patch.key !== undefined ? patch.key : nextLabel || field.key);
+        const nextKey =
+          patch.key !== undefined
+            ? normalizeTechnicalFieldKeyDraft(patch.key, 60)
+            : normalizeTechnicalFieldKeyDraft(field.key, 60) ||
+              buildDefaultTechnicalFieldKeyFromLabel(nextLabel || field.key || `field_${fieldIndex + 1}`);
         return {
           ...field,
           ...patch,
-          key: nextKey || field.key,
+          key: nextKey || field.key || buildDefaultTechnicalFieldKeyFromLabel(nextLabel || `field_${fieldIndex + 1}`),
           label: nextLabel || field.label,
           order: fieldIndex + 1,
         };
@@ -729,15 +755,26 @@ export default function AdminDashboardPage() {
     const type = normalizeSimpleText(formState.type, 80);
     const camundaProcessId = normalizeSimpleText(formState.camundaProcessId, 160);
     const camundaVersion = normalizeSimpleText(formState.camundaVersion, 80);
+    const invalidFieldKeys = [];
     const requiredFields = formState.requiredFields
       .map((field, index) => ({
-        key: normalizeCode(field.key || field.label || `field_${index + 1}`),
+        key:
+          normalizeTechnicalFieldKeyDraft(field.key, 60) ||
+          (!normalizeTechnicalFieldKeyDraft(field.key, 60)
+            ? buildDefaultTechnicalFieldKeyFromLabel(field.label || `field_${index + 1}`)
+            : ""),
         label: normalizeSimpleText(field.label, 80),
         type: normalizeSimpleText(field.type, 24).toLowerCase() || "text",
         required: field.required !== false,
         order: index + 1,
       }))
-      .filter((field) => field.key && field.label);
+      .filter((field) => {
+        const isValid = field.key && isSafeTechnicalFieldKey(field.key);
+        if (!isValid) {
+          invalidFieldKeys.push(field.key || "(vacía)");
+        }
+        return field.key && field.label && isValid;
+      });
     const enabledChannels = Array.from(
       new Set(formState.enabledChannels.map((channel) => normalizeSimpleText(channel, 20).toLowerCase()))
     ).filter(Boolean);
@@ -791,6 +828,13 @@ export default function AdminDashboardPage() {
     }
     if (!camundaProcessId) {
       return { ok: false, error: procedureCopy.validation.camundaRequired };
+    }
+    if (invalidFieldKeys.length > 0) {
+      return {
+        ok: false,
+        error:
+          "La key técnica de cada campo debe usar solo letras, números o guion bajo (sin espacios, tildes ni símbolos).",
+      };
     }
     if (!requiredFields.length) {
       return { ok: false, error: procedureCopy.validation.requiredFieldsRequired };

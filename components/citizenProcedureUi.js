@@ -157,11 +157,18 @@ export function resolvePhotoData(procedureRequest) {
     procedureRequest?.collectedData && typeof procedureRequest.collectedData === "object"
       ? procedureRequest.collectedData
       : {};
+  const catalogPhoto = collectedData.photo && typeof collectedData.photo === "object" ? collectedData.photo : null;
+  const catalogUrl =
+    catalogPhoto && typeof catalogPhoto.url === "string" ? catalogPhoto.url.trim() : "";
+  const catalogFileName =
+    catalogPhoto && typeof catalogPhoto.filename === "string" ? catalogPhoto.filename.trim() : "";
   const publicUrl =
-    typeof collectedData.photoAttachmentPublicUrl === "string"
+    catalogUrl ||
+    (typeof collectedData.photoAttachmentPublicUrl === "string"
       ? collectedData.photoAttachmentPublicUrl.trim()
-      : "";
+      : "");
   const fileName =
+    catalogFileName ||
     (typeof collectedData.photoAttachmentOriginalName === "string" &&
       collectedData.photoAttachmentOriginalName.trim()) ||
     (typeof collectedData.photoAttachmentStoredFilename === "string" &&

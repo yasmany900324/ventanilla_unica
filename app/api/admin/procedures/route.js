@@ -27,6 +27,8 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingName: "El nombre del procedimiento es obligatorio.",
     missingFields: "Debes configurar al menos un campo solicitado para el procedimiento.",
     missingCamundaProcessId: "El ID del proceso de Camunda es obligatorio.",
+    invalidTechnicalFieldKey:
+      "La key técnica de campo es inválida. Usá solo letras, números o guion bajo (sin espacios ni tildes).",
     missingChannels: "Debes habilitar al menos un canal.",
     duplicateCode: "Ya existe un procedimiento con ese código.",
     notFound: "No se encontró el procedimiento solicitado.",
@@ -44,6 +46,8 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingName: "Procedure name is required.",
     missingFields: "At least one required field must be configured.",
     missingCamundaProcessId: "Camunda Process ID is required.",
+    invalidTechnicalFieldKey:
+      "Field technical key is invalid. Use only letters, numbers, or underscores (no spaces/accented/special chars).",
     missingChannels: "At least one channel must be enabled.",
     duplicateCode: "A procedure with that code already exists.",
     notFound: "Requested procedure was not found.",
@@ -61,6 +65,8 @@ const PROCEDURE_ADMIN_MESSAGES = {
     missingName: "O nome do procedimento é obrigatório.",
     missingFields: "Configure ao menos um campo solicitado para o procedimento.",
     missingCamundaProcessId: "O ID do processo do Camunda é obrigatório.",
+    invalidTechnicalFieldKey:
+      "A chave técnica do campo é inválida. Use apenas letras, números ou sublinhado (sem espaços/acentos/caracteres especiais).",
     missingChannels: "Configure ao menos um canal habilitado.",
     duplicateCode: "Já existe um procedimento com esse código.",
     notFound: "Não foi encontrado o procedimento solicitado.",
@@ -103,6 +109,20 @@ function normalizeCode(value) {
   return lookup.replace(/[\s-]+/g, "_").replace(/[^a-z0-9_]/g, "").slice(0, 120);
 }
 
+const TECHNICAL_FIELD_KEY_REGEX = /^[A-Za-z0-9_]{1,60}$/;
+
+function normalizeTechnicalFieldKey(value, maxLength = 60) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim().slice(0, maxLength);
+  return TECHNICAL_FIELD_KEY_REGEX.test(trimmed) ? trimmed : "";
+}
+
+function normalizeLegacyFieldKey(value, maxLength = 60) {
+  return normalizeLookup(value).replace(/[\s-]+/g, "_").replace(/[^a-z0-9_]/g, "").slice(0, maxLength);
+}
+
 function normalizeStringArray(value, maxLength = 120) {
   if (!Array.isArray(value)) {
     return [];
@@ -143,19 +163,29 @@ function normalizeEnabledChannels(value) {
   return output;
 }
 
-function normalizeRequiredFields(value) {
+function normalizeRequiredFields(value, { strict = false } = {}) {
   if (!Array.isArray(value)) {
-    return [];
+    return { fields: [], invalidKey: null };
   }
 
   const seenKeys = new Set();
   const output = [];
+  let invalidKey = null;
   value.forEach((rawField, index) => {
     if (!rawField || typeof rawField !== "object") {
       return;
     }
 
-    const key = normalizeCode(rawField.key).slice(0, 60);
+    const hasExplicitKey = typeof rawField.key === "string" && rawField.key.trim().length > 0;
+    const key =
+      normalizeTechnicalFieldKey(rawField.key, 60) ||
+      (!hasExplicitKey ? normalizeLegacyFieldKey(rawField.label || `field_${index + 1}`, 60) : "");
+    if (hasExplicitKey && !key) {
+      if (!invalidKey) {
+        invalidKey = normalizeText(rawField.key, 120);
+      }
+      return;
+    }
     if (!key || seenKeys.has(key)) {
       return;
     }
@@ -193,14 +223,18 @@ function normalizeRequiredFields(value) {
     });
   });
 
-  return output.sort((a, b) => a.order - b.order);
+  if (strict && invalidKey) {
+    return { fields: [], invalidKey };
+  }
+  return { fields: output.sort((a, b) => a.order - b.order), invalidKey: null };
 }
 
-function normalizeCamundaVariableMappings(value) {
+function normalizeCamundaVariableMappings(value, { strict = false } = {}) {
   if (!Array.isArray(value)) {
-    return [];
+    return { mappings: [], invalidFieldKey: null };
   }
   const mappings = [];
+  let invalidFieldKey = null;
   value.forEach((entry) => {
     if (!entry || typeof entry !== "object") {
       return;
@@ -211,7 +245,17 @@ function normalizeCamundaVariableMappings(value) {
       normalizedScope === "COMPLETE_TASK"
         ? normalizeText(entry.camundaTaskDefinitionKey, 160) || null
         : null;
-    const procedureFieldKey = normalizeCode(entry.procedureFieldKey).slice(0, 60);
+    const hasExplicitFieldKey =
+      typeof entry.procedureFieldKey === "string" && entry.procedureFieldKey.trim().length > 0;
+    const procedureFieldKey =
+      normalizeTechnicalFieldKey(entry.procedureFieldKey, 60) ||
+      (!hasExplicitFieldKey ? normalizeLegacyFieldKey(entry.procedureFieldKey || "", 60) : "");
+    if (hasExplicitFieldKey && !procedureFieldKey) {
+      if (!invalidFieldKey) {
+        invalidFieldKey = normalizeText(entry.procedureFieldKey, 120);
+      }
+      return;
+    }
     const camundaVariableName = normalizeText(entry.camundaVariableName, 160);
     if (!procedureFieldKey || !camundaVariableName) {
       return;
@@ -229,13 +273,16 @@ function normalizeCamundaVariableMappings(value) {
       enabled: entry.enabled !== false,
     });
   });
-  return mappings;
+  if (strict && invalidFieldKey) {
+    return { mappings: [], invalidFieldKey };
+  }
+  return { mappings, invalidFieldKey: null };
 }
 
 function validateCamundaVariableMappings(mappings, requiredFields) {
   const fieldKeys = new Set(
     (Array.isArray(requiredFields) ? requiredFields : [])
-      .map((field) => normalizeCode(field?.key || ""))
+      .map((field) => normalizeTechnicalFieldKey(field?.key || "", 60))
       .filter(Boolean)
   );
   const seenVariableNames = new Set();
@@ -297,7 +344,7 @@ function normalizeFlowDefinition(value) {
     if (!normalizedTaskKey || !rawConfig || typeof rawConfig !== "object") {
       return;
     }
-    const fieldKey = normalizeCode(rawConfig.fieldKey).slice(0, 60);
+    const fieldKey = normalizeTechnicalFieldKey(rawConfig.fieldKey, 60);
     const prompt = normalizeText(rawConfig.prompt, 280);
     if (!fieldKey || !prompt) {
       return;
@@ -334,7 +381,7 @@ function normalizeFlowDefinition(value) {
         return;
       }
       const camundaVariableName = normalizeText(rawVariable.camundaVariableName, 160);
-      const procedureFieldKey = normalizeCode(rawVariable.procedureFieldKey).slice(0, 60);
+      const procedureFieldKey = normalizeTechnicalFieldKey(rawVariable.procedureFieldKey, 60);
       if (!camundaVariableName && !procedureFieldKey) {
         return;
       }
@@ -381,7 +428,16 @@ function normalizeProcedurePayload(rawPayload, messages) {
     return { ok: false, error: messages.missingName };
   }
 
-  const fieldDefinitions = normalizeRequiredFields(payload.fieldDefinitions || payload.requiredFields || []);
+  const requiredFieldsResult = normalizeRequiredFields(payload.fieldDefinitions || payload.requiredFields || [], {
+    strict: true,
+  });
+  if (requiredFieldsResult.invalidKey) {
+    return {
+      ok: false,
+      error: `${messages.invalidTechnicalFieldKey} (key="${requiredFieldsResult.invalidKey}")`,
+    };
+  }
+  const fieldDefinitions = requiredFieldsResult.fields;
   if (fieldDefinitions.length === 0) {
     return { ok: false, error: messages.missingFields };
   }
@@ -394,7 +450,16 @@ function normalizeProcedurePayload(rawPayload, messages) {
     return { ok: false, error: messages.missingChannels };
   }
 
-  const camundaVariableMappings = normalizeCamundaVariableMappings(payload.camundaVariableMappings);
+  const mappingsResult = normalizeCamundaVariableMappings(payload.camundaVariableMappings, {
+    strict: true,
+  });
+  if (mappingsResult.invalidFieldKey) {
+    return {
+      ok: false,
+      error: `${messages.invalidTechnicalFieldKey} (key="${mappingsResult.invalidFieldKey}")`,
+    };
+  }
+  const camundaVariableMappings = mappingsResult.mappings;
   const mappingsValidation = validateCamundaVariableMappings(camundaVariableMappings, fieldDefinitions);
   if (!mappingsValidation.ok) {
     return { ok: false, error: mappingsValidation.error };

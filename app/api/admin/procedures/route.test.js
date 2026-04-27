@@ -132,6 +132,55 @@ describe("api/admin/procedures", () => {
     expect(body.procedure.isActive).toBe(false);
   });
 
+  it("PATCH conserva key técnica camelCase en fields y mappings Camunda", async () => {
+    const existing = createProcedure();
+    const updated = createProcedure({
+      requiredFields: [
+        { key: "comprobantePago", label: "Comprobante de pago", type: "image", required: true, order: 1 },
+      ],
+    });
+    mocks.getProcedureCatalogEntryByCode
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce(updated);
+    mocks.sqlQueue.push([{ id: "proc-1", code: "registrar_incidencia" }]);
+
+    const request = new Request("http://localhost/api/admin/procedures?locale=es", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalCode: "registrar_incidencia",
+        code: "registrar_incidencia",
+        name: "Registrar incidencia",
+        category: "Incidencia",
+        camundaProcessId: "proceso_incidencia_v1",
+        enabledChannels: ["web"],
+        requiredFields: [
+          { key: "comprobantePago", label: "Comprobante de pago", type: "image", required: true },
+        ],
+        camundaVariableMappings: [
+          {
+            scope: "START_INSTANCE",
+            procedureFieldKey: "comprobantePago",
+            camundaVariableName: "comprobantePago",
+            camundaVariableType: "json",
+            required: true,
+            enabled: true,
+          },
+        ],
+      }),
+    });
+    const response = await PATCH(request);
+    expect(response.status).toBe(200);
+    expect(mocks.replaceProcedureTypeFields).toHaveBeenCalledWith(
+      "proc-1",
+      expect.arrayContaining([expect.objectContaining({ key: "comprobantePago" })])
+    );
+    expect(mocks.replaceProcedureTypeCamundaVariableMappings).toHaveBeenCalledWith(
+      "proc-1",
+      expect.arrayContaining([expect.objectContaining({ procedureFieldKey: "comprobantePago" })])
+    );
+  });
+
   it("PATCH valida camundaProcessId obligatorio", async () => {
     mocks.getProcedureCatalogEntryByCode.mockResolvedValue(createProcedure());
     const request = new Request("http://localhost/api/admin/procedures?locale=es", {
@@ -174,6 +223,28 @@ describe("api/admin/procedures", () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/campo/i);
+  });
+
+  it("PATCH rechaza key técnica inválida en requiredFields", async () => {
+    mocks.getProcedureCatalogEntryByCode.mockResolvedValue(createProcedure());
+    const request = new Request("http://localhost/api/admin/procedures?locale=es", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalCode: "registrar_incidencia",
+        code: "registrar_incidencia",
+        name: "Registrar incidencia",
+        category: "Incidencia",
+        camundaProcessId: "proceso_incidencia_v1",
+        enabledChannels: ["web"],
+        requiredFields: [{ key: "comprobante pago", label: "Comprobante", type: "image", required: true }],
+      }),
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/key técnica|key=\"comprobante pago\"/i);
   });
 
   it("PATCH valida al menos un canal habilitado", async () => {

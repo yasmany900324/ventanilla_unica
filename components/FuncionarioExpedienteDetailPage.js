@@ -339,10 +339,14 @@ function buildProcedurePhotoPreviewUrl(procedureRequestId, collectedData) {
   if (!procedureRequestId || !collectedData || typeof collectedData !== "object") {
     return "";
   }
+  const catalogPhoto = collectedData.photo && typeof collectedData.photo === "object" ? collectedData.photo : null;
+  const catalogUrl =
+    catalogPhoto && typeof catalogPhoto.url === "string" ? catalogPhoto.url.trim() : "";
   const publicUrl =
-    typeof collectedData.photoAttachmentPublicUrl === "string"
+    catalogUrl ||
+    (typeof collectedData.photoAttachmentPublicUrl === "string"
       ? collectedData.photoAttachmentPublicUrl.trim()
-      : "";
+      : "");
   if (publicUrl) {
     return publicUrl;
   }
