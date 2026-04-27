@@ -878,6 +878,15 @@ function CaseQuickPreviewModal({
     return null;
   }
 
+  const isCompactInfoDialog =
+    previewState.type === "image_info" ||
+    previewState.type === "location_text" ||
+    (previewState.type === "map" && !previewState.coordinates);
+  const panelInlineStyle = isCompactInfoDialog
+    ? { width: "min(92vw, 520px)", maxWidth: "520px", minHeight: "auto" }
+    : undefined;
+  const titleInlineStyle = isCompactInfoDialog ? { whiteSpace: "nowrap", marginRight: "0.5rem" } : undefined;
+
   return createPortal(
     <div
       className="admin-roles-confirm-dialog expediente-preview-modal"
@@ -890,21 +899,34 @@ function CaseQuickPreviewModal({
         }
       }}
     >
-      <section className="admin-roles-confirm-dialog__panel expediente-preview-modal__panel">
+      <section
+        className="admin-roles-confirm-dialog__panel expediente-preview-modal__panel"
+        style={panelInlineStyle}
+      >
         <header className="admin-roles-confirm-dialog__header expediente-preview-modal__header">
-          <h2 id="expediente-preview-modal-title" className="admin-roles-confirm-dialog__title">
+          <h2
+            id="expediente-preview-modal-title"
+            className="admin-roles-confirm-dialog__title"
+            style={titleInlineStyle}
+          >
             {previewState.title}
           </h2>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="admin-roles-confirm-dialog__button admin-roles-confirm-dialog__button--ghost"
-            onClick={onClose}
-          >
-            Cerrar
-          </button>
+          {!isCompactInfoDialog ? (
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="button-inline button-inline--compact"
+              onClick={onClose}
+              style={{ marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              Cerrar
+            </button>
+          ) : null}
         </header>
-        <div className="expediente-preview-modal__content">
+        <div
+          className="expediente-preview-modal__content"
+          style={isCompactInfoDialog ? { minHeight: "auto", paddingBottom: "0.35rem" } : undefined}
+        >
           {previewState.type === "image" ? (
             previewState.imageUrl && !imageLoadError ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -970,13 +992,6 @@ function CaseQuickPreviewModal({
             <>
               <p className="small">Ubicación registrada sin coordenadas para mapa.</p>
               {previewState.locationText ? <p className="small">{previewState.locationText}</p> : null}
-              {previewState.locationSearchUrl ? (
-                <p className="small" style={{ marginTop: "0.5rem" }}>
-                  <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
-                    Buscar ubicación
-                  </a>
-                </p>
-              ) : null}
             </>
           ) : null}
           {previewState.type === "map" && mapRenderError && previewState.locationSearchUrl ? (
@@ -1000,10 +1015,32 @@ function CaseQuickPreviewModal({
           ) : null}
           {previewState.type === "image_info" && IS_DEVELOPMENT ? (
             <p className="small">
-              <span className="admin-procedure-table__mono">[quick-preview:image] filename found but public URL missing</span>
+              <span className="admin-procedure-table__mono">
+                [quick-preview:image] filename found but public URL missing
+              </span>
             </p>
           ) : null}
         </div>
+        {isCompactInfoDialog ? (
+          <footer
+            className="admin-roles-confirm-dialog__actions"
+            style={{ justifyContent: "flex-end", gap: "0.5rem", paddingTop: "0.25rem" }}
+          >
+            {previewState.locationSearchUrl ? (
+              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
+                Buscar ubicación
+              </a>
+            ) : null}
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="button-inline button-inline--compact"
+              onClick={onClose}
+            >
+              Cerrar
+            </button>
+          </footer>
+        ) : null}
       </section>
     </div>,
     document.body
