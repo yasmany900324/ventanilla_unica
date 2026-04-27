@@ -178,6 +178,9 @@ function resolveAttachmentValue(collectedData) {
     collectedData.image,
     collectedData.imageUrl,
     collectedData.attachmentUrl,
+    collectedData.photoAttachmentPublicUrl,
+    collectedData.photoAttachmentOriginalName,
+    collectedData.photoAttachmentStoredFilename,
   ];
   return candidates.find((item) => typeof item === "string" && item.trim()) || null;
 }
@@ -332,22 +335,51 @@ function formatLocationForDisplay(rawLocation) {
   return "Formato inválido";
 }
 
-function formatAttachmentForDisplay(rawAttachment) {
+function buildProcedurePhotoPreviewUrl(procedureRequestId, collectedData) {
+  if (!procedureRequestId || !collectedData || typeof collectedData !== "object") {
+    return "";
+  }
+  const publicUrl =
+    typeof collectedData.photoAttachmentPublicUrl === "string"
+      ? collectedData.photoAttachmentPublicUrl.trim()
+      : "";
+  if (publicUrl) {
+    return publicUrl;
+  }
+  const hasStoredReference = Boolean(
+    (typeof collectedData.photoAttachmentStorageKey === "string" &&
+      collectedData.photoAttachmentStorageKey.trim()) ||
+      (typeof collectedData.photoAttachmentStoredFilename === "string" &&
+        collectedData.photoAttachmentStoredFilename.trim())
+  );
+  if (String(collectedData.photoStatus || "").trim().toLowerCase() !== "provided" || !hasStoredReference) {
+    return "";
+  }
+  return `/api/funcionario/procedures/requests/${encodeURIComponent(procedureRequestId)}/photo`;
+}
+
+function formatAttachmentForDisplay(rawAttachment, options = {}) {
+  const fallbackLabel =
+    typeof options.labelFallback === "string" ? options.labelFallback.trim() : "";
+  const explicitPreviewUrl =
+    typeof options.previewUrl === "string" ? options.previewUrl.trim() : "";
   const normalized = normalizeImageReference(rawAttachment);
+  const resolvedPreviewUrl = explicitPreviewUrl || normalized.url || "";
+  const hasAnyAttachmentReference = Boolean(rawAttachment || fallbackLabel);
   let previewReason = "no_image_reference";
-  if (rawAttachment) {
-    if (!normalized.isValid) {
-      previewReason = "unsupported_or_unresolved";
-    } else if (normalized.url) {
+  if (hasAnyAttachmentReference) {
+    if (resolvedPreviewUrl) {
       previewReason = "preview_ready";
+    } else if (!normalized.isValid && !fallbackLabel) {
+      previewReason = "unsupported_or_unresolved";
     } else {
       previewReason = "filename_without_public_url";
     }
   }
   return {
-    isValid: normalized.isValid,
-    url: normalized.url,
-    label: normalized.displayName || "",
+    isValid: normalized.isValid || Boolean(resolvedPreviewUrl),
+    url: resolvedPreviewUrl || null,
+    label: normalized.displayName || fallbackLabel || "",
     previewReason,
   };
 }
@@ -377,6 +409,17 @@ function buildLocationSearchUrl(value) {
     return "";
   }
   return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+}
+
+function buildOpenStreetMapLinkFromCoordinates(coordinates) {
+  const lat = Number(coordinates?.lat);
+  const lng = Number(coordinates?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return "";
+  }
+  return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(
+    lng
+  )}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
 }
 
 function deriveCamundaStatus(procedureRequest, detail) {
@@ -567,7 +610,14 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   const typedLocation = resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, isLocationFieldType);
   const typedAttachment = resolveTypedFieldValueByMatcher(collectedData, fieldDefinitions, isImageFieldType);
   const rawAttachment = typedAttachment ?? resolveAttachmentValue(collectedData);
-  const attachmentDisplay = formatAttachmentForDisplay(rawAttachment);
+  const attachmentResolvedPreviewUrl = buildProcedurePhotoPreviewUrl(procedureRequestId, collectedData);
+  const attachmentDisplay = formatAttachmentForDisplay(rawAttachment, {
+    previewUrl: attachmentResolvedPreviewUrl,
+    labelFallback:
+      String(collectedData?.photoAttachmentOriginalName || "").trim() ||
+      String(collectedData?.photoAttachmentStoredFilename || "").trim(),
+  });
+  const hasAnyImageReference = Boolean(rawAttachment || attachmentResolvedPreviewUrl || attachmentDisplay.label);
   const canPreviewAttachment = Boolean(attachmentDisplay.url && attachmentDisplay.isValid);
   const hasPhotoProvided = String(collectedData?.photoStatus || "").trim().toLowerCase() === "provided";
   const hasPhotoSkipped = ["skipped", "not_requested"].includes(
@@ -604,7 +654,7 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   const locationSearchUrl = buildLocationSearchUrl(locationValue);
   const imageActionLabel = canPreviewAttachment
     ? "Ver imagen"
-    : rawAttachment
+    : hasAnyImageReference
       ? "Ver datos de imagen"
       : "Sin imagen";
   const locationActionLabel = canPreviewLocationMap
@@ -612,7 +662,7 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     : locationSearchUrl
       ? "Buscar ubicación"
       : "Ver ubicación registrada";
-  const showQuickImageCard = Boolean(hasImageTypeConfigured || rawAttachment || hasPhotoProvided);
+  const showQuickImageCard = Boolean(hasImageTypeConfigured || hasAnyImageReference || hasPhotoProvided);
   const showQuickLocationCard = Boolean(hasLocationTypeConfigured || rawLocation || locationCoordinates);
   const quickPreviewCards = [
     ...(showQuickImageCard
@@ -717,6 +767,8 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     rawAttachment,
     rawLocation,
     attachmentDisplay,
+    attachmentResolvedPreviewUrl,
+    hasAnyImageReference,
     imagePreviewReason,
     attachmentSummaryText,
     locationValue,
@@ -878,14 +930,13 @@ function CaseQuickPreviewModal({
     return null;
   }
 
-  const isCompactInfoDialog =
-    previewState.type === "image_info" ||
-    previewState.type === "location_text" ||
-    (previewState.type === "map" && !previewState.coordinates);
-  const panelInlineStyle = isCompactInfoDialog
-    ? { width: "min(92vw, 520px)", maxWidth: "520px", minHeight: "auto" }
-    : undefined;
-  const titleInlineStyle = isCompactInfoDialog ? { whiteSpace: "nowrap", marginRight: "0.5rem" } : undefined;
+  const isImagePreview = previewState.type === "image";
+  const isMapPreview = previewState.type === "map" && Boolean(previewState.coordinates);
+  const isCompactInfoDialog = !isImagePreview && !isMapPreview;
+  const panelModeClass = isCompactInfoDialog
+    ? "expediente-preview-modal__panel--compact"
+    : "expediente-preview-modal__panel--media";
+  const mapLink = buildOpenStreetMapLinkFromCoordinates(previewState.coordinates);
 
   return createPortal(
     <div
@@ -899,34 +950,31 @@ function CaseQuickPreviewModal({
         }
       }}
     >
-      <section
-        className="admin-roles-confirm-dialog__panel expediente-preview-modal__panel"
-        style={panelInlineStyle}
-      >
+      <section className={`admin-roles-confirm-dialog__panel expediente-preview-modal__panel ${panelModeClass}`}>
         <header className="admin-roles-confirm-dialog__header expediente-preview-modal__header">
-          <h2
-            id="expediente-preview-modal-title"
-            className="admin-roles-confirm-dialog__title"
-            style={titleInlineStyle}
+          <div className="expediente-preview-modal__heading">
+            <h2 id="expediente-preview-modal-title" className="admin-roles-confirm-dialog__title">
+              {previewState.title}
+            </h2>
+            <p className="expediente-preview-modal__subtitle">
+              {isImagePreview
+                ? "Vista previa de la imagen registrada."
+                : isMapPreview
+                  ? "Ubicación georreferenciada del expediente."
+                  : "Información registrada en el expediente."}
+            </p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="expediente-preview-modal__close"
+            onClick={onClose}
+            aria-label="Cerrar diálogo de vista rápida"
           >
-            {previewState.title}
-          </h2>
-          {!isCompactInfoDialog ? (
-            <button
-              ref={closeButtonRef}
-              type="button"
-              className="button-inline button-inline--compact"
-              onClick={onClose}
-              style={{ marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0 }}
-            >
-              Cerrar
-            </button>
-          ) : null}
+            ×
+          </button>
         </header>
-        <div
-          className="expediente-preview-modal__content"
-          style={isCompactInfoDialog ? { minHeight: "auto", paddingBottom: "0.35rem" } : undefined}
-        >
+        <div className="expediente-preview-modal__content">
           {previewState.type === "image" ? (
             previewState.imageUrl && !imageLoadError ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -946,30 +994,32 @@ function CaseQuickPreviewModal({
                 }}
               />
             ) : (
-              <>
+              <div className="expediente-preview-modal__info">
                 <p className="small">No se pudo cargar la imagen.</p>
                 {previewState.imageReference ? (
-                  <p className="small">
-                    Referencia técnica:{" "}
-                    <span className="admin-procedure-table__mono">{previewState.imageReference}</span>
-                  </p>
+                  <dl className="expediente-preview-modal__meta">
+                    <dt>Referencia</dt>
+                    <dd className="admin-procedure-table__mono">{previewState.imageReference}</dd>
+                  </dl>
                 ) : null}
-              </>
+              </div>
             )
           ) : previewState.type === "image_info" ? (
-            <>
+            <div className="expediente-preview-modal__info">
               <p className="small">Imagen registrada, pero no hay URL pública disponible para previsualizar.</p>
               {previewState.imageReference ? (
-                <p className="small">
-                  Referencia técnica:{" "}
-                  <span className="admin-procedure-table__mono">{previewState.imageReference}</span>
-                </p>
+                <dl className="expediente-preview-modal__meta">
+                  <dt>Archivo</dt>
+                  <dd className="admin-procedure-table__mono">{previewState.imageReference}</dd>
+                </dl>
               ) : null}
-            </>
+            </div>
           ) : previewState.type === "map" ? (
             previewState.coordinates ? (
               mapRenderError ? (
-                <p className="small">No se pudo renderizar el mapa con las coordenadas disponibles.</p>
+                <div className="expediente-preview-modal__info">
+                  <p className="small">No se pudo renderizar el mapa con las coordenadas disponibles.</p>
+                </div>
               ) : (
                 <div className="expediente-preview-modal__map">
                   <MapRenderErrorBoundary
@@ -986,31 +1036,32 @@ function CaseQuickPreviewModal({
                 </div>
               )
             ) : (
-              <p className="small">No hay coordenadas suficientes para mostrar el mapa.</p>
+              <div className="expediente-preview-modal__info">
+                <p className="small">No hay coordenadas suficientes para mostrar el mapa.</p>
+              </div>
             )
           ) : previewState.type === "location_text" ? (
-            <>
+            <div className="expediente-preview-modal__info">
               <p className="small">Ubicación registrada sin coordenadas para mapa.</p>
-              {previewState.locationText ? <p className="small">{previewState.locationText}</p> : null}
-            </>
+              {previewState.locationText ? (
+                <dl className="expediente-preview-modal__meta">
+                  <dt>Ubicación</dt>
+                  <dd>{previewState.locationText}</dd>
+                </dl>
+              ) : null}
+            </div>
           ) : null}
-          {previewState.type === "map" && mapRenderError && previewState.locationSearchUrl ? (
-            <p className="small" style={{ marginTop: "0.5rem" }}>
-              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
-                Buscar ubicación
-              </a>
-            </p>
+          {isMapPreview && previewState.coordinates ? (
+            <dl className="expediente-preview-modal__meta">
+              <dt>Coordenadas</dt>
+              <dd className="admin-procedure-table__mono">
+                {Number(previewState.coordinates.lat).toFixed(6)}, {Number(previewState.coordinates.lng).toFixed(6)}
+              </dd>
+            </dl>
           ) : null}
           {previewState.type === "map" && mapRenderError && IS_DEVELOPMENT ? (
             <p className="small">
               <span className="admin-procedure-table__mono">[quick-preview:location] map render error</span>
-            </p>
-          ) : null}
-          {previewState.type === "map" && !previewState.coordinates && previewState.locationSearchUrl ? (
-            <p className="small" style={{ marginTop: "0.5rem" }}>
-              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
-                Buscar ubicación
-              </a>
             </p>
           ) : null}
           {previewState.type === "image_info" && IS_DEVELOPMENT ? (
@@ -1021,26 +1072,36 @@ function CaseQuickPreviewModal({
             </p>
           ) : null}
         </div>
-        {isCompactInfoDialog ? (
-          <footer
-            className="admin-roles-confirm-dialog__actions"
-            style={{ justifyContent: "flex-end", gap: "0.5rem", paddingTop: "0.25rem" }}
-          >
-            {previewState.locationSearchUrl ? (
-              <a href={previewState.locationSearchUrl} target="_blank" rel="noreferrer" className="button-inline">
-                Buscar ubicación
-              </a>
-            ) : null}
-            <button
-              ref={closeButtonRef}
-              type="button"
-              className="button-inline button-inline--compact"
-              onClick={onClose}
+        <footer className="expediente-preview-modal__actions">
+          {isImagePreview && previewState.imageUrl ? (
+            <a
+              href={previewState.imageUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="button-inline expediente-preview-modal__action-link"
             >
-              Cerrar
-            </button>
-          </footer>
-        ) : null}
+              Abrir en nueva pestaña
+            </a>
+          ) : null}
+          {isMapPreview && mapLink ? (
+            <a href={mapLink} target="_blank" rel="noreferrer" className="button-inline expediente-preview-modal__action-link">
+              Abrir en OpenStreetMap
+            </a>
+          ) : null}
+          {!isMapPreview && previewState.locationSearchUrl ? (
+            <a
+              href={previewState.locationSearchUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="button-inline expediente-preview-modal__action-link"
+            >
+              Buscar ubicación
+            </a>
+          ) : null}
+          <button type="button" className="button-inline button-inline--compact expediente-preview-modal__action-close" onClick={onClose}>
+            Cerrar
+          </button>
+        </footer>
       </section>
     </div>,
     document.body
@@ -1235,6 +1296,8 @@ export default function FuncionarioExpedienteDetailPage() {
     rawAttachment,
     rawLocation,
     attachmentDisplay,
+    attachmentResolvedPreviewUrl,
+    hasAnyImageReference,
     imagePreviewReason,
     attachmentSummaryText,
     locationValue,
@@ -1277,7 +1340,9 @@ export default function FuncionarioExpedienteDetailPage() {
     console.log("resolvedImagePreview", {
       rawAttachment,
       imageFieldKey,
+      attachmentResolvedPreviewUrl,
       display: attachmentDisplay,
+      hasAnyImageReference,
       canPreviewAttachment,
     });
     console.log("resolvedLocationPreview", {
@@ -1295,11 +1360,13 @@ export default function FuncionarioExpedienteDetailPage() {
     attachmentDisplay,
     canPreviewAttachment,
     canPreviewLocationMap,
+    hasAnyImageReference,
     collectedData,
     fieldDefinitions,
     imageFields,
     imageFieldKey,
     imagePreviewReason,
+    attachmentResolvedPreviewUrl,
     locationCoordinates,
     locationFields,
     locationPreviewReason,
@@ -1416,7 +1483,7 @@ export default function FuncionarioExpedienteDetailPage() {
       quickPreviewTriggerRef.current = null;
     }
     if (previewType === "image") {
-      if (!rawAttachment) {
+      if (!hasAnyImageReference) {
         return;
       }
       const modalType = canPreviewAttachment && attachmentDisplay.url ? "image" : "image_info";
@@ -1443,7 +1510,7 @@ export default function FuncionarioExpedienteDetailPage() {
       setQuickPreviewModal({
         isOpen: true,
         type: modalType,
-        title: "Ubicación en mapa",
+        title: modalType === "map" ? "Ubicación en mapa" : "Ubicación registrada",
         imageUrl: "",
         imageAlt: "",
         coordinates: locationCoordinates,
@@ -1674,7 +1741,7 @@ export default function FuncionarioExpedienteDetailPage() {
                         type="button"
                         className="button-inline button-inline--compact"
                         onClick={(event) => openQuickPreview(event, "image")}
-                        disabled={!rawAttachment}
+                        disabled={!hasAnyImageReference}
                         title={canPreviewAttachment ? "Ver imagen" : "Ver datos de imagen registrada"}
                       >
                         {imageActionLabel}
@@ -1738,9 +1805,9 @@ export default function FuncionarioExpedienteDetailPage() {
                           type="button"
                           className="button-inline button-inline--compact"
                           onClick={(event) => openQuickPreview(event, "image")}
-                          disabled={!rawAttachment}
+                          disabled={!hasAnyImageReference}
                         >
-                          {canPreviewAttachment ? "Ampliar" : "Ver datos"}
+                          {canPreviewAttachment ? "Ampliar imagen" : "Ver datos"}
                         </button>
                       </article>
                     ) : null}
@@ -1782,7 +1849,7 @@ export default function FuncionarioExpedienteDetailPage() {
                           onClick={(event) => openQuickPreview(event, "location")}
                           disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
                         >
-                          {canPreviewLocationMap ? "Ampliar" : locationSearchUrl ? "Buscar ubicación" : "Ver datos"}
+                          {canPreviewLocationMap ? "Ampliar mapa" : locationSearchUrl ? "Buscar ubicación" : "Ver datos"}
                         </button>
                       </article>
                     ) : null}
