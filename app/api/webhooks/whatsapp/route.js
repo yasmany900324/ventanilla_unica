@@ -230,6 +230,14 @@ export async function POST(request) {
         console.error("[whatsapp] assistant error", {
           waId: maskWaId(item.waId),
           status: result.status,
+          sessionId,
+          flowKey: result?.snapshot?.flowKey || null,
+          state: result?.snapshot?.state || null,
+          currentStep: result?.snapshot?.currentStep || null,
+          confirmationState: result?.snapshot?.confirmationState || null,
+          action: result?.body?.action || null,
+          nextStep: result?.body?.nextStep || null,
+          error: typeof result?.body?.error === "string" ? result.body.error.slice(0, 280) : null,
         });
         await sendWhatsAppTextMessage({
           to: item.waId,
@@ -252,7 +260,14 @@ export async function POST(request) {
         });
       }
     } catch (error) {
-      console.error("[whatsapp] turn failed", { waId: maskWaId(item.waId), error });
+      console.error("[whatsapp] turn failed", {
+        waId: maskWaId(item.waId),
+        sessionId,
+        message: error?.message || null,
+        code: error?.code || null,
+        stack: typeof error?.stack === "string" ? error.stack.slice(0, 1200) : null,
+        inboundType: normalized.type,
+      });
       await sendWhatsAppTextMessage({
         to: item.waId,
         text: "Ocurrió un error interno. Intenta más tarde.",
