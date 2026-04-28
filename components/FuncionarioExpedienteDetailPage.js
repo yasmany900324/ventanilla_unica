@@ -10,6 +10,11 @@ import { useLocale } from "./LocaleProvider";
 import { normalizeImageReference } from "../lib/imageReference";
 import {
   ACTIVE_TASK_API_MISS_USER_MESSAGE,
+  buildCamundaAdvanceActionSummaryLabel,
+  buildCamundaAssigneeResponsibilityLabel,
+  buildFunctionalWorkflowStateLabel,
+  buildInboxRelationLabelFromOwner,
+  buildOperativeStepLabel,
   buildOperationalSituation,
   computeRequiresCamundaRetry,
   deriveCamundaStatus,
@@ -108,18 +113,6 @@ function parseJsonInput(value, fallback = {}) {
 
 function stringifyJson(value) {
   return JSON.stringify(value || {}, null, 2);
-}
-
-function humanizeTaskKey(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return "Sin tarea activa";
-  }
-  return normalized
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 function getLocalStatusLabel(value) {
@@ -508,6 +501,8 @@ function normalizeDetailResponse(payload) {
         taskDefinitionKey: rawActiveTask.taskDefinitionKey || null,
         taskDefinitionName: rawActiveTask.name || null,
         name: rawActiveTask.name || null,
+        taskName: rawActiveTask.taskName != null ? String(rawActiveTask.taskName).trim() || null : null,
+        label: rawActiveTask.label != null ? String(rawActiveTask.label).trim() || null : null,
         assignee: rawActiveTask.assignee ?? null,
         state: rawActiveTask.state || null,
         createdAt: rawActiveTask.createdAt || null,
@@ -528,7 +523,7 @@ function normalizeDetailResponse(payload) {
 }
 
 /** Pure view-model for expediente detail; keeps SSR/minifier from reordering TDZ-prone const chains in the component. */
-function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, actionLoadingKey, isAdmin) {
+function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, actionLoadingKey, isAdmin, currentUserId) {
   const availableActions = Array.isArray(detail?.availableActions) ? detail.availableActions : [];
   const procedureRequest = detail?.procedureRequest || null;
   const isAvailable = procedureRequest?.assignmentScope === "available";
@@ -633,10 +628,7 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   ];
   const caseDescription = resolvePrimaryDescription(procedureRequest, collectedData);
   const contactEmail = resolveContactEmail(procedureRequest, collectedData);
-  const activeTaskLabel =
-    detail?.activeTaskDisplay?.title ||
-    detail?.activeTask?.taskDefinitionName ||
-    humanizeTaskKey(detail?.activeTask?.taskDefinitionKey);
+  const operativeStepLabel = buildOperativeStepLabel(detail?.activeTask);
   const activeTaskDescription = String(detail?.activeTaskDisplay?.description || "").trim();
   const trackingCode = procedureRequest?.requestCode || null;
   const camundaStatusKey = deriveCamundaStatus(procedureRequest, detail);
@@ -684,15 +676,22 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     requiresCamundaRetry,
     isInitialCamundaSyncPending,
   });
-  const responsibleLabel = procedureRequest?.assignedToUserId
-    ? "Funcionario asignado"
-    : "Sin funcionario asignado";
-  const relationLabel =
-    getAssignmentScopeLabel(procedureRequest) === "Sin relación"
-      ? "No asignado a mi bandeja"
-      : getAssignmentScopeLabel(procedureRequest);
-  const activeTaskOperationalLabel =
-    activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+  const inboxBandejaRelationLabel = buildInboxRelationLabelFromOwner(
+    procedureRequest?.assignedToUserId,
+    currentUserId
+  );
+  const camundaAssigneeResponsibilityLabel = buildCamundaAssigneeResponsibilityLabel(
+    detail?.activeTask?.assignee,
+    currentUserId
+  );
+  const processStateUpper = String(detail?.operationalState?.process?.state || "").trim();
+  const functionalWorkflowStateLabel = buildFunctionalWorkflowStateLabel({
+    hasActiveTask,
+    activeTask: detail?.activeTask,
+    processStateUpper,
+    camundaStatusKey,
+  });
+  const camundaAdvanceActionSummaryLabel = buildCamundaAdvanceActionSummaryLabel(operationalActions);
   const camundaTaskStateDisplay = hasActiveTask
     ? String(detail?.activeTask?.state || "").trim() || "—"
     : "—";
@@ -701,6 +700,12 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     : detail?.activeTask?.assignee != null && String(detail.activeTask.assignee).trim()
       ? String(detail.activeTask.assignee).trim()
       : "Sin asignar";
+  const camundaLiveProcessInstanceKey =
+    detail?.operationalState?.process?.instanceKey != null &&
+    String(detail.operationalState.process.instanceKey).trim()
+      ? String(detail.operationalState.process.instanceKey).trim()
+      : null;
+  const camundaProcessStateDisplay = String(detail?.operationalState?.process?.state || "").trim() || "—";
   const operationalErrors = Array.isArray(detail?.operationalState?.errors)
     ? detail.operationalState.errors
     : [];
@@ -751,9 +756,13 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     syncSecondaryButtonLabel,
     isRetrySyncLoading,
     operationalSituation,
-    responsibleLabel,
-    relationLabel,
-    activeTaskOperationalLabel,
+    operativeStepLabel,
+    functionalWorkflowStateLabel,
+    camundaAssigneeResponsibilityLabel,
+    inboxBandejaRelationLabel,
+    camundaAdvanceActionSummaryLabel,
+    camundaLiveProcessInstanceKey,
+    camundaProcessStateDisplay,
     retrySyncAction,
     operationalErrors,
     primaryOperationalError,
@@ -1184,8 +1193,15 @@ export default function FuncionarioExpedienteDetailPage() {
   }, [isBackofficeManager, isLoadingAuth, loadDetail, procedureRequestId, user]);
 
   const expedienteViewModel = useMemo(
-    () => buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, actionLoadingKey, isAdmin),
-    [actionLoadingKey, detail, isAdmin, procedureRequestId]
+    () =>
+      buildFuncionarioExpedientePageViewModel(
+        detail,
+        procedureRequestId,
+        actionLoadingKey,
+        isAdmin,
+        user?.id
+      ),
+    [actionLoadingKey, detail, isAdmin, procedureRequestId, user?.id]
   );
 
   const runAction = async (action) => {
@@ -1289,9 +1305,13 @@ export default function FuncionarioExpedienteDetailPage() {
     syncSecondaryButtonLabel,
     isRetrySyncLoading,
     operationalSituation,
-    responsibleLabel,
-    relationLabel,
-    activeTaskOperationalLabel,
+    operativeStepLabel,
+    functionalWorkflowStateLabel,
+    camundaAssigneeResponsibilityLabel,
+    inboxBandejaRelationLabel,
+    camundaAdvanceActionSummaryLabel,
+    camundaLiveProcessInstanceKey,
+    camundaProcessStateDisplay,
     retrySyncAction,
     operationalErrors,
     primaryOperationalError,
@@ -1910,36 +1930,24 @@ export default function FuncionarioExpedienteDetailPage() {
                 </dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Estado del proceso (Camunda)</dt>
-                <dd>{detail?.operationalState?.process?.state || "-"}</dd>
+                <dt>Paso actual</dt>
+                <dd>{operativeStepLabel}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Situación</dt>
-                <dd>{operationalSituation}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Tarea activa</dt>
-                <dd>{activeTaskOperationalLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Estado tarea (Camunda)</dt>
-                <dd>{camundaTaskStateDisplay}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Responsable Camunda</dt>
-                <dd>{camundaTaskAssigneeCamundaLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Tarea ID (Camunda)</dt>
-                <dd>{detail?.activeTask?.id || detail?.activeTask?.taskId || "-"}</dd>
+                <dt>Estado</dt>
+                <dd>{functionalWorkflowStateLabel}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Responsable</dt>
-                <dd>{responsibleLabel}</dd>
+                <dd>{camundaAssigneeResponsibilityLabel}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Relación con mi bandeja</dt>
-                <dd>{relationLabel}</dd>
+                <dd>{inboxBandejaRelationLabel}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Acción para avanzar</dt>
+                <dd>{camundaAdvanceActionSummaryLabel}</dd>
               </div>
             </dl>
             {activeTaskDescription ? (
@@ -1999,6 +2007,45 @@ export default function FuncionarioExpedienteDetailPage() {
 
           <section className="card dashboard-section admin-procedure-fields">
             <h3>Información técnica</h3>
+
+            <details>
+              <summary>Camunda — snapshot operativo (técnico)</summary>
+              <p className="small">
+                <strong>Estado del proceso (Camunda):</strong> {camundaProcessStateDisplay}
+              </p>
+              <p className="small">
+                <strong>Estado tarea (Camunda):</strong> {camundaTaskStateDisplay}
+              </p>
+              <p className="small">
+                <strong>Tarea ID (Camunda):</strong>{" "}
+                <span className="admin-procedure-table__mono">
+                  {detail?.activeTask?.id || detail?.activeTask?.taskId || "-"}
+                </span>
+              </p>
+              <p className="small">
+                <strong>taskDefinitionKey / elementId:</strong>{" "}
+                <span className="admin-procedure-table__mono">
+                  {detail?.activeTask?.taskDefinitionKey || "-"}
+                </span>
+              </p>
+              <p className="small">
+                <strong>processInstanceKey (live):</strong>{" "}
+                <span className="admin-procedure-table__mono">{camundaLiveProcessInstanceKey || "-"}</span>
+              </p>
+              <p className="small">
+                <strong>Assignee (Camunda, id):</strong>{" "}
+                <span className="admin-procedure-table__mono">{camundaTaskAssigneeCamundaLabel}</span>
+              </p>
+              <p className="small">
+                <strong>Situación (diagnóstico):</strong> {operationalSituation}
+              </p>
+              {detail?.activeTaskDisplay?.title ? (
+                <p className="small">
+                  <strong>activeTaskDisplay.title:</strong>{" "}
+                  <span className="admin-procedure-table__mono">{detail.activeTaskDisplay.title}</span>
+                </p>
+              ) : null}
+            </details>
 
             <details>
               <summary>Ver datos técnicos del expediente</summary>
