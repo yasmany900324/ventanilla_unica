@@ -1,4 +1,5 @@
 import React from "react";
+import { buildCitizenProcedurePhotoPreviewUrl } from "../lib/funcionarioPhotoPreview";
 
 export const TERMINAL_STATUSES = new Set(["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"]);
 
@@ -164,9 +165,8 @@ export function resolvePhotoData(procedureRequest) {
     catalogPhoto && typeof catalogPhoto.filename === "string" ? catalogPhoto.filename.trim() : "";
   const publicUrl =
     catalogUrl ||
-    (typeof collectedData.photoAttachmentPublicUrl === "string"
-      ? collectedData.photoAttachmentPublicUrl.trim()
-      : "");
+    buildCitizenProcedurePhotoPreviewUrl(procedureRequest?.id || "", collectedData) ||
+    "";
   const fileName =
     catalogFileName ||
     (typeof collectedData.photoAttachmentOriginalName === "string" &&

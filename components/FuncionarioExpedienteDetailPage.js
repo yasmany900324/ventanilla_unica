@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { normalizeImageReference } from "../lib/imageReference";
+import { buildProcedurePhotoPreviewUrl } from "../lib/funcionarioPhotoPreview";
 import {
   ACTIVE_TASK_API_MISS_USER_MESSAGE,
   buildCamundaAssigneeResponsibilityLabel,
@@ -379,33 +380,6 @@ function formatLocationForDisplay(rawLocation) {
     }
   }
   return "Formato inválido";
-}
-
-function buildProcedurePhotoPreviewUrl(procedureRequestId, collectedData) {
-  if (!procedureRequestId || !collectedData || typeof collectedData !== "object") {
-    return "";
-  }
-  const catalogPhoto = collectedData.photo && typeof collectedData.photo === "object" ? collectedData.photo : null;
-  const catalogUrl =
-    catalogPhoto && typeof catalogPhoto.url === "string" ? catalogPhoto.url.trim() : "";
-  const publicUrl =
-    catalogUrl ||
-    (typeof collectedData.photoAttachmentPublicUrl === "string"
-      ? collectedData.photoAttachmentPublicUrl.trim()
-      : "");
-  if (publicUrl) {
-    return publicUrl;
-  }
-  const hasStoredReference = Boolean(
-    (typeof collectedData.photoAttachmentStorageKey === "string" &&
-      collectedData.photoAttachmentStorageKey.trim()) ||
-      (typeof collectedData.photoAttachmentStoredFilename === "string" &&
-        collectedData.photoAttachmentStoredFilename.trim())
-  );
-  if (String(collectedData.photoStatus || "").trim().toLowerCase() !== "provided" || !hasStoredReference) {
-    return "";
-  }
-  return `/api/funcionario/procedures/requests/${encodeURIComponent(procedureRequestId)}/photo`;
 }
 
 function formatAttachmentForDisplay(rawAttachment, options = {}) {
