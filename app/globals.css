@@ -8441,6 +8441,127 @@ a.dashboard-onify-detail-btn {
   color: #2a5ca9;
 }
 
+.funcionario-expediente-detail__flow-muted {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #5c6f88;
+  line-height: 1.45;
+}
+
+.funcionario-expediente-detail__flow-error {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #8b1c1c;
+  line-height: 1.45;
+}
+
+.funcionario-expediente-detail__flow-block {
+  margin-top: 1rem;
+}
+
+.funcionario-expediente-detail__flow-block:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.funcionario-expediente-detail__flow-heading {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6a7f9a;
+}
+
+.funcionario-expediente-detail__flow-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.funcionario-expediente-detail__flow-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1f3d66;
+}
+
+.funcionario-expediente-detail__flow-check {
+  color: #1f6f2d;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.funcionario-expediente-detail__flow-note {
+  margin-top: 0.55rem;
+}
+
+.funcionario-expediente-detail__flow-current {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #123360;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.funcionario-expediente-detail__flow-bullet {
+  color: #2a5ca9;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.funcionario-expediente-detail__flow-next-line {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #2b3f5c;
+}
+
+.funcionario-expediente-detail__flow-next-intro {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #2b3f5c;
+}
+
+.funcionario-expediente-detail__flow-alt-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: #2b3f5c;
+}
+
+.funcionario-expediente-detail__flow-alt-cond {
+  font-weight: 600;
+  color: #154189;
+}
+
+.funcionario-expediente-detail__flow-actions {
+  margin-top: 1.1rem;
+}
+
+.funcionario-expediente-detail__flow-diagram-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.funcionario-expediente-detail__rail-current-step {
+  margin: 0.65rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #d8e4f4;
+  background: #f8fbff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1f3d66;
+}
+
 .funcionario-expediente-detail__status-dl {
   margin: 0;
   display: grid;

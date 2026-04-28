@@ -1,37 +1,16 @@
-import { FUNCIONARIO_WORKFLOW_STEPS } from "../../lib/funcionarioExpedienteDetailWorkflow";
-
-function MiniDots({ currentIndex }) {
-  const safeIndex = Math.min(Math.max(Number(currentIndex) || 0, 0), FUNCIONARIO_WORKFLOW_STEPS.length - 1);
-  return (
-    <div className="funcionario-expediente-detail__mini-dots" aria-hidden="true">
-      {FUNCIONARIO_WORKFLOW_STEPS.map((step, index) => (
-        <span
-          key={step.id}
-          className={`funcionario-expediente-detail__mini-dot ${
-            index < safeIndex
-              ? "funcionario-expediente-detail__mini-dot--done"
-              : index === safeIndex
-                ? "funcionario-expediente-detail__mini-dot--current"
-                : ""
-          }`}
-          title={step.label}
-        />
-      ))}
-    </div>
-  );
-}
-
 /**
  * Estado del trámite en lenguaje humano (panel lateral).
  */
 export default function CaseTramiteStatusCard({
-  currentStepIndex,
+  currentStepLabel,
   operativeStepLabel,
   expedienteStatusLabel,
   taskAssigneeLabel,
   bandejaLabel,
   siguienteAccionLabel,
 }) {
+  const displayCurrent = String(currentStepLabel || operativeStepLabel || "").trim() || "—";
+
   return (
     <section className="dashboard-onify-card dashboard-onify-section funcionario-expediente-detail__card funcionario-expediente-detail__card--rail">
       <div className="dashboard-onify-section__head dashboard-onify-section__head--stacked">
@@ -66,10 +45,7 @@ export default function CaseTramiteStatusCard({
           <dd>{siguienteAccionLabel || "—"}</dd>
         </div>
       </dl>
-      <div className="funcionario-expediente-detail__mini-progress">
-        <p className="funcionario-expediente-detail__mini-progress-label">Avance por etapas</p>
-        <MiniDots currentIndex={currentStepIndex} />
-      </div>
+      <p className="funcionario-expediente-detail__rail-current-step">Paso actual (proceso): {displayCurrent}</p>
     </section>
   );
 }

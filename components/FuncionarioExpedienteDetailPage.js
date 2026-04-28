@@ -20,7 +20,6 @@ import {
   splitOperationalErrors,
 } from "../lib/funcionarioExpedienteOperationalCamunda";
 import { deriveFuncionarioExpedienteActionUi } from "../lib/funcionarioExpedienteDetailActionUi";
-import { inferFuncionarioWorkflowProgress } from "../lib/funcionarioExpedienteDetailWorkflow";
 import CaseHeader from "./funcionarioExpedienteDetail/CaseHeader";
 import CaseSummaryCard from "./funcionarioExpedienteDetail/CaseSummaryCard";
 import CitizenInfoCard from "./funcionarioExpedienteDetail/CitizenInfoCard";
@@ -1041,6 +1040,8 @@ export default function FuncionarioExpedienteDetailPage() {
 
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(true);
+  const [flowSummary, setFlowSummary] = useState(null);
+  const [flowSummaryError, setFlowSummaryError] = useState(null);
   const [fatalError, setFatalError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [actionError, setActionError] = useState("");
@@ -1095,10 +1096,13 @@ export default function FuncionarioExpedienteDetailPage() {
     setActionError("");
     setSuccessMessage("");
     setDeleteTechnicalDetail("");
+    setFlowSummaryError(null);
     try {
-      const response = await fetch(`/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`, {
-        cache: "no-store",
-      });
+      const base = `/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`;
+      const [response, summaryResponse] = await Promise.all([
+        fetch(base, { cache: "no-store" }),
+        fetch(`${base}/process-flow-summary`, { cache: "no-store" }),
+      ]);
       const data = await response.json();
       if (!response.ok) {
         if (response.status === 404) {
@@ -1112,15 +1116,36 @@ export default function FuncionarioExpedienteDetailPage() {
           setFatalError({ message: data?.error || "No se pudo cargar el detalle del expediente." });
         }
         setDetail(null);
+        setFlowSummary(null);
+        setFlowSummaryError(null);
         return;
       }
       setDetail(normalizeDetailResponse(data));
       setCompleteVariablesJson("{}");
       setInternalObservation("");
       setNextStatus("");
+      if (summaryResponse.ok) {
+        const summaryData = await summaryResponse.json();
+        setFlowSummary(summaryData && typeof summaryData === "object" ? summaryData : null);
+        setFlowSummaryError(null);
+      } else {
+        setFlowSummary(null);
+        let msg = "No se pudo cargar el resumen del flujo.";
+        try {
+          const errBody = await summaryResponse.json();
+          if (errBody?.error) {
+            msg = String(errBody.error);
+          }
+        } catch {
+          /* ignore */
+        }
+        setFlowSummaryError(msg);
+      }
     } catch (_error) {
       setFatalError({ message: "No se pudo cargar el detalle del expediente." });
       setDetail(null);
+      setFlowSummary(null);
+      setFlowSummaryError(null);
     } finally {
       setDetailLoading(false);
     }
@@ -1256,27 +1281,10 @@ export default function FuncionarioExpedienteDetailPage() {
     camundaTaskAssigneeCamundaLabel,
   } = expedienteViewModel;
 
-  const workflowProgress = useMemo(
-    () =>
-      inferFuncionarioWorkflowProgress({
-        procedureStatus: procedureRequest?.status,
-        operativeStepLabel,
-        hasActiveTask: Boolean(detail?.activeTask?.taskDefinitionKey),
-      }),
-    [detail?.activeTask?.taskDefinitionKey, operativeStepLabel, procedureRequest?.status]
-  );
-
   const actionCardBadge = useMemo(
     () => resolveActionCardBadge({ isAvailable, functionalWorkflowStateLabel }),
     [functionalWorkflowStateLabel, isAvailable]
   );
-
-  const progressInstruction = useMemo(() => {
-    const tail =
-      activeTaskDescription ||
-      "Revisá la información del caso y usá la acción principal para continuar con el trámite.";
-    return `Paso actual: ${operativeStepLabel}. ${tail}`;
-  }, [activeTaskDescription, operativeStepLabel]);
 
   const expedienteActionLayout = useMemo(() => {
     const scope = procedureRequest?.assignmentScope;
@@ -1772,7 +1780,13 @@ export default function FuncionarioExpedienteDetailPage() {
                 whatsappPhone={procedureRequest.whatsappPhone}
                 email={contactEmail}
               />
-              <CaseProgressCard currentIndex={workflowProgress.currentIndex} instructionText={progressInstruction} />
+              <CaseProgressCard
+                procedureRequestId={procedureRequestId}
+                summary={flowSummary}
+                summaryLoading={detailLoading}
+                summaryError={flowSummaryError}
+                camundaProcessState={detail?.operationalState?.process?.state || null}
+              />
               {expedienteActionLayout.wideCompleteAction ? (
                 <CompleteStepWideCard
                   action={expedienteActionLayout.wideCompleteAction}
@@ -1794,7 +1808,7 @@ export default function FuncionarioExpedienteDetailPage() {
             </div>
             <aside className="funcionario-expediente-detail__col-rail">
               <CaseTramiteStatusCard
-                currentStepIndex={workflowProgress.currentIndex}
+                currentStepLabel={flowSummary?.current?.label || null}
                 operativeStepLabel={operativeStepLabel}
                 expedienteStatusLabel={getLocalStatusLabel(procedureRequest.status)}
                 taskAssigneeLabel={camundaAssigneeResponsibilityLabel}
