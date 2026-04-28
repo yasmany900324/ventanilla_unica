@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getLiveCamundaTaskSnapshot: vi.fn(),
   getCamundaProcessInstance: vi.fn(),
   getCamundaProcessDefinitionXml: vi.fn(),
+  resolveProcedureCamundaProcessDefinitionKey: vi.fn(),
   getProcedureCatalogEntryById: vi.fn(),
 }));
 
@@ -30,6 +31,10 @@ vi.mock("../../../../../../../lib/camunda/client", async () => {
     getCamundaProcessDefinitionXml: mocks.getCamundaProcessDefinitionXml,
   };
 });
+
+vi.mock("../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionKey", () => ({
+  resolveProcedureCamundaProcessDefinitionKey: mocks.resolveProcedureCamundaProcessDefinitionKey,
+}));
 
 vi.mock("../../../../../../../lib/procedureCatalog", () => ({
   getProcedureCatalogEntryById: mocks.getProcedureCatalogEntryById,
@@ -57,6 +62,11 @@ describe("api/funcionario/procedures/requests/[id]/bpmn-xml GET", () => {
       activeTask: { exists: true, taskDefinitionKey: "UserTask_Active", name: "Tarea activa" },
     });
     mocks.getCamundaProcessInstance.mockResolvedValue(null);
+    mocks.resolveProcedureCamundaProcessDefinitionKey.mockResolvedValue({
+      processDefinitionKey: "2251799813689999",
+      bpmnProcessId: "Process_x",
+      resolutionSource: "search.process-definitions",
+    });
     mocks.getCamundaProcessDefinitionXml.mockResolvedValue("<bpmn/>");
   });
 
@@ -77,7 +87,21 @@ describe("api/funcionario/procedures/requests/[id]/bpmn-xml GET", () => {
     expect(body.bpmnXml).toBe("<bpmn/>");
     expect(body.activeElementId).toBe("UserTask_Active");
     expect(body.processInstanceKey).toBe("2251");
-    expect(body.processDefinitionId).toBe("Process_x:1:key");
-    expect(mocks.getCamundaProcessDefinitionXml).toHaveBeenCalledWith("Process_x:1:key");
+    expect(body.processDefinitionKey).toBe("2251799813689999");
+    expect(body.processDefinitionId).toBe("2251799813689999");
+    expect(mocks.getCamundaProcessDefinitionXml).toHaveBeenCalledWith("2251799813689999");
+  });
+
+  it("devuelve error funcional si no puede resolver processDefinitionKey", async () => {
+    mocks.resolveProcedureCamundaProcessDefinitionKey.mockResolvedValueOnce({
+      processDefinitionKey: null,
+      bpmnProcessId: "Process_1hvmc45",
+      resolutionSource: null,
+    });
+    const res = await GET(new Request("http://localhost/x"), { params: Promise.resolve({ id: "pr-1" }) });
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.error).toBe("No se pudo resolver la key de definición de proceso para descargar el BPMN XML.");
+    expect(mocks.getCamundaProcessDefinitionXml).not.toHaveBeenCalled();
   });
 });

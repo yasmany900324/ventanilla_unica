@@ -3,8 +3,9 @@ import { getAppRouteParamString } from "../../../../../../../lib/nextAppRoutePar
 import { resolveFuncionarioProcedureRequestReadContext } from "../../../../../../../lib/funcionarioProcedureRequestReadContext";
 import { getLiveCamundaTaskSnapshot } from "../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
 import { CamundaClientError, getCamundaProcessDefinitionXml, getCamundaProcessInstance } from "../../../../../../../lib/camunda/client";
-import { resolveProcedureCamundaProcessDefinitionId } from "../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionId";
+import { resolveProcedureCamundaProcessDefinitionKey } from "../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionKey";
 import { getProcedureCatalogEntryById } from "../../../../../../../lib/procedureCatalog";
+import { sanitizeForLogs } from "../../../../../../../lib/logging/sanitizeForLogs";
 
 export async function GET(request, { params }) {
   try {
@@ -28,25 +29,37 @@ export async function GET(request, { params }) {
     ).trim();
 
     let processInstance = null;
-    const fromSnap = String(snapshot?.process?.definitionId || snapshot?.process?.bpmnProcessId || "").trim();
-    if (instanceKey && !fromSnap) {
+    const snapshotDefinitionKey = String(
+      snapshot?.process?.processDefinitionKey || snapshot?.process?.definitionKey || ""
+    ).trim();
+    if (instanceKey && !snapshotDefinitionKey) {
       processInstance = await getCamundaProcessInstance(instanceKey).catch(() => null);
     }
 
-    const processDefinitionId = resolveProcedureCamundaProcessDefinitionId({
+    const resolvedDefinition = await resolveProcedureCamundaProcessDefinitionKey({
       snapshot,
       processInstance,
       procedureRequest,
       procedureType,
     });
-    if (!processDefinitionId) {
+    console.info(
+      "[camunda] resolución de processDefinitionKey para BPMN XML",
+      sanitizeForLogs({
+        processInstanceKey: instanceKey || null,
+        bpmnProcessId: resolvedDefinition.bpmnProcessId || null,
+        resolvedProcessDefinitionKey: resolvedDefinition.processDefinitionKey || null,
+        resolutionSource: resolvedDefinition.resolutionSource || null,
+      })
+    );
+
+    if (!resolvedDefinition.processDefinitionKey) {
       return NextResponse.json(
-        { error: "No hay definición de proceso Camunda resuelta para este expediente." },
-        { status: 404 }
+        { error: "No se pudo resolver la key de definición de proceso para descargar el BPMN XML." },
+        { status: 502 }
       );
     }
 
-    const bpmnXml = await getCamundaProcessDefinitionXml(processDefinitionId);
+    const bpmnXml = await getCamundaProcessDefinitionXml(resolvedDefinition.processDefinitionKey);
     const activeElementId =
       snapshot?.activeTask?.exists && snapshot.activeTask.taskDefinitionKey
         ? String(snapshot.activeTask.taskDefinitionKey).trim()
@@ -56,8 +69,9 @@ export async function GET(request, { params }) {
       bpmnXml,
       activeElementId,
       processInstanceKey: snapshot?.process?.instanceKey ?? null,
-      bpmnProcessId: snapshot?.process?.bpmnProcessId ?? procedureType?.camundaProcessId ?? null,
-      processDefinitionId,
+      bpmnProcessId: resolvedDefinition.bpmnProcessId ?? procedureType?.camundaProcessId ?? null,
+      processDefinitionKey: resolvedDefinition.processDefinitionKey,
+      processDefinitionId: resolvedDefinition.processDefinitionKey,
     });
   } catch (error) {
     if (error instanceof CamundaClientError) {

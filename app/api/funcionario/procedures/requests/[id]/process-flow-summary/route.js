@@ -3,10 +3,11 @@ import { getAppRouteParamString } from "../../../../../../../lib/nextAppRoutePar
 import { resolveFuncionarioProcedureRequestReadContext } from "../../../../../../../lib/funcionarioProcedureRequestReadContext";
 import { getLiveCamundaTaskSnapshot } from "../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
 import { CamundaClientError, getCamundaProcessDefinitionXml, getCamundaProcessInstance } from "../../../../../../../lib/camunda/client";
-import { resolveProcedureCamundaProcessDefinitionId } from "../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionId";
+import { resolveProcedureCamundaProcessDefinitionKey } from "../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionKey";
 import { getProcedureCatalogEntryById } from "../../../../../../../lib/procedureCatalog";
 import { listProcedureRequestEvents } from "../../../../../../../lib/procedureRequests";
 import { buildProcedureRequestProcessFlowSummary } from "../../../../../../../lib/procedureRequestProcessFlowSummary";
+import { sanitizeForLogs } from "../../../../../../../lib/logging/sanitizeForLogs";
 
 export async function GET(request, { params }) {
   try {
@@ -34,22 +35,33 @@ export async function GET(request, { params }) {
     ).trim();
 
     let processInstance = null;
-    const fromSnap = String(snapshot?.process?.definitionId || snapshot?.process?.bpmnProcessId || "").trim();
-    if (instanceKey && !fromSnap) {
+    const snapshotDefinitionKey = String(
+      snapshot?.process?.processDefinitionKey || snapshot?.process?.definitionKey || ""
+    ).trim();
+    if (instanceKey && !snapshotDefinitionKey) {
       processInstance = await getCamundaProcessInstance(instanceKey).catch(() => null);
     }
 
-    const processDefinitionId = resolveProcedureCamundaProcessDefinitionId({
+    const resolvedDefinition = await resolveProcedureCamundaProcessDefinitionKey({
       snapshot,
       processInstance,
       procedureRequest,
       procedureType,
     });
+    console.info(
+      "[process-flow-summary] resolución de processDefinitionKey",
+      sanitizeForLogs({
+        processInstanceKey: instanceKey || null,
+        bpmnProcessId: resolvedDefinition.bpmnProcessId || null,
+        resolvedProcessDefinitionKey: resolvedDefinition.processDefinitionKey || null,
+        resolutionSource: resolvedDefinition.resolutionSource || null,
+      })
+    );
 
     let bpmnXml = null;
-    if (processDefinitionId) {
+    if (resolvedDefinition.processDefinitionKey) {
       try {
-        bpmnXml = await getCamundaProcessDefinitionXml(processDefinitionId);
+        bpmnXml = await getCamundaProcessDefinitionXml(resolvedDefinition.processDefinitionKey);
       } catch (error) {
         if (error instanceof CamundaClientError) {
           console.warn(
@@ -61,6 +73,14 @@ export async function GET(request, { params }) {
         }
         bpmnXml = null;
       }
+    } else {
+      console.warn(
+        "[process-flow-summary] No se pudo resolver la key de definición de proceso para descargar el BPMN XML.",
+        sanitizeForLogs({
+          processInstanceKey: instanceKey || null,
+          bpmnProcessId: resolvedDefinition.bpmnProcessId || null,
+        })
+      );
     }
 
     const summary = await buildProcedureRequestProcessFlowSummary({

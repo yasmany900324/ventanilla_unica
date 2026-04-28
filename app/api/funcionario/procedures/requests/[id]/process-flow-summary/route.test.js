@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getLiveCamundaTaskSnapshot: vi.fn(),
   getCamundaProcessInstance: vi.fn(),
   getCamundaProcessDefinitionXml: vi.fn(),
+  resolveProcedureCamundaProcessDefinitionKey: vi.fn(),
   getProcedureCatalogEntryById: vi.fn(),
   listProcedureRequestEvents: vi.fn(),
 }));
@@ -32,6 +33,10 @@ vi.mock("../../../../../../../lib/camunda/client", async () => {
     getCamundaProcessDefinitionXml: mocks.getCamundaProcessDefinitionXml,
   };
 });
+
+vi.mock("../../../../../../../lib/camunda/resolveProcedureCamundaProcessDefinitionKey", () => ({
+  resolveProcedureCamundaProcessDefinitionKey: mocks.resolveProcedureCamundaProcessDefinitionKey,
+}));
 
 vi.mock("../../../../../../../lib/procedureCatalog", () => ({
   getProcedureCatalogEntryById: mocks.getProcedureCatalogEntryById,
@@ -85,6 +90,11 @@ describe("api/funcionario/procedures/requests/[id]/process-flow-summary GET", ()
       activeTask: { exists: true, taskDefinitionKey: "UserTask_A", name: "Registrar Datos Iniciales" },
     });
     mocks.getCamundaProcessInstance.mockResolvedValue(null);
+    mocks.resolveProcedureCamundaProcessDefinitionKey.mockResolvedValue({
+      processDefinitionKey: "2251799813689999",
+      bpmnProcessId: "Process_1hvmc45",
+      resolutionSource: "search.process-definitions",
+    });
     mocks.getCamundaProcessDefinitionXml.mockResolvedValue(SAMPLE_BPMN);
     mocks.listProcedureRequestEvents.mockResolvedValue([]);
   });
