@@ -19,10 +19,7 @@ import {
   deriveCamundaStatus,
   splitOperationalErrors,
 } from "../lib/funcionarioExpedienteOperationalCamunda";
-import {
-  buildFuncionarioSiguienteAccionLabel,
-  partitionPrimaryOperationalActions,
-} from "../lib/funcionarioExpedienteDetailActions";
+import { deriveFuncionarioExpedienteActionUi } from "../lib/funcionarioExpedienteDetailActionUi";
 import { inferFuncionarioWorkflowProgress } from "../lib/funcionarioExpedienteDetailWorkflow";
 import CaseHeader from "./funcionarioExpedienteDetail/CaseHeader";
 import CaseSummaryCard from "./funcionarioExpedienteDetail/CaseSummaryCard";
@@ -1282,20 +1279,51 @@ export default function FuncionarioExpedienteDetailPage() {
   }, [activeTaskDescription, operativeStepLabel]);
 
   const expedienteActionLayout = useMemo(() => {
-    const parted = partitionPrimaryOperationalActions(operationalActions);
-    const wideCompleteAction =
-      !isAvailable && parted.primary?.actionKey === "complete_task" ? parted.primary : null;
-    const railOperationalActions = wideCompleteAction ? parted.secondary : operationalActions;
-    const siguienteAccionLabel = buildFuncionarioSiguienteAccionLabel({
-      isAvailable,
-      claimAction,
+    const scope = procedureRequest?.assignmentScope;
+    const assignedToMe = scope === "assigned_to_me";
+    const actionUi = deriveFuncionarioExpedienteActionUi({
       showCamundaSyncAlert,
+      assignmentScope: scope,
+      isAvailable,
+      isAssignedToMe: assignedToMe,
+      isAdmin,
+      currentUserId: user?.id,
+      activeTask: detail?.activeTask,
       operationalActions,
+      claimAction,
+      procedureRequest,
+      detail,
     });
-    return { wideCompleteAction, railOperationalActions, siguienteAccionLabel };
-  }, [claimAction, isAvailable, operationalActions, showCamundaSyncAlert]);
+    return {
+      mode: actionUi.mode,
+      siguienteAccionLabel: actionUi.siguienteAccionLabel,
+      wideCompleteAction: actionUi.completeActionForWide,
+      railOperationalActions: actionUi.railOperationalActions,
+      showClaimExpediente: actionUi.showClaimExpediente,
+      blockingMessage: actionUi.blockingMessage,
+    };
+  }, [
+    claimAction,
+    detail,
+    isAdmin,
+    isAvailable,
+    operationalActions,
+    procedureRequest,
+    showCamundaSyncAlert,
+    user?.id,
+  ]);
 
   const actionLead = useMemo(() => {
+    const mode = expedienteActionLayout.mode;
+    if (mode === "process_finished") {
+      return "El trámite ya completó su flujo en el motor de procesos. Solo resta consulta o archivo según corresponda.";
+    }
+    if (mode === "blocked_other_assignee" || mode === "blocked_other_inbox") {
+      return "La gestión depende del funcionario asignado o de la liberación de la tarea activa.";
+    }
+    if (mode === "take_camunda_task") {
+      return "La tarea del proceso está pendiente de responsable: tomala para continuar.";
+    }
     if (isAvailable) {
       return "Este expediente está en la bandeja general: tomalo para empezar a gestionarlo desde tu espacio.";
     }
@@ -1310,6 +1338,7 @@ export default function FuncionarioExpedienteDetailPage() {
     }
     return "Seguí las acciones disponibles y completá los datos solicitados para avanzar el trámite.";
   }, [
+    expedienteActionLayout.mode,
     expedienteActionLayout.wideCompleteAction,
     isAvailable,
     primaryOperationalError,
@@ -1785,9 +1814,16 @@ export default function FuncionarioExpedienteDetailPage() {
                 onRetryCamundaSync={handleRetryCamundaSync}
                 isRetrySyncLoading={isRetrySyncLoading}
                 isAvailable={isAvailable}
-                claimHint="Para gestionarlo, primero tomá la tarea y asignalo a tu bandeja."
+                claimHint={
+                  expedienteActionLayout.showClaimExpediente
+                    ? "Tomá el expediente para asignarlo a tu bandeja y habilitar las tareas del proceso."
+                    : null
+                }
                 claimAction={claimAction}
                 operationalActions={expedienteActionLayout.railOperationalActions}
+                railBlockMessage={expedienteActionLayout.blockingMessage}
+                railFinishedMessage={expedienteActionLayout.mode === "process_finished" ? "Proceso finalizado" : null}
+                showExpedienteClaimSection={expedienteActionLayout.showClaimExpediente}
                 onRunAction={runAction}
                 actionLoadingKey={actionLoadingKey}
                 completeVariablesJson={completeVariablesJson}

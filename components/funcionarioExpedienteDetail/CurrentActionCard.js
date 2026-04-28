@@ -15,10 +15,15 @@ function ActionBlock({
   setInternalObservation,
   nextStatus,
   setNextStatus,
+  titleOverride,
+  descriptionOverride,
 }) {
   const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
-  const actionTitle = buildActionTitle(action);
-  const actionDescription = buildActionDescription(action);
+  const actionTitle = titleOverride != null && String(titleOverride).trim() ? String(titleOverride).trim() : buildActionTitle(action);
+  const actionDescription =
+    descriptionOverride != null && String(descriptionOverride).trim()
+      ? String(descriptionOverride).trim()
+      : buildActionDescription(action);
   const isPrimary = action.enabled !== false && (action.actionKey === "claim_task" || action.actionKey === "complete_task");
   const isSync = action.actionKey === "retry_camunda_sync";
 
@@ -90,6 +95,9 @@ export default function CurrentActionCard({
   nextStatus,
   setNextStatus,
   emptyOperationalMessage,
+  railBlockMessage,
+  railFinishedMessage,
+  showExpedienteClaimSection = true,
 }) {
   const { primary: primaryOperationalAction, secondary: secondaryOperationalActions } = partitionPrimaryOperationalActions(
     operationalActions
@@ -147,15 +155,27 @@ export default function CurrentActionCard({
         </div>
       ) : null}
 
+      {railFinishedMessage ? (
+        <div className="funcionario-expediente-detail__alert funcionario-expediente-detail__alert--info" role="status">
+          <p className="funcionario-expediente-detail__alert-title">{railFinishedMessage}</p>
+        </div>
+      ) : null}
+
+      {railBlockMessage ? (
+        <div className="funcionario-expediente-detail__alert funcionario-expediente-detail__alert--warn" role="status">
+          <p className="funcionario-expediente-detail__alert-body">{railBlockMessage}</p>
+        </div>
+      ) : null}
+
       <div className="funcionario-expediente-detail__action-headline">
         <p className="funcionario-expediente-detail__action-kicker">{headline}</p>
       </div>
 
-      {isAvailable && claimHint ? (
+      {isAvailable && showExpedienteClaimSection && claimHint ? (
         <p className="funcionario-expediente-detail__claim-hint">{claimHint}</p>
       ) : null}
 
-      {claimAction && isAvailable ? (
+      {claimAction && isAvailable && showExpedienteClaimSection ? (
         <ActionBlock
           action={claimAction}
           onRunAction={onRunAction}
@@ -166,10 +186,12 @@ export default function CurrentActionCard({
           setInternalObservation={setInternalObservation}
           nextStatus={nextStatus}
           setNextStatus={setNextStatus}
+          titleOverride="Tomar expediente"
+          descriptionOverride="Asigná este expediente a tu bandeja para habilitar la gestión y las acciones del proceso."
         />
       ) : null}
 
-      {!isAvailable && primaryOperationalAction ? (
+      {!isAvailable && !railBlockMessage && !railFinishedMessage && primaryOperationalAction ? (
         <div className="funcionario-expediente-detail__action-stack">
           <ActionBlock
             key={`${primaryOperationalAction.actionKey || "action"}:${primaryOperationalAction.endpoint}`}
@@ -207,7 +229,11 @@ export default function CurrentActionCard({
         </div>
       ) : null}
 
-      {!isAvailable && operationalActions.length === 0 && !showCamundaSyncAlert ? (
+      {!isAvailable &&
+      operationalActions.length === 0 &&
+      !showCamundaSyncAlert &&
+      !railBlockMessage &&
+      !railFinishedMessage ? (
         <p className="dashboard-onify-empty">{emptyOperationalMessage}</p>
       ) : null}
     </section>
