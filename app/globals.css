@@ -8240,3 +8240,626 @@ a.dashboard-onify-detail-btn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Funcionario — detalle de expediente (layout Onify) */
+.funcionario-expediente-detail.page.page--dashboard {
+  max-width: 1220px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.funcionario-expediente-detail__hero-card {
+  padding-top: 1.65rem;
+}
+
+.funcionario-expediente-detail__hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.funcionario-expediente-detail__hero-main {
+  flex: 1;
+  min-width: min(100%, 320px);
+}
+
+.funcionario-expediente-detail__hero-aside {
+  flex-shrink: 0;
+}
+
+.funcionario-expediente-detail__hero-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.funcionario-expediente-detail__hero-title-row h1 {
+  margin: 0;
+  color: #102a56;
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  line-height: 1.12;
+  font-weight: 800;
+}
+
+.funcionario-expediente-detail__hero-sep {
+  color: #9eb0c9;
+  font-weight: 400;
+  user-select: none;
+}
+
+.funcionario-expediente-detail__hero-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a4d99;
+  letter-spacing: 0.02em;
+}
+
+.funcionario-expediente-detail__hero-meta {
+  margin-top: 0.85rem;
+}
+
+.funcionario-expediente-detail__hero-status {
+  color: #0f4a9c;
+  font-weight: 700;
+}
+
+.funcionario-expediente-detail__hero-badges {
+  margin-top: 0.75rem;
+}
+
+.funcionario-expediente-detail__back-btn {
+  white-space: nowrap;
+}
+
+.funcionario-expediente-detail__columns {
+  align-items: start;
+}
+
+.funcionario-expediente-detail__col-main,
+.funcionario-expediente-detail__col-rail {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.funcionario-expediente-detail__col-rail {
+  position: sticky;
+  top: 0.85rem;
+}
+
+.funcionario-expediente-detail__summary-body {
+  margin-top: 0.25rem;
+}
+
+.funcionario-expediente-detail__summary-fields {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.funcionario-expediente-detail__summary-quick-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #123360;
+}
+
+.funcionario-expediente-detail__citizen-grid {
+  display: grid;
+  gap: 0.72rem;
+}
+
+@media (min-width: 640px) {
+  .funcionario-expediente-detail__citizen-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.funcionario-expediente-detail__stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.35rem;
+}
+
+.funcionario-expediente-detail__step {
+  flex: 1 1 140px;
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid #d8e4f4;
+  padding: 0.55rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #fbfdff;
+}
+
+.funcionario-expediente-detail__step--done {
+  border-color: #b6d4a3;
+  background: #f4faf1;
+}
+
+.funcionario-expediente-detail__step--current {
+  border-color: #6b9fe0;
+  background: linear-gradient(180deg, #f0f6ff 0%, #e4eefc 100%);
+  box-shadow: 0 0 0 1px rgba(26, 77, 153, 0.12);
+}
+
+.funcionario-expediente-detail__step--upcoming {
+  opacity: 0.72;
+}
+
+.funcionario-expediente-detail__step-index {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: #e8f1ff;
+  color: #154189;
+  flex-shrink: 0;
+}
+
+.funcionario-expediente-detail__step--done .funcionario-expediente-detail__step-index {
+  background: #d9f0cf;
+  color: #1f5f2a;
+}
+
+.funcionario-expediente-detail__step-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #173a6e;
+  line-height: 1.25;
+}
+
+.funcionario-expediente-detail__step-instruction {
+  margin: 0.85rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid #d8e4f4;
+  background: #f8fbff;
+  color: #3d5577;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.funcionario-expediente-detail__step-instruction-icon {
+  flex-shrink: 0;
+  margin-top: 0.08rem;
+  color: #2a5ca9;
+}
+
+.funcionario-expediente-detail__status-dl {
+  margin: 0;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.funcionario-expediente-detail__status-row {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.funcionario-expediente-detail__status-row dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6a7f9a;
+}
+
+.funcionario-expediente-detail__status-row dd {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #102a56;
+  line-height: 1.35;
+}
+
+.funcionario-expediente-detail__status-row--accent dd {
+  color: #0f4a9c;
+  font-size: 1.02rem;
+}
+
+.funcionario-expediente-detail__mini-progress {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #e3ebf7;
+}
+
+.funcionario-expediente-detail__mini-progress-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6a7f9a;
+}
+
+.funcionario-expediente-detail__mini-dots {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.funcionario-expediente-detail__mini-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #d5e2f5;
+}
+
+.funcionario-expediente-detail__mini-dot--done {
+  background: #4caf50;
+}
+
+.funcionario-expediente-detail__mini-dot--current {
+  background: #1a5cb8;
+  box-shadow: 0 0 0 3px rgba(26, 92, 184, 0.22);
+}
+
+.funcionario-expediente-detail__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border-left: 2px solid #d8e4f4;
+  margin-left: 0.45rem;
+  padding-left: 1rem;
+}
+
+.funcionario-expediente-detail__timeline-item {
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.funcionario-expediente-detail__timeline-dot {
+  position: absolute;
+  left: calc(-1rem - 0.36rem);
+  top: 0.2rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  background: #1a5cb8;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #c9daf3;
+}
+
+.funcionario-expediente-detail__timeline-time {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #6a7f9a;
+  letter-spacing: 0.02em;
+}
+
+.funcionario-expediente-detail__timeline-text {
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
+  color: #1f3558;
+  line-height: 1.45;
+}
+
+.funcionario-expediente-detail__timeline-item--current {
+  padding-bottom: 0;
+}
+
+.funcionario-expediente-detail__timeline-item--current .funcionario-expediente-detail__timeline-text {
+  color: #0f4a9c;
+  font-weight: 700;
+}
+
+.funcionario-expediente-detail__timeline-label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a5cb8;
+}
+
+.funcionario-expediente-detail__timeline-label-icon {
+  display: inline-flex;
+  color: #2a5ca9;
+}
+
+.funcionario-expediente-detail__card--action .dashboard-onify-section__head {
+  align-items: flex-start;
+}
+
+.funcionario-expediente-detail__action-headline {
+  margin-top: 0.25rem;
+}
+
+.funcionario-expediente-detail__action-kicker {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #102a56;
+  line-height: 1.3;
+}
+
+.funcionario-expediente-detail__claim-hint {
+  margin: 0 0 0.5rem;
+  color: #4d6687;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.funcionario-expediente-detail__alert {
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.funcionario-expediente-detail__alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.funcionario-expediente-detail__alert--info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.funcionario-expediente-detail__alert--warn {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.funcionario-expediente-detail__alert-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #7c2d12;
+}
+
+.funcionario-expediente-detail__alert--error .funcionario-expediente-detail__alert-title {
+  color: #991b1b;
+}
+
+.funcionario-expediente-detail__alert-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #3d5577;
+}
+
+.funcionario-expediente-detail__action-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.funcionario-expediente-detail__action-block {
+  border-radius: 14px;
+  border: 1px solid #e3ebf7;
+  padding: 0.85rem 1rem;
+  background: #fbfdff;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.funcionario-expediente-detail__action-block--primary {
+  border-color: #b9d3f5;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+}
+
+.funcionario-expediente-detail__action-block-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #123360;
+}
+
+.funcionario-expediente-detail__action-block-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4d6687;
+  line-height: 1.5;
+}
+
+.funcionario-expediente-detail__action-block-muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #8a5a1b;
+}
+
+.funcionario-expediente-detail__guided-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.funcionario-expediente-detail__field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #56708e;
+  letter-spacing: 0.02em;
+}
+
+.funcionario-expediente-detail__textarea,
+.funcionario-expediente-detail__input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid #d8e4f4;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.funcionario-expediente-detail__textarea {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.funcionario-expediente-detail__checklist-block {
+  margin-bottom: 0.25rem;
+}
+
+.funcionario-expediente-detail__checklist-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #123360;
+}
+
+.funcionario-expediente-detail__checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.funcionario-expediente-detail__checklist-item {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.funcionario-expediente-detail__checklist-bullet {
+  flex-shrink: 0;
+  color: #1a5cb8;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.funcionario-expediente-detail__checklist-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f3558;
+}
+
+.funcionario-expediente-detail__nested-details {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: #5f7492;
+}
+
+.funcionario-expediente-detail__nested-details-text {
+  margin: 0.35rem 0 0;
+}
+
+.funcionario-expediente-detail__cta {
+  margin-top: 0.35rem;
+  width: 100%;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.98rem;
+  color: #ffffff;
+  background: linear-gradient(180deg, #1a5cb8 0%, #0f3d8a 100%);
+  box-shadow: 0 10px 22px rgba(15, 61, 138, 0.22);
+}
+
+.funcionario-expediente-detail__cta:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+.funcionario-expediente-detail__cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.funcionario-expediente-detail__cta--secondary {
+  background: #f4f8ff;
+  color: #123360;
+  border: 1px solid #c5d8f2;
+  box-shadow: none;
+}
+
+.funcionario-expediente-detail__cta--sync {
+  background: linear-gradient(180deg, #b45309 0%, #92400e 100%);
+  box-shadow: 0 8px 18px rgba(146, 64, 14, 0.2);
+}
+
+.funcionario-expediente-detail__accordion {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.funcionario-expediente-detail__details {
+  border-radius: 12px;
+  border: 1px solid #e3ebf7;
+  background: #fbfdff;
+  padding: 0.15rem 0.65rem;
+}
+
+.funcionario-expediente-detail__details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #154189;
+  padding: 0.45rem 0;
+}
+
+.funcionario-expediente-detail__details-body {
+  padding-bottom: 0.65rem;
+}
+
+.funcionario-expediente-detail__pre {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+  font-size: 0.78rem;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.funcionario-expediente-detail__danger {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fffafa 0%, #fff1f1 100%);
+}
+
+.funcionario-expediente-detail__danger-btn {
+  margin-top: 0.35rem;
+  min-height: 44px;
+  padding: 0.55rem 1.1rem;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid #b42318;
+  background: #ffffff;
+  color: #b42318;
+}
+
+.funcionario-expediente-detail__danger-btn:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+@media (max-width: 900px) {
+  .funcionario-expediente-detail__col-rail {
+    position: static;
+  }
+
+  .funcionario-expediente-detail__hero-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .funcionario-expediente-detail__hero-aside {
+    width: 100%;
+  }
+
+  .funcionario-expediente-detail__back-btn {
+    width: 100%;
+  }
+}

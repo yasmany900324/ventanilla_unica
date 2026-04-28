@@ -20,6 +20,16 @@ import {
   deriveCamundaStatus,
   splitOperationalErrors,
 } from "../lib/funcionarioExpedienteOperationalCamunda";
+import { inferFuncionarioWorkflowProgress } from "../lib/funcionarioExpedienteDetailWorkflow";
+import CaseHeader from "./funcionarioExpedienteDetail/CaseHeader";
+import CaseSummaryCard from "./funcionarioExpedienteDetail/CaseSummaryCard";
+import CitizenInfoCard from "./funcionarioExpedienteDetail/CitizenInfoCard";
+import CaseProgressCard from "./funcionarioExpedienteDetail/CaseProgressCard";
+import CaseTramiteStatusCard from "./funcionarioExpedienteDetail/CaseTramiteStatusCard";
+import CaseRecentActivityCard from "./funcionarioExpedienteDetail/CaseRecentActivityCard";
+import CurrentActionCard from "./funcionarioExpedienteDetail/CurrentActionCard";
+import TechnicalInfoAccordion from "./funcionarioExpedienteDetail/TechnicalInfoAccordion";
+import DangerZoneCard from "./funcionarioExpedienteDetail/DangerZoneCard";
 
 const LocationMapPreview = dynamic(() => import("./LocationMapPreview"), { ssr: false });
 
@@ -133,41 +143,62 @@ function getAssignmentScopeLabel(item) {
     return "Asignado a mí";
   }
   if (item?.assignmentScope === "available") {
-    return "Disponible";
+    return "Disponible para tomar";
   }
-  return "Sin relación";
+  if (item?.assignmentScope === "admin") {
+    return "Vista administración";
+  }
+  if (item?.assignedToUserId) {
+    return "Asignado a otro funcionario";
+  }
+  return "Disponible para tomar";
 }
 
-function buildActionTitle(action) {
-  if (action?.displayLabel) {
-    return action.displayLabel;
+function buildBandejaRelationSimple(procedureRequest) {
+  if (!procedureRequest) {
+    return "—";
   }
-  if (action?.actionKey === "claim_task") {
-    return "Tomar expediente";
+  if (procedureRequest.assignmentScope === "assigned_to_me") {
+    return "Asignado a mí";
   }
-  if (action?.actionKey === "complete_task") {
-    return "Completar tarea";
+  if (procedureRequest.assignmentScope === "available") {
+    return "Disponible para tomar";
   }
-  if (action?.actionKey === "retry_camunda_sync") {
-    return "Reintentar sincronización";
+  if (procedureRequest.assignmentScope === "admin") {
+    return "Vista administración";
   }
-  return action?.label || "Acción";
+  if (procedureRequest.assignedToUserId) {
+    return "Asignado a otro funcionario";
+  }
+  return "Disponible para tomar";
 }
 
-function buildActionDescription(action) {
-  if (typeof action?.description === "string" && action.description.trim()) {
-    return action.description.trim();
+function mapSiguienteAccionLabel(label) {
+  const s = String(label || "").trim();
+  if (s === "Tomar tarea") {
+    return "Tomar trámite";
   }
-  if (action?.actionKey === "claim_task") {
-    return "Asigna este expediente a tu bandeja para habilitar la gestión y acciones de Camunda.";
+  if (s === "Completar tarea") {
+    return "Completar paso";
   }
-  if (action?.actionKey === "retry_camunda_sync") {
-    return "Reenvía el expediente a Camunda cuando hubo error de sincronización.";
+  return s || "—";
+}
+
+function resolveActionCardBadge({ isAvailable, functionalWorkflowStateLabel }) {
+  if (isAvailable) {
+    return { label: "Disponible para tomar", tone: "waiting" };
   }
-  if (action?.actionKey === "complete_task") {
-    return `Avanza el flujo de Camunda para: ${action.taskDisplayName || "tarea activa"}.`;
+  const f = String(functionalWorkflowStateLabel || "");
+  if (f.includes("Pendiente de tomar")) {
+    return { label: "Pendiente de tomar", tone: "warning" };
   }
-  return action?.label || "";
+  if (f.includes("Sin tarea")) {
+    return { label: "Sin tarea activa", tone: "neutral" };
+  }
+  if (f.includes("Completada")) {
+    return { label: "Trámite completado", tone: "resolved" };
+  }
+  return { label: "En gestión", tone: "progress" };
 }
 
 function resolveAttachmentValue(collectedData) {
@@ -773,30 +804,6 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   };
 }
 
-function ProcedureFieldVariables({ requiredVariables }) {
-  if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
-    return null;
-  }
-  return (
-    <>
-      <p className="small">Variables requeridas para esta tarea:</p>
-      <ul className="admin-procedure-fields__list">
-        {requiredVariables.map((item, index) => (
-          <li key={`${item.procedureFieldKey || "field"}-${index}`} className="admin-procedure-fields__item">
-            <p className="small">
-              <strong>{item.fieldLabel || item.procedureFieldKey}</strong>
-            </p>
-            <p className="small">
-              Variable Camunda: {item.camundaVariableName} ({item.camundaVariableType || "string"})
-            </p>
-            <p className="small">Obligatoria: {item.required ? "Sí" : "No"}</p>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 function BackToBandejaLink() {
   return (
     <p className="small" style={{ marginTop: "1rem" }}>
@@ -805,60 +812,6 @@ function BackToBandejaLink() {
       </Link>
     </p>
   );
-}
-
-function ActionCards({ actions, onRunAction, actionLoadingKey, completeVariablesJson, setCompleteVariablesJson, internalObservation, setInternalObservation, nextStatus, setNextStatus }) {
-  if (!actions.length) {
-    return null;
-  }
-  return actions.map((action) => {
-    const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
-    const actionTitle = buildActionTitle(action);
-    const actionDescription = buildActionDescription(action);
-    return (
-      <div key={actionKey} className="admin-procedure-fields__item">
-        <p className="small">
-          <strong>{actionTitle}</strong>
-        </p>
-        {actionDescription ? <p className="small">{actionDescription}</p> : null}
-        {action.enabled === false && action.reason ? (
-          <p className="small">No disponible: {String(action.reason || "").replace(/_/g, " ").toLowerCase()}</p>
-        ) : null}
-        {action.actionKey === "complete_task" ? (
-          <>
-            <label className="small">Variables para avanzar (JSON)</label>
-            <textarea
-              rows={6}
-              value={completeVariablesJson}
-              onChange={(event) => setCompleteVariablesJson(event.target.value)}
-            />
-            <label className="small">Observaciones internas</label>
-            <textarea
-              rows={3}
-              value={internalObservation}
-              onChange={(event) => setInternalObservation(event.target.value)}
-            />
-            <label className="small">Cambio de estado local (opcional)</label>
-            <input
-              type="text"
-              value={nextStatus}
-              onChange={(event) => setNextStatus(event.target.value)}
-              placeholder="Ej: PENDING_BACKOFFICE_ACTION"
-            />
-            <ProcedureFieldVariables requiredVariables={action.requiredVariables} />
-          </>
-        ) : null}
-        <button
-          type="button"
-          className="button-inline"
-          onClick={() => onRunAction(action)}
-          disabled={action.enabled === false || actionLoadingKey === actionKey}
-        >
-          {actionLoadingKey === actionKey ? "Procesando..." : actionTitle}
-        </button>
-      </div>
-    );
-  });
 }
 
 function CaseQuickPreviewModal({
@@ -1288,13 +1241,10 @@ export default function FuncionarioExpedienteDetailPage() {
     locationCoordinates,
     locationPreviewReason,
     locationSearchUrl,
-    imageActionLabel,
-    locationActionLabel,
     canPreviewAttachment,
     canPreviewLocationMap,
     showQuickImageCard,
     showQuickLocationCard,
-    quickPreviewCards,
     caseDescription,
     contactEmail,
     activeTaskDescription,
@@ -1302,13 +1252,11 @@ export default function FuncionarioExpedienteDetailPage() {
     canManageDeletion,
     showCamundaSyncAlert,
     syncPrimaryButtonLabel,
-    syncSecondaryButtonLabel,
     isRetrySyncLoading,
     operationalSituation,
     operativeStepLabel,
     functionalWorkflowStateLabel,
     camundaAssigneeResponsibilityLabel,
-    inboxBandejaRelationLabel,
     camundaAdvanceActionSummaryLabel,
     camundaLiveProcessInstanceKey,
     camundaProcessStateDisplay,
@@ -1320,6 +1268,46 @@ export default function FuncionarioExpedienteDetailPage() {
     camundaTaskStateDisplay,
     camundaTaskAssigneeCamundaLabel,
   } = expedienteViewModel;
+
+  const workflowProgress = useMemo(
+    () =>
+      inferFuncionarioWorkflowProgress({
+        procedureStatus: procedureRequest?.status,
+        operativeStepLabel,
+        hasActiveTask: Boolean(detail?.activeTask?.taskDefinitionKey),
+      }),
+    [detail?.activeTask?.taskDefinitionKey, operativeStepLabel, procedureRequest?.status]
+  );
+
+  const actionCardBadge = useMemo(
+    () => resolveActionCardBadge({ isAvailable, functionalWorkflowStateLabel }),
+    [functionalWorkflowStateLabel, isAvailable]
+  );
+
+  const progressInstruction = useMemo(() => {
+    const tail =
+      activeTaskDescription ||
+      "Revisá la información del caso y usá la acción principal para continuar con el trámite.";
+    return `Paso actual: ${operativeStepLabel}. ${tail}`;
+  }, [activeTaskDescription, operativeStepLabel]);
+
+  const actionLead = useMemo(() => {
+    if (isAvailable) {
+      return "Este expediente está en la bandeja general: tomalo para empezar a gestionarlo desde tu espacio.";
+    }
+    if (showCamundaSyncAlert) {
+      return "Antes de avanzar con tareas, sincronizá el expediente con el motor de procesos.";
+    }
+    if (primaryOperationalError) {
+      return "Hay un inconveniente operativo. Revisá el mensaje y, si corresponde, contactá a sistemas.";
+    }
+    return "Seguí las acciones disponibles y completá los datos solicitados para avanzar el trámite.";
+  }, [isAvailable, primaryOperationalError, showCamundaSyncAlert]);
+
+  const siguienteAccionUi = useMemo(
+    () => mapSiguienteAccionLabel(camundaAdvanceActionSummaryLabel),
+    [camundaAdvanceActionSummaryLabel]
+  );
 
   useEffect(() => {
     if (!IS_DEVELOPMENT || !procedureRequestId) {
@@ -1571,6 +1559,100 @@ export default function FuncionarioExpedienteDetailPage() {
     }
   };
 
+  const quickImageSlot = showQuickImageCard ? (
+    <article className="expediente-summary-card">
+      <p className="small expediente-summary-card__title">Imagen</p>
+      {canPreviewAttachment && attachmentDisplay.url && !quickImageLoadError ? (
+        <button
+          type="button"
+          className="expediente-summary-card__preview-button"
+          onClick={(event) => openQuickPreview(event, "image")}
+          aria-label="Ver imagen adjunta ampliada"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={attachmentDisplay.url}
+            alt={attachmentSummaryText || "Imagen adjunta"}
+            className="expediente-summary-card__image"
+            onError={() => {
+              setQuickImageLoadError(true);
+              if (IS_DEVELOPMENT) {
+                console.warn("[quick-preview:image] image load error", {
+                  src: attachmentDisplay.url,
+                  fieldKey: imageFieldKey,
+                  value: rawAttachment,
+                });
+              }
+            }}
+          />
+        </button>
+      ) : (
+        <div className="expediente-summary-card__placeholder">
+          <p className="small">
+            {quickImageLoadError
+              ? "No se pudo cargar la imagen"
+              : buildImagePreviewReasonText(imagePreviewReason)}
+          </p>
+          {attachmentDisplay.label ? (
+            <p className="small">
+              <span className="admin-procedure-table__mono">{attachmentDisplay.label}</span>
+            </p>
+          ) : null}
+        </div>
+      )}
+      <button
+        type="button"
+        className="button-inline button-inline--compact"
+        onClick={(event) => openQuickPreview(event, "image")}
+        disabled={!hasAnyImageReference}
+      >
+        {canPreviewAttachment ? "Ver imagen" : "Ver datos"}
+      </button>
+    </article>
+  ) : null;
+
+  const quickLocationSlot = showQuickLocationCard ? (
+    <article className="expediente-summary-card">
+      <p className="small expediente-summary-card__title">Ubicación</p>
+      {canPreviewLocationMap && locationCoordinates && !quickMapRenderError ? (
+        <button
+          type="button"
+          className="expediente-summary-card__preview-button"
+          onClick={(event) => openQuickPreview(event, "location")}
+          aria-label="Ver mapa ampliado de ubicación"
+        >
+          <MapRenderErrorBoundary
+            resetKey={`${locationCoordinates.lat}-${locationCoordinates.lng}`}
+            fallback={<p className="small">No se pudo renderizar el mapa.</p>}
+            onError={handleQuickMapRenderError}
+          >
+            <LocationMapPreview
+              latitude={locationCoordinates.lat}
+              longitude={locationCoordinates.lng}
+              ariaLabel={locationValue || "Vista rápida de ubicación"}
+            />
+          </MapRenderErrorBoundary>
+        </button>
+      ) : (
+        <div className="expediente-summary-card__placeholder">
+          <p className="small">
+            {quickMapRenderError
+              ? "No se pudo renderizar el mapa con las coordenadas disponibles."
+              : "Ubicación registrada sin coordenadas para mapa."}
+          </p>
+        </div>
+      )}
+      <button
+        type="button"
+        className="button-inline button-inline--compact"
+        onClick={(event) => openQuickPreview(event, "location")}
+        disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
+      >
+        {canPreviewLocationMap ? "Ver mapa" : locationSearchUrl ? "Buscar ubicación" : "Ver datos"}
+      </button>
+    </article>
+  ) : null;
+
   if (isLoadingAuth) {
     return (
       <main className="page page--dashboard" lang={locale}>
@@ -1608,510 +1690,130 @@ export default function FuncionarioExpedienteDetailPage() {
   }
 
   return (
-    <main className="page page--dashboard" lang={locale}>
-      <section className="card dashboard-header">
-        <div>
-          <p className="eyebrow">ÁREA DEL FUNCIONARIO</p>
-          <h1>Detalle del expediente</h1>
-          <p className="description">
-            {trackingCode ? (
-              <>
-                Número de expediente:{" "}
-                <span className="admin-procedure-table__mono">{trackingCode}</span>
-              </>
-            ) : (
-              "Expediente"
-            )}
-          </p>
-          {procedureRequest ? (
-            <>
-              <p className="small" style={{ marginTop: "0.5rem" }}>
-                <span
-                  className={`badge ${
-                    isAvailable ? "badge--recibido" : "badge--en-revision"
-                  }`}
-                >
-                  {getAssignmentScopeLabel(procedureRequest)}
-                </span>
-              </p>
-              <p className="small" style={{ marginTop: "0.5rem" }}>
-                <strong>Tipo:</strong> {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}{" "}
-                {" · "}
-                <strong>Canal:</strong> {procedureRequest.channel || "-"} {" · "}
-                <strong>Creado:</strong> {formatDateTime(procedureRequest.createdAt, locale)} {" · "}
-                <strong>Estado:</strong> {getLocalStatusLabel(procedureRequest.status)}
-              </p>
-            </>
-          ) : null}
-        </div>
-        <p className="small" style={{ marginTop: "0.75rem" }}>
-          <Link href="/funcionario/dashboard" className="portal-action-link">
-            ← Volver a la bandeja
-          </Link>
-        </p>
-      </section>
-
+    <main className="page page--dashboard dashboard-onify funcionario-expediente-detail" lang={locale}>
       {successMessage ? (
-        <section className="card">
+        <section className="dashboard-onify-card dashboard-onify-section">
           <p className="info-message">{successMessage}</p>
         </section>
       ) : null}
       {actionError ? (
-        <section className="card">
+        <section className="dashboard-onify-card dashboard-onify-section">
           <p className="error-message">{actionError}</p>
         </section>
       ) : null}
 
       {detailLoading ? (
-        <section className="card dashboard-section">
-          <p className="info-message">Cargando detalle...</p>
+        <section className="dashboard-onify-card dashboard-onify-section">
+          <p className="info-message">Cargando detalle…</p>
         </section>
       ) : null}
 
       {!detailLoading && procedureRequest ? (
         <>
-          {isAvailable ? (
-            <section className="card dashboard-section">
-              <h3>Expediente disponible</h3>
-              <p className="small">
-                Este expediente está disponible para ser tomado. Para gestionarlo, primero debes asignarlo a tu
-                bandeja.
-              </p>
-              {claimAction ? (
-                <button
-                  type="button"
-                  className="button-inline"
-                  onClick={() => runAction(claimAction)}
-                  disabled={
-                    claimAction.enabled === false ||
-                    actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`
-                  }
-                >
-                  {actionLoadingKey === `${claimAction.actionKey}:${claimAction.endpoint}`
-                    ? "Procesando..."
-                    : "Tomar expediente"}
-                </button>
-              ) : null}
-            </section>
-          ) : null}
+          <CaseHeader
+            trackingCode={trackingCode}
+            procedureName={procedureRequest.procedureName || procedureRequest.procedureCode || ""}
+            channel={procedureRequest.channel || ""}
+            createdAtLabel={formatDateTime(procedureRequest.createdAt, locale)}
+            expedienteStatusLabel={getLocalStatusLabel(procedureRequest.status)}
+            assignmentLabel={getAssignmentScopeLabel(procedureRequest)}
+          />
 
-          <section className="card dashboard-section admin-procedure-fields">
-            <h3>Resumen del caso</h3>
-            <div className="expediente-summary-layout">
-              <div className="expediente-summary-layout__main">
-                <p className="small">
-                  <strong>Tipo de procedimiento:</strong>{" "}
-                  {procedureRequest.procedureName || procedureRequest.procedureCode || "-"}
-                </p>
-                <p className="small">
-                  <strong>Descripción:</strong> {caseDescription || "Sin descripción informada."}
-                </p>
-                <p className="small">
-                  <strong>Ubicación:</strong> {locationValue || "No informada"}
-                  {showQuickLocationCard ? (
-                    <>
-                      {" · "}
-                      <button
-                        type="button"
-                        className="button-inline button-inline--compact"
-                        onClick={(event) => openQuickPreview(event, "location")}
-                        disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
-                        title={
-                          canPreviewLocationMap
-                            ? "Ver mapa"
-                            : locationSearchUrl
-                              ? "Buscar ubicación textual"
-                              : "Ubicación registrada sin coordenadas para mapa"
-                        }
-                      >
-                        {locationActionLabel}
-                      </button>
-                    </>
-                  ) : null}
-                </p>
-                <p className="small">
-                  <strong>Imagen adjunta:</strong> {attachmentSummaryText}
-                  {showQuickImageCard ? (
-                    <>
-                      {" · "}
-                      <button
-                        type="button"
-                        className="button-inline button-inline--compact"
-                        onClick={(event) => openQuickPreview(event, "image")}
-                        disabled={!hasAnyImageReference}
-                        title={canPreviewAttachment ? "Ver imagen" : "Ver datos de imagen registrada"}
-                      >
-                        {imageActionLabel}
-                      </button>
-                    </>
-                  ) : null}
-                </p>
-                <p className="small">
-                  <strong>Canal de origen:</strong> {procedureRequest.channel || "-"}
-                </p>
-                <p className="small">
-                  <strong>Fecha de creación:</strong> {formatDateTime(procedureRequest.createdAt, locale)}
-                </p>
-              </div>
-              <aside className="expediente-summary-layout__quick">
-                <h4>Vista rápida</h4>
-                {quickPreviewCards.length ? (
-                  <div className="expediente-summary-layout__quick-list">
-                    {showQuickImageCard ? (
-                      <article className="expediente-summary-card">
-                        <p className="small expediente-summary-card__title">Imagen</p>
-                        {canPreviewAttachment && attachmentDisplay.url && !quickImageLoadError ? (
-                          <button
-                            type="button"
-                            className="expediente-summary-card__preview-button"
-                            onClick={(event) => openQuickPreview(event, "image")}
-                            aria-label="Ver imagen adjunta ampliada"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={attachmentDisplay.url}
-                              alt={attachmentSummaryText || "Imagen adjunta"}
-                              className="expediente-summary-card__image"
-                              onError={() => {
-                                setQuickImageLoadError(true);
-                                if (IS_DEVELOPMENT) {
-                                  console.warn("[quick-preview:image] image load error", {
-                                    src: attachmentDisplay.url,
-                                    fieldKey: imageFieldKey,
-                                    value: rawAttachment,
-                                  });
-                                }
-                              }}
-                            />
-                          </button>
-                        ) : (
-                          <div className="expediente-summary-card__placeholder">
-                            <p className="small">
-                              {quickImageLoadError
-                                ? "No se pudo cargar la imagen"
-                                : buildImagePreviewReasonText(imagePreviewReason)}
-                            </p>
-                            {attachmentDisplay.label ? (
-                              <p className="small">
-                                <span className="admin-procedure-table__mono">{attachmentDisplay.label}</span>
-                              </p>
-                            ) : null}
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className="button-inline button-inline--compact"
-                          onClick={(event) => openQuickPreview(event, "image")}
-                          disabled={!hasAnyImageReference}
-                        >
-                          {canPreviewAttachment ? "Ampliar imagen" : "Ver datos"}
-                        </button>
-                      </article>
-                    ) : null}
-
-                    {showQuickLocationCard ? (
-                      <article className="expediente-summary-card">
-                        <p className="small expediente-summary-card__title">Ubicación</p>
-                        {canPreviewLocationMap && locationCoordinates && !quickMapRenderError ? (
-                          <button
-                            type="button"
-                            className="expediente-summary-card__preview-button"
-                            onClick={(event) => openQuickPreview(event, "location")}
-                            aria-label="Ver mapa ampliado de ubicación"
-                          >
-                            <MapRenderErrorBoundary
-                              resetKey={`${locationCoordinates.lat}-${locationCoordinates.lng}`}
-                              fallback={<p className="small">No se pudo renderizar el mapa.</p>}
-                              onError={handleQuickMapRenderError}
-                            >
-                              <LocationMapPreview
-                                latitude={locationCoordinates.lat}
-                                longitude={locationCoordinates.lng}
-                                ariaLabel={locationValue || "Vista rápida de ubicación"}
-                              />
-                            </MapRenderErrorBoundary>
-                          </button>
-                        ) : (
-                          <div className="expediente-summary-card__placeholder">
-                            <p className="small">
-                              {quickMapRenderError
-                                ? "No se pudo renderizar el mapa con las coordenadas disponibles."
-                                : "Ubicación registrada sin coordenadas para mapa."}
-                            </p>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className="button-inline button-inline--compact"
-                          onClick={(event) => openQuickPreview(event, "location")}
-                          disabled={!canPreviewLocationMap && !locationSearchUrl && !locationValue}
-                        >
-                          {canPreviewLocationMap ? "Ampliar mapa" : locationSearchUrl ? "Buscar ubicación" : "Ver datos"}
-                        </button>
-                      </article>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="small">No hay adjuntos o ubicaciones para vista rápida.</p>
-                )}
-              </aside>
+          <div className="funcionario-expediente-detail__columns dashboard-onify-detail-layout">
+            <div className="funcionario-expediente-detail__col-main">
+              <CaseSummaryCard
+                procedureName={procedureRequest.procedureName || procedureRequest.procedureCode || "—"}
+                caseDescription={caseDescription}
+                locationValue={locationValue}
+                attachmentSummaryText={attachmentSummaryText}
+                channel={procedureRequest.channel || "—"}
+                createdAtLabel={formatDateTime(procedureRequest.createdAt, locale)}
+                quickImageSlot={quickImageSlot}
+                quickLocationSlot={quickLocationSlot}
+              />
+              <CitizenInfoCard
+                userId={procedureRequest.userId}
+                whatsappPhone={procedureRequest.whatsappPhone}
+                email={contactEmail}
+              />
+              <CaseProgressCard currentIndex={workflowProgress.currentIndex} instructionText={progressInstruction} />
+              <CaseRecentActivityCard
+                events={detail?.history}
+                locale={locale}
+                operativeStepLabel={operativeStepLabel}
+              />
             </div>
-          </section>
+            <aside className="funcionario-expediente-detail__col-rail">
+              <CaseTramiteStatusCard
+                currentStepIndex={workflowProgress.currentIndex}
+                operativeStepLabel={operativeStepLabel}
+                expedienteStatusLabel={getLocalStatusLabel(procedureRequest.status)}
+                taskAssigneeLabel={camundaAssigneeResponsibilityLabel}
+                bandejaLabel={buildBandejaRelationSimple(procedureRequest)}
+                siguienteAccionLabel={siguienteAccionUi}
+              />
+              <CurrentActionCard
+                headline={operativeStepLabel}
+                leadText={actionLead}
+                statusBadgeLabel={actionCardBadge.label}
+                statusBadgeTone={actionCardBadge.tone}
+                primaryOperationalError={primaryOperationalError}
+                showActiveTaskApiMissBanner={showActiveTaskApiMissBanner}
+                activeTaskApiMissMessage={activeTaskApiMissMessage}
+                showCamundaSyncAlert={showCamundaSyncAlert}
+                syncPrimaryButtonLabel={syncPrimaryButtonLabel}
+                onRetryCamundaSync={handleRetryCamundaSync}
+                isRetrySyncLoading={isRetrySyncLoading}
+                isAvailable={isAvailable}
+                claimHint="Para gestionarlo, primero tomá el trámite y asignalo a tu bandeja."
+                claimAction={claimAction}
+                operationalActions={operationalActions}
+                onRunAction={runAction}
+                actionLoadingKey={actionLoadingKey}
+                completeVariablesJson={completeVariablesJson}
+                setCompleteVariablesJson={setCompleteVariablesJson}
+                internalObservation={internalObservation}
+                setInternalObservation={setInternalObservation}
+                nextStatus={nextStatus}
+                setNextStatus={setNextStatus}
+                emptyOperationalMessage="No hay acciones disponibles para este expediente en este momento."
+              />
+            </aside>
+          </div>
 
-          <section className="card dashboard-section admin-procedure-fields">
-            <h3>Datos del ciudadano / contacto</h3>
-            <p className="small">
-              <strong>Ciudadano asociado:</strong> {procedureRequest.userId || "No asociado"}
-            </p>
-            <p className="small">
-              <strong>Número de WhatsApp:</strong> {procedureRequest.whatsappPhone || "No informado"}
-            </p>
-            <p className="small">
-              <strong>Email:</strong> {contactEmail || "No informado"}
-            </p>
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h3>Estado operativo</h3>
-            {primaryOperationalError ? (
-              <div
-                className="admin-roles-confirm-dialog__lead"
-                style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "0.75rem" }}
-              >
-                <p className="small" style={{ margin: 0 }}>
-                  Error operacional de Camunda: {primaryOperationalError.message || "No se pudo obtener snapshot live."}
-                </p>
-              </div>
-            ) : null}
-            {showActiveTaskApiMissBanner ? (
-              <div
-                className="admin-roles-confirm-dialog__lead"
-                style={{
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: "10px",
-                  padding: "0.75rem",
-                  marginTop: primaryOperationalError ? "0.65rem" : 0,
-                }}
-              >
-                <p className="small" style={{ margin: 0 }}>
-                  {activeTaskApiMissMessage}
-                </p>
-              </div>
-            ) : null}
-            {showCamundaSyncAlert ? (
-              <div
-                className="admin-roles-confirm-dialog__lead"
-                style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "0.75rem" }}
-              >
-                <p className="small" style={{ margin: 0 }}>
-                  Este expediente requiere revisión de sincronización con Camunda.
-                </p>
-                <button
-                  type="button"
-                  className="button-inline"
-                  onClick={handleRetryCamundaSync}
-                  disabled={isRetrySyncLoading}
-                  style={{ marginTop: "0.65rem" }}
-                >
-                  {isRetrySyncLoading ? "Sincronizando..." : syncPrimaryButtonLabel}
-                </button>
-              </div>
-            ) : null}
-            <dl className="admin-roles-confirm-dialog__details" style={{ marginTop: "0.85rem" }}>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Estado del expediente</dt>
-                <dd>
-                  <span
-                    className={`badge ${showCamundaSyncAlert ? "badge--en-revision" : "badge--recibido"}`}
-                  >
-                    {getLocalStatusLabel(procedureRequest.status)}
-                  </span>
-                </dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Paso actual</dt>
-                <dd>{operativeStepLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Estado</dt>
-                <dd>{functionalWorkflowStateLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Responsable</dt>
-                <dd>{camundaAssigneeResponsibilityLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Relación con mi bandeja</dt>
-                <dd>{inboxBandejaRelationLabel}</dd>
-              </div>
-              <div className="admin-roles-confirm-dialog__detail-row">
-                <dt>Acción para avanzar</dt>
-                <dd>{camundaAdvanceActionSummaryLabel}</dd>
-              </div>
-            </dl>
-            {activeTaskDescription ? (
-              <p className="small">
-                <strong>Detalle de tarea:</strong> {activeTaskDescription}
-              </p>
-            ) : null}
-            {operationalErrors.length > 1 ? (
-              <p className="small">
-                <strong>Errores operacionales adicionales:</strong>{" "}
-                {operationalErrors
-                  .slice(1)
-                  .map((item) => item?.message)
-                  .filter(Boolean)
-                  .join(" | ")}
-              </p>
-            ) : null}
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h3>Acciones operativas</h3>
-            {isAvailable ? (
-              <p className="small">
-                Hasta tomar el expediente no se habilitan acciones de gestión ni avances de Camunda.
-              </p>
-            ) : (
-              <p className="small">
-                Acciones habilitadas para este expediente asignado a tu bandeja.
-              </p>
-            )}
-            <ActionCards
-              actions={operationalActions}
-              onRunAction={runAction}
-              actionLoadingKey={actionLoadingKey}
-              completeVariablesJson={completeVariablesJson}
-              setCompleteVariablesJson={setCompleteVariablesJson}
-              internalObservation={internalObservation}
-              setInternalObservation={setInternalObservation}
-              nextStatus={nextStatus}
-              setNextStatus={setNextStatus}
-            />
-            {showCamundaSyncAlert ? (
-              <button
-                type="button"
-                className="button-inline"
-                onClick={handleRetryCamundaSync}
-                disabled={isRetrySyncLoading}
-                style={{ marginTop: "0.4rem" }}
-              >
-                {isRetrySyncLoading ? "Sincronizando..." : syncSecondaryButtonLabel}
-              </button>
-            ) : null}
-            {!isAvailable && !showCamundaSyncAlert && operationalActions.length === 0 ? (
-              <p className="empty-message">No hay acciones operativas disponibles para este expediente.</p>
-            ) : null}
-          </section>
-
-          <section className="card dashboard-section admin-procedure-fields">
-            <h3>Información técnica</h3>
-
-            <details>
-              <summary>Camunda — snapshot operativo (técnico)</summary>
-              <p className="small">
-                <strong>Estado del proceso (Camunda):</strong> {camundaProcessStateDisplay}
-              </p>
-              <p className="small">
-                <strong>Estado tarea (Camunda):</strong> {camundaTaskStateDisplay}
-              </p>
-              <p className="small">
-                <strong>Tarea ID (Camunda):</strong>{" "}
-                <span className="admin-procedure-table__mono">
-                  {detail?.activeTask?.id || detail?.activeTask?.taskId || "-"}
-                </span>
-              </p>
-              <p className="small">
-                <strong>taskDefinitionKey / elementId:</strong>{" "}
-                <span className="admin-procedure-table__mono">
-                  {detail?.activeTask?.taskDefinitionKey || "-"}
-                </span>
-              </p>
-              <p className="small">
-                <strong>processInstanceKey (live):</strong>{" "}
-                <span className="admin-procedure-table__mono">{camundaLiveProcessInstanceKey || "-"}</span>
-              </p>
-              <p className="small">
-                <strong>Assignee (Camunda, id):</strong>{" "}
-                <span className="admin-procedure-table__mono">{camundaTaskAssigneeCamundaLabel}</span>
-              </p>
-              <p className="small">
-                <strong>Situación (diagnóstico):</strong> {operationalSituation}
-              </p>
-              {detail?.activeTaskDisplay?.title ? (
-                <p className="small">
-                  <strong>activeTaskDisplay.title:</strong>{" "}
-                  <span className="admin-procedure-table__mono">{detail.activeTaskDisplay.title}</span>
-                </p>
-              ) : null}
-            </details>
-
-            <details>
-              <summary>Ver datos técnicos del expediente</summary>
-              <p className="small">
-                <strong>ID interno:</strong>{" "}
-                <span className="admin-procedure-table__mono">{procedureRequest.id}</span>
-              </p>
-              <p className="small">
-                <strong>UUID responsable:</strong>{" "}
-                <span className="admin-procedure-table__mono">{procedureRequest.assignedToUserId || "-"}</span>
-              </p>
-              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
-                {stringifyJson(collectedData)}
-              </pre>
-            </details>
-
-            <details>
-              <summary>Ver variables de Camunda</summary>
-              <p className="small">
-                <strong>Instancia:</strong> {procedureRequest.camundaProcessInstanceKey || "-"}
-              </p>
-              <p className="small">
-                <strong>Definición:</strong> {procedureRequest.camundaProcessDefinitionId || "-"}
-              </p>
-              <p className="small">
-                <strong>Error de sincronización:</strong> {procedureRequest.camundaError || "Sin errores"}
-              </p>
-              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
-                {stringifyJson(procedureRequest.camundaMetadata)}
-              </pre>
-            </details>
-
-            <details>
-              <summary>Ver historial técnico</summary>
-              <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
-                {stringifyJson(detail.history || [])}
-              </pre>
-            </details>
-          </section>
+          <TechnicalInfoAccordion
+            extraOperationalErrors={operationalErrors.length > 1 ? operationalErrors.slice(1) : []}
+            camundaProcessStateDisplay={camundaProcessStateDisplay}
+            camundaTaskStateDisplay={camundaTaskStateDisplay}
+            activeTaskId={detail?.activeTask?.id || detail?.activeTask?.taskId}
+            taskDefinitionKey={detail?.activeTask?.taskDefinitionKey}
+            camundaLiveProcessInstanceKey={camundaLiveProcessInstanceKey}
+            camundaTaskAssigneeCamundaLabel={camundaTaskAssigneeCamundaLabel}
+            operationalSituation={operationalSituation}
+            activeTaskDisplayTitle={detail?.activeTaskDisplay?.title}
+            procedureRequestId={procedureRequest.id}
+            assignedToUserId={procedureRequest.assignedToUserId}
+            collectedDataJson={stringifyJson(collectedData)}
+            camundaProcessInstanceKey={procedureRequest.camundaProcessInstanceKey}
+            camundaProcessDefinitionId={procedureRequest.camundaProcessDefinitionId}
+            camundaError={procedureRequest.camundaError}
+            camundaMetadataJson={stringifyJson(procedureRequest.camundaMetadata)}
+            historyJson={stringifyJson(detail?.history || [])}
+          />
 
           {canManageDeletion ? (
-            <section className="card dashboard-section admin-procedure-fields">
-              <h3>Zona de peligro</h3>
-              <p className="small">
-                Esta acción es destructiva. El expediente se elimina en forma permanente y no puede recuperarse.
-              </p>
-              <button
-                type="button"
-                className="button-inline button-inline--danger"
-                onClick={() => setIsDeleteConfirmOpen(true)}
-                disabled={deleteLoading}
-              >
-                {deleteLoading ? "Eliminando..." : "Eliminar expediente"}
-              </button>
-            </section>
+            <DangerZoneCard onRequestDelete={() => setIsDeleteConfirmOpen(true)} deleteLoading={deleteLoading} />
           ) : null}
         </>
+      ) : !detailLoading ? (
+        <p className="dashboard-onify-empty">No se pudo mostrar el expediente.</p>
       ) : null}
 
       {deleteTechnicalDetail ? (
-        <section className="card dashboard-section admin-procedure-fields">
-          <details>
+        <section className="dashboard-onify-card dashboard-onify-section funcionario-expediente-detail__card funcionario-expediente-detail__card--technical">
+          <details className="funcionario-expediente-detail__details">
             <summary>Detalle técnico de eliminación</summary>
-            <pre className="admin-procedure-table__mono" style={{ whiteSpace: "pre-wrap" }}>
-              {deleteTechnicalDetail}
-            </pre>
+            <pre className="admin-procedure-table__mono funcionario-expediente-detail__pre">{deleteTechnicalDetail}</pre>
           </details>
         </section>
       ) : null}
