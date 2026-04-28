@@ -124,7 +124,7 @@ export default function BpmnProcessDiagramModal({ isOpen, onClose, procedureRequ
       <div className="funcionario-bpmn-modal__dialog">
         <div className="funcionario-bpmn-modal__head">
           <h2 id="funcionario-bpmn-modal-title">Diagrama completo del proceso</h2>
-          <button type="button" className="funcionario-bpmn-modal__close" onClick={onClose}>
+          <button type="button" className="funcionario-bpmn-modal__close-button" onClick={onClose}>
             Cerrar
           </button>
         </div>
