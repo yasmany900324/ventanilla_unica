@@ -10,7 +10,6 @@ import { useLocale } from "./LocaleProvider";
 import { normalizeImageReference } from "../lib/imageReference";
 import {
   ACTIVE_TASK_API_MISS_USER_MESSAGE,
-  buildCamundaAdvanceActionSummaryLabel,
   buildCamundaAssigneeResponsibilityLabel,
   buildFunctionalWorkflowStateLabel,
   buildInboxRelationLabelFromOwner,
@@ -20,6 +19,10 @@ import {
   deriveCamundaStatus,
   splitOperationalErrors,
 } from "../lib/funcionarioExpedienteOperationalCamunda";
+import {
+  buildFuncionarioSiguienteAccionLabel,
+  partitionPrimaryOperationalActions,
+} from "../lib/funcionarioExpedienteDetailActions";
 import { inferFuncionarioWorkflowProgress } from "../lib/funcionarioExpedienteDetailWorkflow";
 import CaseHeader from "./funcionarioExpedienteDetail/CaseHeader";
 import CaseSummaryCard from "./funcionarioExpedienteDetail/CaseSummaryCard";
@@ -27,6 +30,7 @@ import CitizenInfoCard from "./funcionarioExpedienteDetail/CitizenInfoCard";
 import CaseProgressCard from "./funcionarioExpedienteDetail/CaseProgressCard";
 import CaseTramiteStatusCard from "./funcionarioExpedienteDetail/CaseTramiteStatusCard";
 import CaseRecentActivityCard from "./funcionarioExpedienteDetail/CaseRecentActivityCard";
+import CompleteStepWideCard from "./funcionarioExpedienteDetail/CompleteStepWideCard";
 import CurrentActionCard from "./funcionarioExpedienteDetail/CurrentActionCard";
 import TechnicalInfoAccordion from "./funcionarioExpedienteDetail/TechnicalInfoAccordion";
 import DangerZoneCard from "./funcionarioExpedienteDetail/DangerZoneCard";
@@ -146,7 +150,7 @@ function getAssignmentScopeLabel(item) {
     return "Disponible para tomar";
   }
   if (item?.assignmentScope === "admin") {
-    return "Vista administración";
+    return null;
   }
   if (item?.assignedToUserId) {
     return "Asignado a otro funcionario";
@@ -165,23 +169,12 @@ function buildBandejaRelationSimple(procedureRequest) {
     return "Disponible para tomar";
   }
   if (procedureRequest.assignmentScope === "admin") {
-    return "Vista administración";
+    return "Disponible para todo el equipo";
   }
   if (procedureRequest.assignedToUserId) {
     return "Asignado a otro funcionario";
   }
   return "Disponible para tomar";
-}
-
-function mapSiguienteAccionLabel(label) {
-  const s = String(label || "").trim();
-  if (s === "Tomar tarea") {
-    return "Tomar trámite";
-  }
-  if (s === "Completar tarea") {
-    return "Completar paso";
-  }
-  return s || "—";
 }
 
 function resolveActionCardBadge({ isAvailable, functionalWorkflowStateLabel }) {
@@ -722,7 +715,6 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     processStateUpper,
     camundaStatusKey,
   });
-  const camundaAdvanceActionSummaryLabel = buildCamundaAdvanceActionSummaryLabel(operationalActions);
   const camundaTaskStateDisplay = hasActiveTask
     ? String(detail?.activeTask?.state || "").trim() || "—"
     : "—";
@@ -791,7 +783,6 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     functionalWorkflowStateLabel,
     camundaAssigneeResponsibilityLabel,
     inboxBandejaRelationLabel,
-    camundaAdvanceActionSummaryLabel,
     camundaLiveProcessInstanceKey,
     camundaProcessStateDisplay,
     retrySyncAction,
@@ -1257,7 +1248,6 @@ export default function FuncionarioExpedienteDetailPage() {
     operativeStepLabel,
     functionalWorkflowStateLabel,
     camundaAssigneeResponsibilityLabel,
-    camundaAdvanceActionSummaryLabel,
     camundaLiveProcessInstanceKey,
     camundaProcessStateDisplay,
     retrySyncAction,
@@ -1291,6 +1281,20 @@ export default function FuncionarioExpedienteDetailPage() {
     return `Paso actual: ${operativeStepLabel}. ${tail}`;
   }, [activeTaskDescription, operativeStepLabel]);
 
+  const expedienteActionLayout = useMemo(() => {
+    const parted = partitionPrimaryOperationalActions(operationalActions);
+    const wideCompleteAction =
+      !isAvailable && parted.primary?.actionKey === "complete_task" ? parted.primary : null;
+    const railOperationalActions = wideCompleteAction ? parted.secondary : operationalActions;
+    const siguienteAccionLabel = buildFuncionarioSiguienteAccionLabel({
+      isAvailable,
+      claimAction,
+      showCamundaSyncAlert,
+      operationalActions,
+    });
+    return { wideCompleteAction, railOperationalActions, siguienteAccionLabel };
+  }, [claimAction, isAvailable, operationalActions, showCamundaSyncAlert]);
+
   const actionLead = useMemo(() => {
     if (isAvailable) {
       return "Este expediente está en la bandeja general: tomalo para empezar a gestionarlo desde tu espacio.";
@@ -1301,13 +1305,16 @@ export default function FuncionarioExpedienteDetailPage() {
     if (primaryOperationalError) {
       return "Hay un inconveniente operativo. Revisá el mensaje y, si corresponde, contactá a sistemas.";
     }
+    if (expedienteActionLayout.wideCompleteAction) {
+      return "Completá el formulario debajo de «Seguimiento del trámite» y confirmá con el botón al pie.";
+    }
     return "Seguí las acciones disponibles y completá los datos solicitados para avanzar el trámite.";
-  }, [isAvailable, primaryOperationalError, showCamundaSyncAlert]);
-
-  const siguienteAccionUi = useMemo(
-    () => mapSiguienteAccionLabel(camundaAdvanceActionSummaryLabel),
-    [camundaAdvanceActionSummaryLabel]
-  );
+  }, [
+    expedienteActionLayout.wideCompleteAction,
+    isAvailable,
+    primaryOperationalError,
+    showCamundaSyncAlert,
+  ]);
 
   useEffect(() => {
     if (!IS_DEVELOPMENT || !procedureRequestId) {
@@ -1737,6 +1744,19 @@ export default function FuncionarioExpedienteDetailPage() {
                 email={contactEmail}
               />
               <CaseProgressCard currentIndex={workflowProgress.currentIndex} instructionText={progressInstruction} />
+              {expedienteActionLayout.wideCompleteAction ? (
+                <CompleteStepWideCard
+                  action={expedienteActionLayout.wideCompleteAction}
+                  onRunAction={runAction}
+                  actionLoadingKey={actionLoadingKey}
+                  completeVariablesJson={completeVariablesJson}
+                  setCompleteVariablesJson={setCompleteVariablesJson}
+                  internalObservation={internalObservation}
+                  setInternalObservation={setInternalObservation}
+                  nextStatus={nextStatus}
+                  setNextStatus={setNextStatus}
+                />
+              ) : null}
               <CaseRecentActivityCard
                 events={detail?.history}
                 locale={locale}
@@ -1750,7 +1770,7 @@ export default function FuncionarioExpedienteDetailPage() {
                 expedienteStatusLabel={getLocalStatusLabel(procedureRequest.status)}
                 taskAssigneeLabel={camundaAssigneeResponsibilityLabel}
                 bandejaLabel={buildBandejaRelationSimple(procedureRequest)}
-                siguienteAccionLabel={siguienteAccionUi}
+                siguienteAccionLabel={expedienteActionLayout.siguienteAccionLabel}
               />
               <CurrentActionCard
                 headline={operativeStepLabel}
@@ -1765,9 +1785,9 @@ export default function FuncionarioExpedienteDetailPage() {
                 onRetryCamundaSync={handleRetryCamundaSync}
                 isRetrySyncLoading={isRetrySyncLoading}
                 isAvailable={isAvailable}
-                claimHint="Para gestionarlo, primero tomá el trámite y asignalo a tu bandeja."
+                claimHint="Para gestionarlo, primero tomá la tarea y asignalo a tu bandeja."
                 claimAction={claimAction}
-                operationalActions={operationalActions}
+                operationalActions={expedienteActionLayout.railOperationalActions}
                 onRunAction={runAction}
                 actionLoadingKey={actionLoadingKey}
                 completeVariablesJson={completeVariablesJson}

@@ -1,48 +1,9 @@
-import { buildActionDescription, buildActionTitle } from "../../lib/funcionarioExpedienteDetailActions";
-
-function partitionPrimaryOperationalActions(actions) {
-  const list = Array.isArray(actions) ? actions : [];
-  if (list.length === 0) {
-    return { primary: null, secondary: [] };
-  }
-  const completeIdx = list.findIndex((a) => a?.actionKey === "complete_task");
-  if (completeIdx >= 0) {
-    const primary = list[completeIdx];
-    const secondary = list.filter((_, i) => i !== completeIdx);
-    return { primary, secondary };
-  }
-  return { primary: list[0], secondary: list.slice(1) };
-}
-
-function ProcedureFieldChecklist({ requiredVariables }) {
-  if (!Array.isArray(requiredVariables) || requiredVariables.length === 0) {
-    return null;
-  }
-  return (
-    <div className="funcionario-expediente-detail__checklist-block">
-      <p className="funcionario-expediente-detail__checklist-title">Datos que podés completar en este paso</p>
-      <ul className="funcionario-expediente-detail__checklist">
-        {requiredVariables.map((item, index) => (
-          <li key={`${item.procedureFieldKey || "field"}-${index}`} className="funcionario-expediente-detail__checklist-item">
-            <span className="funcionario-expediente-detail__checklist-bullet" aria-hidden="true">
-              {item.required ? "●" : "○"}
-            </span>
-            <div>
-              <p className="funcionario-expediente-detail__checklist-label">{item.fieldLabel || item.procedureFieldKey}</p>
-              <details className="funcionario-expediente-detail__nested-details">
-                <summary>Detalle técnico del campo</summary>
-                <p className="funcionario-expediente-detail__nested-details-text">
-                  Variable interna: <span className="admin-procedure-table__mono">{item.camundaVariableName}</span>
-                  {item.camundaVariableType ? ` (${item.camundaVariableType})` : ""}
-                </p>
-              </details>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+import {
+  buildActionDescription,
+  buildActionTitle,
+  partitionPrimaryOperationalActions,
+} from "../../lib/funcionarioExpedienteDetailActions";
+import CompleteStepFormFields from "./CompleteStepFormFields";
 
 function ActionBlock({
   action,
@@ -77,41 +38,15 @@ function ActionBlock({
         ) : null}
       </div>
       {action.actionKey === "complete_task" ? (
-        <div className="funcionario-expediente-detail__guided-form">
-          <ProcedureFieldChecklist requiredVariables={action.requiredVariables} />
-          <label className="funcionario-expediente-detail__field-label" htmlFor="func-exp-complete-json">
-            Valores adicionales (JSON, opcional)
-          </label>
-          <textarea
-            id="func-exp-complete-json"
-            className="funcionario-expediente-detail__textarea"
-            rows={5}
-            value={completeVariablesJson}
-            onChange={(event) => setCompleteVariablesJson(event.target.value)}
-            spellCheck={false}
-          />
-          <label className="funcionario-expediente-detail__field-label" htmlFor="func-exp-obs">
-            Observaciones internas
-          </label>
-          <textarea
-            id="func-exp-obs"
-            className="funcionario-expediente-detail__textarea"
-            rows={3}
-            value={internalObservation}
-            onChange={(event) => setInternalObservation(event.target.value)}
-          />
-          <label className="funcionario-expediente-detail__field-label" htmlFor="func-exp-next-status">
-            Cambio de estado local (opcional, uso avanzado)
-          </label>
-          <input
-            id="func-exp-next-status"
-            className="funcionario-expediente-detail__input"
-            type="text"
-            value={nextStatus}
-            onChange={(event) => setNextStatus(event.target.value)}
-            placeholder="Ej.: PENDING_BACKOFFICE_ACTION"
-          />
-        </div>
+        <CompleteStepFormFields
+          requiredVariables={action.requiredVariables}
+          completeVariablesJson={completeVariablesJson}
+          setCompleteVariablesJson={setCompleteVariablesJson}
+          internalObservation={internalObservation}
+          setInternalObservation={setInternalObservation}
+          nextStatus={nextStatus}
+          setNextStatus={setNextStatus}
+        />
       ) : null}
       <button
         type="button"
@@ -128,7 +63,7 @@ function ActionBlock({
 }
 
 /**
- * Tarjeta principal de acción y alertas operativas.
+ * Tarjeta principal de acción y alertas operativas (columna derecha).
  */
 export default function CurrentActionCard({
   headline,

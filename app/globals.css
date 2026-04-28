@@ -8687,6 +8687,20 @@ a.dashboard-onify-detail-btn {
   gap: 0.5rem;
 }
 
+.funcionario-expediente-detail__guided-form--wide {
+  gap: 0.65rem;
+}
+
+.funcionario-expediente-detail__complete-wide .funcionario-expediente-detail__textarea {
+  min-height: 6.5rem;
+  max-width: 100%;
+}
+
+.funcionario-expediente-detail__complete-wide-head {
+  display: grid;
+  gap: 0.4rem;
+}
+
 .funcionario-expediente-detail__field-label {
   font-size: 0.78rem;
   font-weight: 700;

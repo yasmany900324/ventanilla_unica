@@ -38,7 +38,7 @@ export default function CaseRecentActivityCard({ events, locale, operativeStepLa
       ) : (
         <ul className="funcionario-expediente-detail__timeline">
           {chronological.map((event, index) => {
-            const label = humanizeProcedureEventLabel(event?.type, event?.newStatus);
+            const label = humanizeProcedureEventLabel(event?.type, event?.newStatus, event?.previousStatus);
             const time = formatEventTime(event?.createdAt, locale);
             return (
               <li key={event?.id || `${time}-${index}`} className="funcionario-expediente-detail__timeline-item">
