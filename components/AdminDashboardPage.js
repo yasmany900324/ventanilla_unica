@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import ConfirmUpdateRolesModal from "./ConfirmUpdateRolesModal";
 import AdminProcedureAssignmentsTab from "./AdminProcedureAssignmentsTab";
+import DuplicateProcedureModal from "./DuplicateProcedureModal";
 import { useLocale } from "./LocaleProvider";
 import { getLocaleCopy } from "../lib/uiTranslations";
 
@@ -149,6 +150,23 @@ function normalizeCode(value) {
     .replace(/[\s-]+/g, "_")
     .replace(/[^a-z0-9_]/g, "")
     .slice(0, 120);
+}
+
+function suggestDuplicateProcedureCode(baseCode, procedures) {
+  const normalizedBase = normalizeCode(`${baseCode || "procedimiento"}_copia`) || "procedimiento_copia";
+  const takenCodes = new Set((Array.isArray(procedures) ? procedures : []).map((item) => normalizeCode(item?.code)));
+  if (!takenCodes.has(normalizedBase)) {
+    return normalizedBase;
+  }
+  let index = 1;
+  while (index <= 9999) {
+    const candidate = normalizeCode(`${normalizedBase}_copy_${index}`);
+    if (candidate && !takenCodes.has(candidate)) {
+      return candidate;
+    }
+    index += 1;
+  }
+  return `${normalizedBase}_${Date.now()}`;
 }
 
 const TECHNICAL_FIELD_KEY_REGEX = /^[A-Za-z0-9_]{1,60}$/;
@@ -398,6 +416,9 @@ export default function AdminDashboardPage() {
   const [isSavingProcedure, setIsSavingProcedure] = useState(false);
   const [togglingCode, setTogglingCode] = useState("");
   const [deletingCode, setDeletingCode] = useState("");
+  const [duplicateModalState, setDuplicateModalState] = useState(null);
+  const [isDuplicatingProcedure, setIsDuplicatingProcedure] = useState(false);
+  const [duplicateProcedureError, setDuplicateProcedureError] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState("");
   const [usersSuccessMessage, setUsersSuccessMessage] = useState("");
@@ -502,6 +523,7 @@ export default function AdminDashboardPage() {
       }
       const incomingProcedures = Array.isArray(data?.procedures) ? data.procedures : [];
       setProcedures(incomingProcedures);
+      return incomingProcedures;
     } catch (error) {
       if (error.name !== "AbortError") {
         setProceduresError(error.message || procedureCopy.loadError);
@@ -509,6 +531,7 @@ export default function AdminDashboardPage() {
     } finally {
       setIsLoadingProcedures(false);
     }
+    return [];
   }, [locale, procedureCopy.loadError, router]);
 
   useEffect(() => {
@@ -670,6 +693,29 @@ export default function AdminDashboardPage() {
     setFormState(createProcedureFormState(procedure));
     setProcedureSuccessMessage("");
     setProceduresError("");
+  };
+
+  const openDuplicateModal = (procedure) => {
+    if (!procedure?.id) {
+      setProceduresError("No se pudo preparar la duplicación: falta el identificador del procedimiento.");
+      return;
+    }
+    setDuplicateProcedureError("");
+    setDuplicateModalState({
+      sourceProcedureId: procedure.id,
+      sourceProcedureCode: procedure.code,
+      sourceProcedureName: procedure.name,
+      initialName: `${normalizeSimpleText(procedure.name, 160) || "Procedimiento"} - copia`,
+      initialCode: suggestDuplicateProcedureCode(procedure.code, procedures),
+    });
+  };
+
+  const closeDuplicateModal = () => {
+    if (isDuplicatingProcedure) {
+      return;
+    }
+    setDuplicateProcedureError("");
+    setDuplicateModalState(null);
   };
 
   const closeExpandedForm = () => {
@@ -978,6 +1024,44 @@ export default function AdminDashboardPage() {
       setProceduresError(error.message || procedureCopy.loadError);
     } finally {
       setDeletingCode("");
+    }
+  };
+
+  const handleConfirmDuplicateProcedure = async (payload) => {
+    if (!duplicateModalState?.sourceProcedureId) {
+      return;
+    }
+    setProcedureSuccessMessage("");
+    setProceduresError("");
+    setDuplicateProcedureError("");
+    setIsDuplicatingProcedure(true);
+    try {
+      const response = await fetch(
+        `/api/admin/procedures/${encodeURIComponent(duplicateModalState.sourceProcedureId)}/duplicate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "No se pudo duplicar el procedimiento.");
+      }
+      const refreshedProcedures = await loadProcedures();
+      setProcedureSuccessMessage("Procedimiento duplicado correctamente. Se creó como inactivo.");
+      const createdCode = normalizeCode(data?.procedure?.code || payload.newCode || "");
+      const duplicated = (Array.isArray(refreshedProcedures) ? refreshedProcedures : []).find(
+        (item) => normalizeCode(item?.code) === createdCode
+      );
+      if (duplicated) {
+        openEditForm(duplicated);
+      }
+      setDuplicateModalState(null);
+    } catch (error) {
+      setDuplicateProcedureError(error.message || "No se pudo duplicar el procedimiento.");
+    } finally {
+      setIsDuplicatingProcedure(false);
     }
   };
 
@@ -1379,6 +1463,14 @@ export default function AdminDashboardPage() {
                                   disabled={isSavingProcedure || togglingCode === procedure.code || deletingCode === procedure.code}
                                 >
                                   {procedureCopy.edit}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button-inline"
+                                  onClick={() => openDuplicateModal(procedure)}
+                                  disabled={isSavingProcedure || togglingCode === procedure.code || deletingCode === procedure.code}
+                                >
+                                  Duplicar
                                 </button>
                                 {procedure.isActive ? (
                                   <button
@@ -1897,6 +1989,17 @@ export default function AdminDashboardPage() {
         )}
         onCancel={() => discardRoleConfirmDialog(roleConfirmDialog, true)}
         onConfirm={handleRoleConfirmSubmit}
+      />
+
+      <DuplicateProcedureModal
+        isOpen={Boolean(duplicateModalState)}
+        procedureName={duplicateModalState?.sourceProcedureName || ""}
+        initialName={duplicateModalState?.initialName || ""}
+        initialCode={duplicateModalState?.initialCode || ""}
+        isSubmitting={isDuplicatingProcedure}
+        requestErrorMessage={duplicateProcedureError}
+        onCancel={closeDuplicateModal}
+        onConfirm={handleConfirmDuplicateProcedure}
       />
     </main>
   );
