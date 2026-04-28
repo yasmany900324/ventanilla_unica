@@ -848,20 +848,28 @@ export default function FuncionarioBandejaExpedientesPage() {
                       <td className="funcionario-bandeja__cell">
                         <div className="funcionario-bandeja__pending-wrap">
                           {canClaimExpediente(item) ? (
-                            <button
-                              type="button"
-                              className="funcionario-bandeja__pending-take"
-                              onClick={() => void handleClaimExpediente(item)}
-                              disabled={claimingId === rowActionsId}
-                            >
-                              {claimingId === rowActionsId
-                                ? "Tomando…"
-                                : item.pendingAction || "Tomar expediente"}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="funcionario-bandeja__pending-take"
+                                onClick={() => void handleClaimExpediente(item)}
+                                disabled={claimingId === rowActionsId}
+                              >
+                                {claimingId === rowActionsId
+                                  ? "Tomando…"
+                                  : item.pendingAction || "Tomar expediente"}
+                              </button>
+                              {item.pendingActionDetail ? (
+                                <span className="funcionario-bandeja__pending-detail">{item.pendingActionDetail}</span>
+                              ) : null}
+                            </>
                           ) : (
-                            <span className="funcionario-bandeja__pending-detail">
-                              {item.pendingAction || "—"}
-                            </span>
+                            <>
+                              <span className="funcionario-bandeja__pending-detail">{item.pendingAction || "—"}</span>
+                              {item.pendingActionDetail ? (
+                                <span className="funcionario-bandeja__pending-detail">{item.pendingActionDetail}</span>
+                              ) : null}
+                            </>
                           )}
                         </div>
                       </td>
