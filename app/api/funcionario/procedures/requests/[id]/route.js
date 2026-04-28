@@ -101,12 +101,15 @@ export async function GET(request, { params }) {
       : null;
     const normalizedActiveTask = activeTask?.activeTask?.exists
       ? {
+          id: activeTask.activeTask.id,
           taskId: activeTask.activeTask.id,
+          userTaskKey: activeTask.activeTask.userTaskKey || activeTask.activeTask.id,
           taskDefinitionKey: activeTask.activeTask.taskDefinitionKey,
           name: activeTask.activeTask.name,
           assignee: activeTask.activeTask.assignee,
           state: activeTask.activeTask.state,
           createdAt: activeTask.activeTask.createdAt,
+          formKey: activeTask.activeTask.formKey || null,
         }
       : null;
     const legacyAvailableActions = buildAvailableActions({

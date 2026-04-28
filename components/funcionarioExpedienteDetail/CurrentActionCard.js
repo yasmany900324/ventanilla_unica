@@ -9,6 +9,11 @@ function ActionBlock({
   action,
   onRunAction,
   actionLoadingKey,
+  activeTaskForm,
+  camundaFormValues,
+  setCamundaFormValues,
+  formValidationErrors,
+  showAdvancedOptions,
   completeVariablesJson,
   setCompleteVariablesJson,
   internalObservation,
@@ -44,13 +49,17 @@ function ActionBlock({
       </div>
       {action.actionKey === "complete_task" ? (
         <CompleteStepFormFields
-          requiredVariables={action.requiredVariables}
+          activeTaskForm={activeTaskForm}
+          formValues={camundaFormValues}
+          setFormValues={setCamundaFormValues}
+          formValidationErrors={formValidationErrors}
           completeVariablesJson={completeVariablesJson}
           setCompleteVariablesJson={setCompleteVariablesJson}
           internalObservation={internalObservation}
           setInternalObservation={setInternalObservation}
           nextStatus={nextStatus}
           setNextStatus={setNextStatus}
+          showAdvancedOptions={showAdvancedOptions}
         />
       ) : null}
       <button
@@ -88,6 +97,11 @@ export default function CurrentActionCard({
   operationalActions,
   onRunAction,
   actionLoadingKey,
+  activeTaskForm,
+  camundaFormValues,
+  setCamundaFormValues,
+  formValidationErrors,
+  showAdvancedOptions = false,
   completeVariablesJson,
   setCompleteVariablesJson,
   internalObservation,
@@ -198,6 +212,11 @@ export default function CurrentActionCard({
             action={primaryOperationalAction}
             onRunAction={onRunAction}
             actionLoadingKey={actionLoadingKey}
+            activeTaskForm={activeTaskForm}
+            camundaFormValues={camundaFormValues}
+            setCamundaFormValues={setCamundaFormValues}
+            formValidationErrors={formValidationErrors}
+            showAdvancedOptions={showAdvancedOptions}
             completeVariablesJson={completeVariablesJson}
             setCompleteVariablesJson={setCompleteVariablesJson}
             internalObservation={internalObservation}
@@ -215,6 +234,11 @@ export default function CurrentActionCard({
                     action={action}
                     onRunAction={onRunAction}
                     actionLoadingKey={actionLoadingKey}
+                    activeTaskForm={activeTaskForm}
+                    camundaFormValues={camundaFormValues}
+                    setCamundaFormValues={setCamundaFormValues}
+                    formValidationErrors={formValidationErrors}
+                    showAdvancedOptions={showAdvancedOptions}
                     completeVariablesJson={completeVariablesJson}
                     setCompleteVariablesJson={setCompleteVariablesJson}
                     internalObservation={internalObservation}

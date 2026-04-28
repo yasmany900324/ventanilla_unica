@@ -39,6 +39,11 @@ export async function POST(request, { params }) {
     const result = await completeProcedureTaskFromBackoffice({
       procedureRequestId,
       collectedData: body?.collectedData && typeof body.collectedData === "object" ? body.collectedData : {},
+      formValues: body?.formValues && typeof body.formValues === "object" ? body.formValues : null,
+      internalObservation:
+        typeof body?.internalObservation === "string" && body.internalObservation.trim()
+          ? body.internalObservation.trim().slice(0, 2000)
+          : null,
       nextLocalStatus:
         typeof body?.nextStatus === "string" && body.nextStatus.trim()
           ? body.nextStatus.trim().slice(0, 80)

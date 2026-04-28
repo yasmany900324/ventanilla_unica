@@ -30,6 +30,7 @@ import CompleteStepWideCard from "./funcionarioExpedienteDetail/CompleteStepWide
 import CurrentActionCard from "./funcionarioExpedienteDetail/CurrentActionCard";
 import TechnicalInfoAccordion from "./funcionarioExpedienteDetail/TechnicalInfoAccordion";
 import DangerZoneCard from "./funcionarioExpedienteDetail/DangerZoneCard";
+import { extractCamundaFormFields } from "./funcionarioExpedienteDetail/CamundaTaskFormRenderer";
 
 const LocationMapPreview = dynamic(() => import("./LocationMapPreview"), { ssr: false });
 
@@ -123,6 +124,28 @@ function parseJsonInput(value, fallback = {}) {
 
 function stringifyJson(value) {
   return JSON.stringify(value || {}, null, 2);
+}
+
+function isValueEmpty(value) {
+  if (value == null) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return !value.trim();
+  }
+  return false;
+}
+
+function buildFormValidationErrors(schema, values) {
+  const fields = extractCamundaFormFields(schema).filter((field) => !field.unsupported);
+  /** @type {Record<string, string>} */
+  const errors = {};
+  fields.forEach((field) => {
+    if (field.required && isValueEmpty(values?.[field.key])) {
+      errors[field.key] = "Este campo es obligatorio.";
+    }
+  });
+  return errors;
 }
 
 function getLocalStatusLabel(value) {
@@ -521,6 +544,7 @@ function normalizeDetailResponse(payload) {
         taskDefinitionKey: rawActiveTask.taskDefinitionKey || null,
         taskDefinitionName: rawActiveTask.name || null,
         name: rawActiveTask.name || null,
+        formKey: rawActiveTask.formKey || null,
         taskName: rawActiveTask.taskName != null ? String(rawActiveTask.taskName).trim() || null : null,
         label: rawActiveTask.label != null ? String(rawActiveTask.label).trim() || null : null,
         assignee: rawActiveTask.assignee ?? null,
@@ -1042,6 +1066,10 @@ export default function FuncionarioExpedienteDetailPage() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [flowSummary, setFlowSummary] = useState(null);
   const [flowSummaryError, setFlowSummaryError] = useState(null);
+  const [activeTaskForm, setActiveTaskForm] = useState(null);
+  const [activeTaskFormLoading, setActiveTaskFormLoading] = useState(false);
+  const [camundaFormValues, setCamundaFormValues] = useState({});
+  const [formValidationErrors, setFormValidationErrors] = useState({});
   const [fatalError, setFatalError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [actionError, setActionError] = useState("");
@@ -1097,11 +1125,14 @@ export default function FuncionarioExpedienteDetailPage() {
     setSuccessMessage("");
     setDeleteTechnicalDetail("");
     setFlowSummaryError(null);
+    setActiveTaskFormLoading(true);
+    setFormValidationErrors({});
     try {
       const base = `/api/funcionario/procedures/requests/${encodeURIComponent(requestId)}`;
-      const [response, summaryResponse] = await Promise.all([
+      const [response, summaryResponse, activeTaskFormResponse] = await Promise.all([
         fetch(base, { cache: "no-store" }),
         fetch(`${base}/process-flow-summary`, { cache: "no-store" }),
+        fetch(`${base}/active-task-form`, { cache: "no-store" }),
       ]);
       const data = await response.json();
       if (!response.ok) {
@@ -1118,12 +1149,14 @@ export default function FuncionarioExpedienteDetailPage() {
         setDetail(null);
         setFlowSummary(null);
         setFlowSummaryError(null);
+        setActiveTaskForm(null);
         return;
       }
       setDetail(normalizeDetailResponse(data));
       setCompleteVariablesJson("{}");
       setInternalObservation("");
       setNextStatus("");
+      setCamundaFormValues({});
       if (summaryResponse.ok) {
         const summaryData = await summaryResponse.json();
         setFlowSummary(summaryData && typeof summaryData === "object" ? summaryData : null);
@@ -1141,13 +1174,26 @@ export default function FuncionarioExpedienteDetailPage() {
         }
         setFlowSummaryError(msg);
       }
+      if (activeTaskFormResponse.ok) {
+        const formData = await activeTaskFormResponse.json();
+        setActiveTaskForm(formData && typeof formData === "object" ? formData : null);
+      } else {
+        setActiveTaskForm({
+          status: "error",
+          form: null,
+          activeTask: null,
+          message: "No se pudo obtener el formulario asociado a la tarea activa.",
+        });
+      }
     } catch (_error) {
       setFatalError({ message: "No se pudo cargar el detalle del expediente." });
       setDetail(null);
       setFlowSummary(null);
       setFlowSummaryError(null);
+      setActiveTaskForm(null);
     } finally {
       setDetailLoading(false);
+      setActiveTaskFormLoading(false);
     }
   }, []);
 
@@ -1181,21 +1227,45 @@ export default function FuncionarioExpedienteDetailPage() {
     try {
       let body = undefined;
       if (action.actionKey === "complete_task") {
-        const parsedVariables = parseJsonInput(completeVariablesJson, {});
-        if (parsedVariables === null || typeof parsedVariables !== "object") {
-          throw new Error("El JSON de variables no es válido.");
-        }
+        const formStatus = String(activeTaskForm?.status || "").trim().toLowerCase();
+        const expectedTaskDefinitionKey = action.expectedTaskDefinitionKey || undefined;
         const observation = String(internalObservation || "").trim();
-        const mergedVariables = { ...parsedVariables };
-        if (observation) {
-          mergedVariables.__internalObservation = observation;
+        const advancedJsonRaw = String(completeVariablesJson || "").trim();
+        let advancedVariables = {};
+        if (advancedJsonRaw && advancedJsonRaw !== "{}") {
+          const parsedAdvanced = parseJsonInput(completeVariablesJson, {});
+          if (parsedAdvanced === null || typeof parsedAdvanced !== "object") {
+            throw new Error("El JSON de opciones avanzadas no es válido.");
+          }
+          advancedVariables = parsedAdvanced;
         }
-        body = {
-          collectedData: mergedVariables,
-          nextStatus: String(nextStatus || "").trim() || undefined,
-          expectedTaskDefinitionKey: action.expectedTaskDefinitionKey || undefined,
-          idempotencyKey: `backoffice-${Date.now()}`,
-        };
+        if (formStatus === "ok") {
+          const errors = buildFormValidationErrors(activeTaskForm?.form?.schema, camundaFormValues);
+          setFormValidationErrors(errors);
+          if (Object.keys(errors).length > 0) {
+            throw new Error("Completa los campos obligatorios del formulario.");
+          }
+          body = {
+            formValues: camundaFormValues && typeof camundaFormValues === "object" ? camundaFormValues : {},
+            internalObservation: observation || undefined,
+            expectedTaskDefinitionKey,
+            idempotencyKey: `backoffice-${Date.now()}`,
+          };
+        } else if (formStatus === "error") {
+          throw new Error("No se pudo obtener el formulario asociado a la tarea activa.");
+        } else {
+          body = {
+            internalObservation: observation || undefined,
+            expectedTaskDefinitionKey,
+            idempotencyKey: `backoffice-${Date.now()}`,
+          };
+        }
+        if ((isAdmin || IS_DEVELOPMENT) && Object.keys(advancedVariables).length > 0) {
+          body.collectedData = advancedVariables;
+        }
+        if ((isAdmin || IS_DEVELOPMENT) && String(nextStatus || "").trim()) {
+          body.nextStatus = String(nextStatus || "").trim();
+        }
       }
       const response = await fetch(action.endpoint, {
         method: action.method || "POST",
@@ -1222,6 +1292,8 @@ export default function FuncionarioExpedienteDetailPage() {
         setSuccessMessage("Sincronización solicitada correctamente.");
       } else {
         setSuccessMessage("Acción ejecutada correctamente.");
+        setCamundaFormValues({});
+        setFormValidationErrors({});
       }
       setFatalError(null);
       await loadDetail(procedureRequestId);
@@ -1792,6 +1864,19 @@ export default function FuncionarioExpedienteDetailPage() {
                   action={expedienteActionLayout.wideCompleteAction}
                   onRunAction={runAction}
                   actionLoadingKey={actionLoadingKey}
+                  activeTaskFormLoading={activeTaskFormLoading}
+                  activeTaskForm={activeTaskFormLoading ? null : activeTaskForm}
+                  camundaFormValues={camundaFormValues}
+                  setCamundaFormValues={(updater) => {
+                    if (typeof updater === "function") {
+                      setCamundaFormValues((prev) => updater(prev));
+                    } else {
+                      setCamundaFormValues(updater);
+                    }
+                    setFormValidationErrors({});
+                  }}
+                  formValidationErrors={formValidationErrors}
+                  showAdvancedOptions={isAdmin || IS_DEVELOPMENT}
                   completeVariablesJson={completeVariablesJson}
                   setCompleteVariablesJson={setCompleteVariablesJson}
                   internalObservation={internalObservation}
@@ -1840,6 +1925,18 @@ export default function FuncionarioExpedienteDetailPage() {
                 showExpedienteClaimSection={expedienteActionLayout.showClaimExpediente}
                 onRunAction={runAction}
                 actionLoadingKey={actionLoadingKey}
+                activeTaskForm={activeTaskFormLoading ? null : activeTaskForm}
+                camundaFormValues={camundaFormValues}
+                setCamundaFormValues={(updater) => {
+                  if (typeof updater === "function") {
+                    setCamundaFormValues((prev) => updater(prev));
+                  } else {
+                    setCamundaFormValues(updater);
+                  }
+                  setFormValidationErrors({});
+                }}
+                formValidationErrors={formValidationErrors}
+                showAdvancedOptions={isAdmin || IS_DEVELOPMENT}
                 completeVariablesJson={completeVariablesJson}
                 setCompleteVariablesJson={setCompleteVariablesJson}
                 internalObservation={internalObservation}

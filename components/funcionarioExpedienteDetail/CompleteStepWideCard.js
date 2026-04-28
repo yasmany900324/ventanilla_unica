@@ -8,6 +8,12 @@ export default function CompleteStepWideCard({
   action,
   onRunAction,
   actionLoadingKey,
+  activeTaskFormLoading,
+  activeTaskForm,
+  camundaFormValues,
+  setCamundaFormValues,
+  formValidationErrors,
+  showAdvancedOptions,
   completeVariablesJson,
   setCompleteVariablesJson,
   internalObservation,
@@ -40,13 +46,17 @@ export default function CompleteStepWideCard({
         ) : null}
       </div>
       <CompleteStepFormFields
-        requiredVariables={action.requiredVariables}
+        activeTaskForm={activeTaskForm}
+        formValues={camundaFormValues}
+        setFormValues={setCamundaFormValues}
+        formValidationErrors={formValidationErrors}
         completeVariablesJson={completeVariablesJson}
         setCompleteVariablesJson={setCompleteVariablesJson}
         internalObservation={internalObservation}
         setInternalObservation={setInternalObservation}
         nextStatus={nextStatus}
         setNextStatus={setNextStatus}
+        showAdvancedOptions={showAdvancedOptions}
         jsonTextareaId="func-exp-wide-complete-json"
         obsTextareaId="func-exp-wide-obs"
         nextStatusInputId="func-exp-wide-next-status"
@@ -55,9 +65,18 @@ export default function CompleteStepWideCard({
         type="button"
         className="dashboard-onify-btn funcionario-expediente-detail__cta"
         onClick={() => onRunAction(action)}
-        disabled={action.enabled === false || actionLoadingKey === actionKey}
+        disabled={
+          action.enabled === false ||
+          actionLoadingKey === actionKey ||
+          activeTaskFormLoading ||
+          activeTaskForm?.status === "error"
+        }
       >
-        {actionLoadingKey === actionKey ? "Procesando…" : title}
+        {actionLoadingKey === actionKey
+          ? "Procesando…"
+          : activeTaskForm?.status === "no_form"
+            ? "Completar tarea sin formulario"
+            : "Completar paso"}
       </button>
     </section>
   );
