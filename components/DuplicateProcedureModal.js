@@ -131,7 +131,10 @@ function DuplicateProcedureModalDialog({
       aria-describedby={describedByIds}
       onClick={handleBackdropClick}
     >
-      <section className="admin-roles-confirm-dialog__panel" onClick={(event) => event.stopPropagation()}>
+      <section
+        className="admin-roles-confirm-dialog__panel duplicate-procedure-modal__panel"
+        onClick={(event) => event.stopPropagation()}
+      >
         <header className="admin-roles-confirm-dialog__header">
           <h2 id={titleId} className="admin-roles-confirm-dialog__title" tabIndex={-1}>
             Duplicar procedimiento
@@ -143,26 +146,30 @@ function DuplicateProcedureModalDialog({
         </p>
         <p className="small">El nuevo procedimiento siempre se creará inactivo.</p>
 
-        <div className="admin-procedure-fields__edit" style={{ marginTop: 12 }}>
-          <label htmlFor="duplicate-procedure-name">Nombre sugerido *</label>
-          <input
-            id="duplicate-procedure-name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            disabled={isSubmitting}
-          />
-          <label htmlFor="duplicate-procedure-code">Código sugerido *</label>
-          <input
-            id="duplicate-procedure-code"
-            type="text"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            disabled={isSubmitting}
-          />
+        <div className="duplicate-procedure-modal__fields">
+          <div className="duplicate-procedure-modal__field">
+            <label htmlFor="duplicate-procedure-name">Nombre sugerido *</label>
+            <input
+              id="duplicate-procedure-name"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="duplicate-procedure-modal__field">
+            <label htmlFor="duplicate-procedure-code">Código sugerido *</label>
+            <input
+              id="duplicate-procedure-code"
+              type="text"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
 
-        <div className="admin-procedure-channels" style={{ marginTop: 12 }}>
+        <div className="admin-procedure-channels duplicate-procedure-modal__channels">
           <label className="admin-procedure-channel">
             <input
               type="checkbox"
