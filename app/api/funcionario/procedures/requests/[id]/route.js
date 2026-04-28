@@ -41,7 +41,7 @@ function mapOperationalActions({
       } else if (normalizedSegment === "funcionario" && procedureRequestId) {
         out.endpoint = `/api/funcionario/procedures/requests/${encodeURIComponent(
           procedureRequestId
-        )}/claim-task`;
+        )}/claim-camunda-task`;
         out.method = "POST";
       }
     }

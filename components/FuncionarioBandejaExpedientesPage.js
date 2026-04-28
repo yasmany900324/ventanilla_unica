@@ -530,7 +530,7 @@ export default function FuncionarioBandejaExpedientesPage() {
       setSuccessMessage("");
       try {
         const response = await fetch(
-          `/api/funcionario/procedures/requests/${encodeURIComponent(internalId)}/claim-task`,
+          `/api/funcionario/procedures/requests/${encodeURIComponent(internalId)}/claim-expediente`,
           { method: "POST" }
         );
         const data = await response.json().catch(() => ({}));

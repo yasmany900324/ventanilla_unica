@@ -105,4 +105,76 @@ describe("api/funcionario/procedures/requests/[id] GET", () => {
     );
     expect(body.availableActions).toBeUndefined();
   });
+
+  it("mapea Tomar expediente al endpoint local explícito", async () => {
+    mocks.resolveFuncionarioAssignmentScopeForProcedureRequest.mockResolvedValue("available");
+    mocks.buildAvailableActions.mockReturnValue([
+      {
+        actionKey: "claim_task",
+        endpoint: "/api/funcionario/procedures/requests/pr-1/claim-expediente",
+        method: "POST",
+      },
+    ]);
+    mocks.getLiveCamundaTaskSnapshot.mockResolvedValue({
+      sourceOfTruth: "camunda_live",
+      process: { state: "ACTIVE", instanceKey: "123" },
+      activeTask: {
+        exists: true,
+        id: "task-1",
+        taskDefinitionKey: "registrar_datos_iniciales",
+        name: "Registrar Datos Iniciales",
+        assignee: null,
+      },
+      availableActions: [{ action: "CLAIM_TASK", enabled: true, reason: null }],
+      errors: [],
+    });
+
+    const request = new Request("http://localhost/api/funcionario/procedures/requests/pr-1");
+    const response = await GET(request, { params: Promise.resolve({ id: "pr-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.operationalState.availableActions[0]).toEqual(
+      expect.objectContaining({
+        action: "CLAIM_TASK",
+        endpoint: "/api/funcionario/procedures/requests/pr-1/claim-expediente",
+      })
+    );
+  });
+
+  it("mapea Tomar tarea al endpoint Camunda explícito cuando no hay claim local", async () => {
+    mocks.resolveFuncionarioAssignmentScopeForProcedureRequest.mockResolvedValue("assigned_to_me");
+    mocks.buildAvailableActions.mockReturnValue([
+      {
+        actionKey: "complete_task",
+        endpoint: "/api/funcionario/procedures/requests/pr-1/complete-task",
+        method: "POST",
+      },
+    ]);
+    mocks.getLiveCamundaTaskSnapshot.mockResolvedValue({
+      sourceOfTruth: "camunda_live",
+      process: { state: "ACTIVE", instanceKey: "123" },
+      activeTask: {
+        exists: true,
+        id: "task-1",
+        taskDefinitionKey: "registrar_datos_iniciales",
+        name: "Registrar Datos Iniciales",
+        assignee: null,
+      },
+      availableActions: [{ action: "CLAIM_TASK", enabled: true, reason: null }],
+      errors: [],
+    });
+
+    const request = new Request("http://localhost/api/funcionario/procedures/requests/pr-1");
+    const response = await GET(request, { params: Promise.resolve({ id: "pr-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.operationalState.availableActions[0]).toEqual(
+      expect.objectContaining({
+        action: "CLAIM_TASK",
+        endpoint: "/api/funcionario/procedures/requests/pr-1/claim-camunda-task",
+      })
+    );
+  });
 });
