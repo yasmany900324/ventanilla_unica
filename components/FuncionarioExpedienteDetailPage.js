@@ -8,6 +8,13 @@ import { createPortal } from "react-dom";
 import { useAuth } from "./AuthProvider";
 import { useLocale } from "./LocaleProvider";
 import { normalizeImageReference } from "../lib/imageReference";
+import {
+  ACTIVE_TASK_API_MISS_USER_MESSAGE,
+  buildOperationalSituation,
+  computeRequiresCamundaRetry,
+  deriveCamundaStatus,
+  splitOperationalErrors,
+} from "../lib/funcionarioExpedienteOperationalCamunda";
 
 const LocationMapPreview = dynamic(() => import("./LocationMapPreview"), { ssr: false });
 
@@ -19,6 +26,7 @@ const LOCAL_STATUS_LABELS = {
   PENDING_BACKOFFICE_ACTION: "Pendiente de revisión",
   WAITING_CITIZEN_INFO: "Esperando información ciudadana",
   ERROR_CAMUNDA_SYNC: "Error de sincronización",
+  CAMUNDA_ACTIVE_TASK_NOT_FOUND: "Instancia activa (tarea API no resuelta)",
   RESOLVED: "Resuelto",
   REJECTED: "Rechazado",
   CLOSED: "Cerrado",
@@ -29,6 +37,7 @@ const CAMUNDA_STATUS_LABELS = {
   ERROR_SYNC: "Error de sincronización",
   TASK_ACTIVE: "Pendiente de revisión",
   SYNC_PENDING: "Pendiente de sincronización",
+  ACTIVE_TASK_NOT_FOUND: "Instancia activa (tarea API no resuelta)",
   PROCESS_RUNNING: "Instancia creada (sin tarea activa)",
   PROCESS_COMPLETED: "Finalizado",
   NOT_SYNCED: "No sincronizado",
@@ -426,43 +435,6 @@ function buildOpenStreetMapLinkFromCoordinates(coordinates) {
   )}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
 }
 
-function deriveCamundaStatus(procedureRequest, detail) {
-  const existing = String(procedureRequest?.camundaStatus || "").trim();
-  if (existing) {
-    return existing;
-  }
-  const processState = String(detail?.operationalState?.process?.state || "")
-    .trim()
-    .toUpperCase();
-  const hasTask = Boolean(detail?.activeTask?.taskDefinitionKey);
-  if (procedureRequest?.camundaError) {
-    return "ERROR_SYNC";
-  }
-  if ((detail?.operationalState?.errors || []).length > 0) {
-    return "ERROR_SYNC";
-  }
-  if (hasTask) {
-    return "TASK_ACTIVE";
-  }
-  if (["COMPLETED", "TERMINATED", "CANCELED", "CANCELLED"].includes(processState)) {
-    return "PROCESS_COMPLETED";
-  }
-  if (processState === "ACTIVE" || processState === "RUNNING") {
-    return "PROCESS_RUNNING";
-  }
-  if (procedureRequest?.camundaProcessInstanceKey) {
-    const localStatus = String(procedureRequest?.status || "").trim().toUpperCase();
-    if (["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"].includes(localStatus)) {
-      return "PROCESS_COMPLETED";
-    }
-    return "PROCESS_RUNNING";
-  }
-  if (String(procedureRequest?.status || "").trim().toUpperCase() === "PENDING_CAMUNDA_SYNC") {
-    return "SYNC_PENDING";
-  }
-  return "NOT_SYNCED";
-}
-
 function resolvePrimaryDescription(procedureRequest, collectedData) {
   const candidates = [
     collectedData?.description,
@@ -493,104 +465,6 @@ function resolveContactEmail(procedureRequest, collectedData) {
 function isPendingCamundaSyncStatus(status) {
   const key = String(status || "").trim().toUpperCase();
   return key === "PENDING_CAMUNDA_SYNC";
-}
-
-function isFailedCamundaSyncStatus(status) {
-  const key = String(status || "").trim().toUpperCase();
-  return key === "ERROR_CAMUNDA_SYNC" || key === "CAMUNDA_SYNC_FAILED";
-}
-
-const TERMINAL_PROCEDURE_STATUSES = new Set(["RESOLVED", "REJECTED", "CLOSED", "ARCHIVED"]);
-
-function isTerminalProcedureStatus(status) {
-  const key = String(status || "").trim().toUpperCase();
-  return TERMINAL_PROCEDURE_STATUSES.has(key);
-}
-
-function normalizeForSyncHeuristic(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_-]+/g, " ");
-}
-
-function textIndicatesSyncFailure(value) {
-  const n = normalizeForSyncHeuristic(value);
-  if (!n) {
-    return false;
-  }
-  if (n.includes("error") && (n.includes("sincronizacion") || n.includes("sync"))) {
-    return true;
-  }
-  if (n.includes("sync error") || n.includes("sync_error") || n.includes("camunda sync")) {
-    return true;
-  }
-  if (/\bfailed\b/.test(n) || /\berror\b/.test(n)) {
-    if (n.includes("camunda") || n.includes("sync")) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function camundaStatusIndicatesSyncFailure(camundaStatusKey) {
-  const key = String(camundaStatusKey || "").trim().toUpperCase();
-  return key === "ERROR_SYNC";
-}
-
-function buildOperationalSituation({
-  procedureRequest,
-  camundaStatusKey,
-  hasActiveTask,
-  requiresCamundaRetry,
-  isInitialCamundaSyncPending,
-}) {
-  if (requiresCamundaRetry) {
-    return "No hay una tarea activa asociada en Camunda. Se recomienda reintentar la sincronización.";
-  }
-  if (isInitialCamundaSyncPending) {
-    return "El expediente está pendiente de sincronización inicial con Camunda.";
-  }
-  if (hasActiveTask) {
-    return "El expediente está sincronizado y cuenta con una tarea operativa activa.";
-  }
-  if (String(camundaStatusKey || "").trim().toUpperCase() === "PROCESS_RUNNING") {
-    return "La instancia de Camunda está activa, pero todavía no se generó una tarea operativa.";
-  }
-  return "Estado operativo estable sin alertas de sincronización.";
-}
-
-function computeRequiresCamundaRetry({
-  procedureRequest,
-  camundaStatusKey,
-  camundaStatusLabel,
-  hasActiveTask,
-  isAvailable,
-}) {
-  if (!procedureRequest || isAvailable || isTerminalProcedureStatus(procedureRequest.status)) {
-    return false;
-  }
-  if (procedureRequest?.camundaError) {
-    return true;
-  }
-  if (isFailedCamundaSyncStatus(procedureRequest?.status)) {
-    return true;
-  }
-  if (camundaStatusIndicatesSyncFailure(camundaStatusKey)) {
-    return true;
-  }
-  if (textIndicatesSyncFailure(getLocalStatusLabel(procedureRequest?.status))) {
-    return true;
-  }
-  if (textIndicatesSyncFailure(camundaStatusLabel)) {
-    return true;
-  }
-  if (!hasActiveTask && procedureRequest?.camundaProcessInstanceKey) {
-    return false;
-  }
-  return false;
 }
 
 function buildFallbackRetryCamundaSyncAction(procedureRequestId, displayLabel) {
@@ -821,7 +695,13 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
   const operationalErrors = Array.isArray(detail?.operationalState?.errors)
     ? detail.operationalState.errors
     : [];
-  const primaryOperationalError = operationalErrors[0] || null;
+  const { blockingErrors, benignActiveTaskMiss } = splitOperationalErrors(operationalErrors);
+  const primaryOperationalError = blockingErrors[0] || null;
+  const showActiveTaskApiMissBanner = Boolean(
+    benignActiveTaskMiss.length > 0 &&
+      !showCamundaSyncAlert &&
+      Boolean(procedureRequest?.camundaProcessInstanceKey)
+  );
 
   return {
     procedureRequest,
@@ -868,6 +748,8 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     retrySyncAction,
     operationalErrors,
     primaryOperationalError,
+    showActiveTaskApiMissBanner,
+    activeTaskApiMissMessage: ACTIVE_TASK_API_MISS_USER_MESSAGE,
   };
 }
 
@@ -1402,6 +1284,8 @@ export default function FuncionarioExpedienteDetailPage() {
     retrySyncAction,
     operationalErrors,
     primaryOperationalError,
+    showActiveTaskApiMissBanner,
+    activeTaskApiMissMessage,
   } = expedienteViewModel;
 
   useEffect(() => {
@@ -1966,6 +1850,22 @@ export default function FuncionarioExpedienteDetailPage() {
                 </p>
               </div>
             ) : null}
+            {showActiveTaskApiMissBanner ? (
+              <div
+                className="admin-roles-confirm-dialog__lead"
+                style={{
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: "10px",
+                  padding: "0.75rem",
+                  marginTop: primaryOperationalError ? "0.65rem" : 0,
+                }}
+              >
+                <p className="small" style={{ margin: 0 }}>
+                  {activeTaskApiMissMessage}
+                </p>
+              </div>
+            ) : null}
             {showCamundaSyncAlert ? (
               <div
                 className="admin-roles-confirm-dialog__lead"
@@ -1989,7 +1889,9 @@ export default function FuncionarioExpedienteDetailPage() {
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Estado del expediente</dt>
                 <dd>
-                  <span className={`badge ${showCamundaSyncAlert ? "badge--en-revision" : "badge--recibido"}`}>
+                  <span
+                    className={`badge ${showCamundaSyncAlert ? "badge--en-revision" : "badge--recibido"}`}
+                  >
                     {getLocalStatusLabel(procedureRequest.status)}
                   </span>
                 </dd>
