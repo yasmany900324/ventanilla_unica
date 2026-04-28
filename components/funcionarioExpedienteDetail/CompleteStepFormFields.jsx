@@ -41,20 +41,20 @@ export default function CompleteStepFormFields({
         <p className="error-message">No se pudo obtener el formulario asociado a la tarea activa.</p>
       ) : null}
 
-      <label className="funcionario-expediente-detail__field-label" htmlFor={obsTextareaId}>
-        Observaciones internas
-      </label>
-      <textarea
-        id={obsTextareaId}
-        className="funcionario-expediente-detail__textarea"
-        rows={3}
-        value={internalObservation}
-        onChange={(event) => setInternalObservation(event.target.value)}
-      />
       {showAdvancedOptions ? (
         <details className="funcionario-expediente-detail__details">
           <summary>Opciones avanzadas / desarrollo</summary>
           <div className="funcionario-expediente-detail__details-body">
+            <label className="funcionario-expediente-detail__field-label" htmlFor={obsTextareaId}>
+              Observaciones internas
+            </label>
+            <textarea
+              id={obsTextareaId}
+              className="funcionario-expediente-detail__textarea"
+              rows={3}
+              value={internalObservation}
+              onChange={(event) => setInternalObservation(event.target.value)}
+            />
             <label className="funcionario-expediente-detail__field-label" htmlFor={jsonTextareaId}>
               Valores adicionales (JSON, opcional)
             </label>

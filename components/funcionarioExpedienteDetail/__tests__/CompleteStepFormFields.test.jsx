@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import CompleteStepFormFields from "../CompleteStepFormFields";
 
 afterEach(() => {
@@ -44,7 +44,28 @@ describe("CompleteStepFormFields", () => {
     expect(screen.getByText("Registrar Datos Iniciales")).toBeTruthy();
     expect(screen.getByLabelText("Observación *")).toBeTruthy();
     expect(screen.getByLabelText("Incidencia resuelta")).toBeTruthy();
+    expect(screen.queryByLabelText("Observaciones internas")).toBeNull();
     expect(screen.queryByText("Valores adicionales (JSON, opcional)")).toBeNull();
+  });
+
+  it("muestra Observaciones internas solo en opciones avanzadas", () => {
+    render(<CompleteStepFormFields {...baseProps({ showAdvancedOptions: true })} />);
+    const summary = screen.getByText("Opciones avanzadas / desarrollo");
+    expect(summary).toBeTruthy();
+    expect(screen.getByLabelText("Observaciones internas")).toBeTruthy();
+  });
+
+  it("actualiza formValues solo con keys del formulario Camunda", () => {
+    const setFormValues = vi.fn();
+    render(<CompleteStepFormFields {...baseProps({ setFormValues })} />);
+
+    fireEvent.change(screen.getByLabelText("Observación *"), {
+      target: { value: "Texto de prueba" },
+    });
+
+    expect(setFormValues).toHaveBeenCalledTimes(1);
+    const updateFn = setFormValues.mock.calls[0][0];
+    expect(updateFn({})).toEqual({ observacionResolucion: "Texto de prueba" });
   });
 
   it("muestra validación required en campos", () => {

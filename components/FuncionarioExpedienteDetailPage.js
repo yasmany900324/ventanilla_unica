@@ -1230,6 +1230,7 @@ export default function FuncionarioExpedienteDetailPage() {
         const formStatus = String(activeTaskForm?.status || "").trim().toLowerCase();
         const expectedTaskDefinitionKey = action.expectedTaskDefinitionKey || undefined;
         const observation = String(internalObservation || "").trim();
+        const shouldSendInternalObservation = Boolean((isAdmin || IS_DEVELOPMENT) && observation);
         const advancedJsonRaw = String(completeVariablesJson || "").trim();
         let advancedVariables = {};
         if (advancedJsonRaw && advancedJsonRaw !== "{}") {
@@ -1247,7 +1248,7 @@ export default function FuncionarioExpedienteDetailPage() {
           }
           body = {
             formValues: camundaFormValues && typeof camundaFormValues === "object" ? camundaFormValues : {},
-            internalObservation: observation || undefined,
+            internalObservation: shouldSendInternalObservation ? observation : undefined,
             expectedTaskDefinitionKey,
             idempotencyKey: `backoffice-${Date.now()}`,
           };
@@ -1255,7 +1256,7 @@ export default function FuncionarioExpedienteDetailPage() {
           throw new Error("No se pudo obtener el formulario asociado a la tarea activa.");
         } else {
           body = {
-            internalObservation: observation || undefined,
+            internalObservation: shouldSendInternalObservation ? observation : undefined,
             expectedTaskDefinitionKey,
             idempotencyKey: `backoffice-${Date.now()}`,
           };
