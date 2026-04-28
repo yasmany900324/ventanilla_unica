@@ -502,12 +502,13 @@ function normalizeDetailResponse(payload) {
     operationalState?.activeTask && operationalState.activeTask.exists ? operationalState.activeTask : null;
   const activeTask = rawActiveTask
     ? {
-        id: rawActiveTask.id || null,
-        taskId: rawActiveTask.id || null,
+        id: rawActiveTask.id || rawActiveTask.taskId || null,
+        taskId: rawActiveTask.taskId || rawActiveTask.id || null,
+        userTaskKey: rawActiveTask.userTaskKey || null,
         taskDefinitionKey: rawActiveTask.taskDefinitionKey || null,
         taskDefinitionName: rawActiveTask.name || null,
         name: rawActiveTask.name || null,
-        assignee: rawActiveTask.assignee || null,
+        assignee: rawActiveTask.assignee ?? null,
         state: rawActiveTask.state || null,
         createdAt: rawActiveTask.createdAt || null,
       }
@@ -692,6 +693,14 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
       : getAssignmentScopeLabel(procedureRequest);
   const activeTaskOperationalLabel =
     activeTaskLabel === "Sin tarea activa" ? "No hay tarea activa disponible" : activeTaskLabel;
+  const camundaTaskStateDisplay = hasActiveTask
+    ? String(detail?.activeTask?.state || "").trim() || "—"
+    : "—";
+  const camundaTaskAssigneeCamundaLabel = !hasActiveTask
+    ? "—"
+    : detail?.activeTask?.assignee != null && String(detail.activeTask.assignee).trim()
+      ? String(detail.activeTask.assignee).trim()
+      : "Sin asignar";
   const operationalErrors = Array.isArray(detail?.operationalState?.errors)
     ? detail.operationalState.errors
     : [];
@@ -750,6 +759,8 @@ function buildFuncionarioExpedientePageViewModel(detail, procedureRequestId, act
     primaryOperationalError,
     showActiveTaskApiMissBanner,
     activeTaskApiMissMessage: ACTIVE_TASK_API_MISS_USER_MESSAGE,
+    camundaTaskStateDisplay,
+    camundaTaskAssigneeCamundaLabel,
   };
 }
 
@@ -1286,6 +1297,8 @@ export default function FuncionarioExpedienteDetailPage() {
     primaryOperationalError,
     showActiveTaskApiMissBanner,
     activeTaskApiMissMessage,
+    camundaTaskStateDisplay,
+    camundaTaskAssigneeCamundaLabel,
   } = expedienteViewModel;
 
   useEffect(() => {
@@ -1907,6 +1920,14 @@ export default function FuncionarioExpedienteDetailPage() {
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Tarea activa</dt>
                 <dd>{activeTaskOperationalLabel}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Estado tarea (Camunda)</dt>
+                <dd>{camundaTaskStateDisplay}</dd>
+              </div>
+              <div className="admin-roles-confirm-dialog__detail-row">
+                <dt>Responsable Camunda</dt>
+                <dd>{camundaTaskAssigneeCamundaLabel}</dd>
               </div>
               <div className="admin-roles-confirm-dialog__detail-row">
                 <dt>Tarea ID (Camunda)</dt>
