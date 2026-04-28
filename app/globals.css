@@ -5122,6 +5122,33 @@ button:disabled {
   cursor: default;
 }
 
+.duplicate-procedure-modal__panel {
+  width: min(calc(100vw - 32px), 640px);
+}
+
+.duplicate-procedure-modal__fields {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.2rem;
+}
+
+.duplicate-procedure-modal__field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.duplicate-procedure-modal__field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.duplicate-procedure-modal__channels {
+  margin-top: 0.15rem;
+  width: 100%;
+  display: grid;
+  gap: 0.55rem;
+}
+
 .expediente-preview-modal__panel {
   border-radius: 18px;
   border: 1px solid #d7e2f4;
