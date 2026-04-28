@@ -132,28 +132,38 @@ export default function CamundaTaskFormRenderer({ schema, values, onChange, vali
         }
         if (field.type === "radio") {
           return (
-            <fieldset key={field.key}>
-              <legend className="funcionario-expediente-detail__field-label">
+            <fieldset key={field.key} className="funcionario-expediente-detail__radio-group">
+              <legend className="funcionario-expediente-detail__field-label funcionario-expediente-detail__radio-legend">
                 {field.label}
                 {field.required ? " *" : ""}
               </legend>
-              {field.options.map((option, index) => {
-                const optValue = renderOptionValue(option);
-                const optLabel = renderOptionLabel(option) || `Opción ${index + 1}`;
-                return (
-                  <label key={`${field.key}-${index}`} className="small" style={{ display: "block" }}>
-                    <input
-                      type="radio"
-                      name={`camunda-form-${field.key}`}
-                      value={optValue}
-                      checked={String(value ?? "") === optValue}
-                      onChange={(event) => onChange(field.key, event.target.value)}
-                      style={{ marginRight: "0.5rem" }}
-                    />
-                    {optLabel}
-                  </label>
-                );
-              })}
+              <div className="funcionario-expediente-detail__radio-options">
+                {field.options.map((option, index) => {
+                  const optValue = renderOptionValue(option);
+                  const optLabel = renderOptionLabel(option) || `Opción ${index + 1}`;
+                  const isSelected = String(value ?? "") === optValue;
+                  const inputId = `camunda-form-${field.key}-${index}`;
+                  return (
+                    <label
+                      key={`${field.key}-${index}`}
+                      htmlFor={inputId}
+                      className={`funcionario-expediente-detail__radio-option${isSelected ? " funcionario-expediente-detail__radio-option--selected" : ""}`}
+                    >
+                      <input
+                        id={inputId}
+                        className="funcionario-expediente-detail__radio-input"
+                        type="radio"
+                        name={`camunda-form-${field.key}`}
+                        value={optValue}
+                        checked={isSelected}
+                        onChange={(event) => onChange(field.key, event.target.value)}
+                      />
+                      <span className="funcionario-expediente-detail__radio-indicator" aria-hidden="true" />
+                      <span className="funcionario-expediente-detail__radio-text">{optLabel}</span>
+                    </label>
+                  );
+                })}
+              </div>
               {error ? <p className="error-message">{error}</p> : null}
             </fieldset>
           );
