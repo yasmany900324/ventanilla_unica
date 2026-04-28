@@ -9,27 +9,27 @@ const mocks = vi.hoisted(() => ({
   getProcedureRequestById: vi.fn(),
 }));
 
-vi.mock("../../../../../../../../lib/auth", () => ({
+vi.mock("../../../../../../../lib/auth", () => ({
   requireFuncionario: mocks.requireFuncionario,
 }));
 
-vi.mock("../../../../../../../../lib/nextAppRouteParams", () => ({
+vi.mock("../../../../../../../lib/nextAppRouteParams", () => ({
   getAppRouteParamString: mocks.getAppRouteParamString,
 }));
 
-vi.mock("../../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot", () => ({
+vi.mock("../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot", () => ({
   getLiveCamundaTaskSnapshot: mocks.getLiveCamundaTaskSnapshot,
 }));
 
-vi.mock("../../../../../../../../lib/camunda/client", () => ({
+vi.mock("../../../../../../../lib/camunda/client", () => ({
   getCamundaUserTaskForm: mocks.getCamundaUserTaskForm,
 }));
 
-vi.mock("../../../../../../../../lib/procedureRequestInboxDetail", () => ({
+vi.mock("../../../../../../../lib/procedureRequestInboxDetail", () => ({
   canAccessProcedureRequestStrict: mocks.canAccessProcedureRequestStrict,
 }));
 
-vi.mock("../../../../../../../../lib/procedureRequests", () => ({
+vi.mock("../../../../../../../lib/procedureRequests", () => ({
   getProcedureRequestById: mocks.getProcedureRequestById,
 }));
 

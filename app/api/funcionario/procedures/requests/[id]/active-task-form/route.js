@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireFuncionario } from "../../../../../../../../lib/auth";
-import { getAppRouteParamString } from "../../../../../../../../lib/nextAppRouteParams";
-import { getLiveCamundaTaskSnapshot } from "../../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
-import { getCamundaUserTaskForm } from "../../../../../../../../lib/camunda/client";
-import { canAccessProcedureRequestStrict } from "../../../../../../../../lib/procedureRequestInboxDetail";
-import { getProcedureRequestById } from "../../../../../../../../lib/procedureRequests";
+import { requireFuncionario } from "../../../../../../../lib/auth";
+import { getAppRouteParamString } from "../../../../../../../lib/nextAppRouteParams";
+import { getLiveCamundaTaskSnapshot } from "../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
+import { getCamundaUserTaskForm } from "../../../../../../../lib/camunda/client";
+import { canAccessProcedureRequestStrict } from "../../../../../../../lib/procedureRequestInboxDetail";
+import { getProcedureRequestById } from "../../../../../../../lib/procedureRequests";
 
 function buildActiveTaskPayload(activeTask) {
   return {
