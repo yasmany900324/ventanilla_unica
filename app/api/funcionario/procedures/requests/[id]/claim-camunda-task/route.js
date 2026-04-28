@@ -3,6 +3,7 @@ import { requireFuncionario } from "../../../../../../../lib/auth";
 import { getAppRouteParamString } from "../../../../../../../lib/nextAppRouteParams";
 import { getLiveCamundaTaskSnapshot } from "../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot";
 import { CamundaClientError, claimCamundaUserTask } from "../../../../../../../lib/camunda/client";
+import { waitForCamundaSnapshotChange } from "../../../../../../../lib/camunda/waitForCamundaSnapshotChange";
 import { sanitizeForLogs } from "../../../../../../../lib/logging/sanitizeForLogs";
 import { getProcedureRequestById } from "../../../../../../../lib/procedureRequests";
 
@@ -67,17 +68,32 @@ export async function POST(request, { params }) {
       );
       return NextResponse.json({
         ok: true,
+        camundaAction: "claim_task",
+        syncStatus: "confirmed",
         idempotent: true,
         message: "La tarea ya estaba asignada a tu usuario.",
+        snapshot: beforeSnapshot,
       });
     }
 
     await claimCamundaUserTask(activeTask.id, funcionarioId);
-    const afterSnapshot = await getLiveCamundaTaskSnapshot({
+    const waitResult = await waitForCamundaSnapshotChange({
       procedureRequest,
       actorId: funcionarioId,
+      action: "claim_task",
+      predicate: (snapshot) => {
+        const assignee = String(snapshot?.activeTask?.assignee || "").trim() || null;
+        return assignee === funcionarioId;
+      },
     });
+    const afterSnapshot =
+      waitResult?.snapshot ||
+      (await getLiveCamundaTaskSnapshot({
+        procedureRequest,
+        actorId: funcionarioId,
+      }));
     const assigneeAfter = String(afterSnapshot?.activeTask?.assignee || "").trim() || null;
+    const syncStatus = waitResult?.confirmed ? "confirmed" : "pending";
 
     console.info(
       "[procedure-claim-camunda]",
@@ -97,6 +113,8 @@ export async function POST(request, { params }) {
 
     return NextResponse.json({
       ok: true,
+      camundaAction: "claim_task",
+      syncStatus,
       idempotent: false,
       message: "Tarea de Camunda reclamada correctamente.",
       snapshot: afterSnapshot,

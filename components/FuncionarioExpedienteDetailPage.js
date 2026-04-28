@@ -20,6 +20,7 @@ import {
   splitOperationalErrors,
 } from "../lib/funcionarioExpedienteOperationalCamunda";
 import { deriveFuncionarioExpedienteActionUi } from "../lib/funcionarioExpedienteDetailActionUi";
+import { canRunFuncionarioAction, syncFuncionarioActionDetail } from "../lib/funcionarioActionSync";
 import CaseHeader from "./funcionarioExpedienteDetail/CaseHeader";
 import CaseSummaryCard from "./funcionarioExpedienteDetail/CaseSummaryCard";
 import CitizenInfoCard from "./funcionarioExpedienteDetail/CitizenInfoCard";
@@ -1073,6 +1074,8 @@ export default function FuncionarioExpedienteDetailPage() {
   const [fatalError, setFatalError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [actionError, setActionError] = useState("");
+  const [actionInfoMessage, setActionInfoMessage] = useState("");
+  const [actionPhase, setActionPhase] = useState("");
   const [actionLoadingKey, setActionLoadingKey] = useState("");
   const [completeVariablesJson, setCompleteVariablesJson] = useState("{}");
   const [internalObservation, setInternalObservation] = useState("");
@@ -1123,6 +1126,8 @@ export default function FuncionarioExpedienteDetailPage() {
     setFatalError(null);
     setActionError("");
     setSuccessMessage("");
+    setActionInfoMessage("");
+    setActionPhase("");
     setDeleteTechnicalDetail("");
     setFlowSummaryError(null);
     setActiveTaskFormLoading(true);
@@ -1220,10 +1225,15 @@ export default function FuncionarioExpedienteDetailPage() {
     if (!action?.endpoint || !procedureRequestId) {
       return;
     }
+    if (!canRunFuncionarioAction(actionLoadingKey)) {
+      return;
+    }
     const actionKey = `${action.actionKey || "action"}:${action.endpoint}`;
     setActionLoadingKey(actionKey);
     setActionError("");
     setSuccessMessage("");
+    setActionInfoMessage("Ejecutando acción...");
+    setActionPhase("executing");
     try {
       let body = undefined;
       if (action.actionKey === "complete_task") {
@@ -1297,10 +1307,17 @@ export default function FuncionarioExpedienteDetailPage() {
         setFormValidationErrors({});
       }
       setFatalError(null);
-      await loadDetail(procedureRequestId);
+      setActionPhase("syncing");
+      await syncFuncionarioActionDetail({
+        syncStatus: data?.syncStatus,
+        procedureRequestId,
+        loadDetail,
+        setActionInfoMessage,
+      });
     } catch (requestError) {
       setActionError(requestError.message || "No se pudo ejecutar la acción.");
     } finally {
+      setActionPhase("");
       setActionLoadingKey("");
     }
   };
@@ -1818,6 +1835,11 @@ export default function FuncionarioExpedienteDetailPage() {
           <p className="error-message">{actionError}</p>
         </section>
       ) : null}
+      {actionInfoMessage ? (
+        <section className="dashboard-onify-card dashboard-onify-section">
+          <p className="info-message">{actionInfoMessage}</p>
+        </section>
+      ) : null}
 
       {detailLoading ? (
         <section className="dashboard-onify-card dashboard-onify-section">
@@ -1926,6 +1948,7 @@ export default function FuncionarioExpedienteDetailPage() {
                 showExpedienteClaimSection={expedienteActionLayout.showClaimExpediente}
                 onRunAction={runAction}
                 actionLoadingKey={actionLoadingKey}
+                actionPhase={actionPhase}
                 activeTaskForm={activeTaskFormLoading ? null : activeTaskForm}
                 camundaFormValues={camundaFormValues}
                 setCamundaFormValues={(updater) => {

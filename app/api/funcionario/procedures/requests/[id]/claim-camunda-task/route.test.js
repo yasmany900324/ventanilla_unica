@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAppRouteParamString: vi.fn(),
   getProcedureRequestById: vi.fn(),
   getLiveCamundaTaskSnapshot: vi.fn(),
+  waitForCamundaSnapshotChange: vi.fn(),
   claimCamundaUserTask: vi.fn(),
 }));
 
@@ -22,6 +23,10 @@ vi.mock("../../../../../../../lib/procedureRequests", () => ({
 
 vi.mock("../../../../../../../lib/camunda/getLiveCamundaTaskSnapshot", () => ({
   getLiveCamundaTaskSnapshot: mocks.getLiveCamundaTaskSnapshot,
+}));
+
+vi.mock("../../../../../../../lib/camunda/waitForCamundaSnapshotChange", () => ({
+  waitForCamundaSnapshotChange: mocks.waitForCamundaSnapshotChange,
 }));
 
 vi.mock("../../../../../../../lib/camunda/client", async () => {
@@ -59,9 +64,53 @@ describe("api/funcionario/procedures/requests/[id]/claim-camunda-task POST", () 
       ],
     });
     mocks.claimCamundaUserTask.mockResolvedValue(undefined);
+    mocks.waitForCamundaSnapshotChange.mockResolvedValue({
+      confirmed: true,
+      attempts: 1,
+      snapshot: {
+        process: { instanceKey: "2251799813704048", state: "ACTIVE" },
+        activeTask: {
+          exists: true,
+          id: "2251799813704056",
+          userTaskKey: "2251799813704056",
+          taskDefinitionKey: "Activity_0g0id0y",
+          assignee: "func-1",
+        },
+        availableActions: [{ action: "COMPLETE_TASK", enabled: true, reason: null }],
+      },
+    });
   });
 
   it("reclama en Camunda y no usa claim local de expediente", async () => {
+    mocks.getLiveCamundaTaskSnapshot.mockResolvedValueOnce({
+      process: { instanceKey: "2251799813704048", state: "ACTIVE" },
+      activeTask: {
+        exists: true,
+        id: "2251799813704056",
+        userTaskKey: "2251799813704056",
+        taskDefinitionKey: "Activity_0g0id0y",
+        assignee: null,
+      },
+      availableActions: [],
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/funcionario/procedures/requests/pr-1/claim-camunda-task"),
+      { params: Promise.resolve({ id: "pr-1" }) }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.camundaAction).toBe("claim_task");
+    expect(body.syncStatus).toBe("confirmed");
+    expect(mocks.claimCamundaUserTask).toHaveBeenCalledWith("2251799813704056", "func-1");
+    expect(mocks.waitForCamundaSnapshotChange).toHaveBeenCalledTimes(1);
+    expect(body.snapshot?.activeTask?.assignee).toBe("func-1");
+    expect(body.snapshot?.availableActions?.find((a) => a.action === "COMPLETE_TASK")?.enabled).toBe(true);
+  });
+
+  it("retorna syncStatus pending cuando Camunda tarda en reflejar snapshot", async () => {
     mocks.getLiveCamundaTaskSnapshot
       .mockResolvedValueOnce({
         process: { instanceKey: "2251799813704048", state: "ACTIVE" },
@@ -81,10 +130,15 @@ describe("api/funcionario/procedures/requests/[id]/claim-camunda-task POST", () 
           id: "2251799813704056",
           userTaskKey: "2251799813704056",
           taskDefinitionKey: "Activity_0g0id0y",
-          assignee: "func-1",
+          assignee: null,
         },
-        availableActions: [{ action: "COMPLETE_TASK", enabled: true, reason: null }],
+        availableActions: [{ action: "COMPLETE_TASK", enabled: false, reason: "TASK_ALREADY_ASSIGNED" }],
       });
+    mocks.waitForCamundaSnapshotChange.mockResolvedValueOnce({
+      confirmed: false,
+      attempts: 10,
+      snapshot: null,
+    });
 
     const response = await POST(
       new Request("http://localhost/api/funcionario/procedures/requests/pr-1/claim-camunda-task"),
@@ -94,10 +148,8 @@ describe("api/funcionario/procedures/requests/[id]/claim-camunda-task POST", () 
 
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
-    expect(mocks.claimCamundaUserTask).toHaveBeenCalledWith("2251799813704056", "func-1");
-    expect(mocks.getLiveCamundaTaskSnapshot).toHaveBeenCalledTimes(2);
-    expect(body.snapshot?.activeTask?.assignee).toBe("func-1");
-    expect(body.snapshot?.availableActions?.find((a) => a.action === "COMPLETE_TASK")?.enabled).toBe(true);
+    expect(body.syncStatus).toBe("pending");
+    expect(body.camundaAction).toBe("claim_task");
   });
 
   it("si no está asignado localmente al funcionario, devuelve error funcional", async () => {
